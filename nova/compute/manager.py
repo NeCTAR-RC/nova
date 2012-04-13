@@ -139,6 +139,10 @@ compute_opts = [
     cfg.BoolOpt('instance_usage_audit',
                default=False,
                help="Generate periodic compute.instance.exists notifications"),
+    cfg.IntOpt("cell_bandwidth_update_interval",
+               default=900,
+               help="Number of seconds between sending updates to cells "
+                        "for bandwidth usage"),
     ]
 
 FLAGS = flags.FLAGS
@@ -232,6 +236,7 @@ class ComputeManager(manager.SchedulerDependentManager):
             FLAGS.network_manager, host=kwargs.get('host', None))
         self._last_host_check = 0
         self._last_bw_usage_poll = 0
+        self._last_bw_usage_cell_update = 0
         self._last_info_cache_heal = 0
         self.compute_api = compute.API()
         self.compute_rpcapi = compute_rpcapi.ComputeAPI()
@@ -2628,6 +2633,12 @@ class ComputeManager(manager.SchedulerDependentManager):
                 FLAGS.bandwidth_poll_interval):
             self._last_bw_usage_poll = curr_time
             LOG.info(_("Updating bandwidth usage cache"))
+            if (curr_time - self._last_bw_usage_cell_update >
+                    FLAGS.cell_bandwidth_update_interval):
+                self._last_bw_usage_cell_update = curr_time
+                update_cells = True
+            else:
+                update_cells = False
 
             instances = self.db.instance_get_all_by_host(context, self.host)
             try:
@@ -2648,7 +2659,8 @@ class ComputeManager(manager.SchedulerDependentManager):
                                         usage['mac_address'],
                                         start_time,
                                         usage['bw_in'], usage['bw_out'],
-                                        last_refreshed=refreshed)
+                                        last_refreshed=refreshed,
+                                        update_cells=update_cells)
 
     @manager.periodic_task
     def _report_driver_status(self, context):

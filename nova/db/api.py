@@ -43,9 +43,11 @@ these objects be simple dictionaries.
 
 """
 
+from nova.cells import api as cells_api
 from nova import exception
 from nova import flags
 from nova.openstack.common import cfg
+from nova.openstack.common import log as logging
 from nova import utils
 
 
@@ -72,6 +74,7 @@ FLAGS.register_opts(db_opts)
 
 IMPL = utils.LazyPluggable('db_backend',
                            sqlalchemy='nova.db.sqlalchemy.api')
+LOG = logging.getLogger(__name__)
 
 
 class NoMoreNetworks(exception.NovaException):
@@ -578,9 +581,16 @@ def instance_data_get_for_project(context, project_id, session=None):
                                               session=session)
 
 
-def instance_destroy(context, instance_uuid, constraint=None):
+def instance_destroy(context, instance_uuid, constraint=None,
+        update_cells=True):
     """Destroy the instance or raise if it does not exist."""
-    return IMPL.instance_destroy(context, instance_uuid, constraint)
+    rv = IMPL.instance_destroy(context, instance_uuid, constraint)
+    if update_cells:
+        try:
+            cells_api.instance_destroy(context, rv)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance destroy"))
+    return rv
 
 
 def instance_get_by_uuid(context, uuid):
@@ -667,13 +677,19 @@ def instance_test_and_set(context, instance_uuid, attr, ok_states,
                                       ok_states, new_state)
 
 
-def instance_update(context, instance_uuid, values):
+def instance_update(context, instance_uuid, values, update_cells=True):
     """Set the given properties on an instance and update it.
 
     Raises NotFound if instance does not exist.
 
     """
-    return IMPL.instance_update(context, instance_uuid, values)
+    rv = IMPL.instance_update(context, instance_uuid, values)
+    if update_cells:
+        try:
+            cells_api.instance_update(context, rv)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance update"))
+    return rv
 
 
 def instance_update_and_get_original(context, instance_uuid, values):
@@ -689,8 +705,12 @@ def instance_update_and_get_original(context, instance_uuid, values):
 
     Raises NotFound if instance does not exist.
     """
-    return IMPL.instance_update_and_get_original(context, instance_uuid,
-                                                 values)
+    rv = IMPL.instance_update_and_get_original(context, instance_uuid, values)
+    try:
+        cells_api.instance_update(context, rv[1])
+    except Exception:
+        LOG.exception(_("Failed to notify cells of instance update"))
+    return rv
 
 
 def instance_add_security_group(context, instance_id, security_group_id):
@@ -1488,6 +1508,34 @@ def instance_type_access_remove(context, flavor_id, project_id):
 ####################
 
 
+def cell_create(context, values):
+    """Create a new child Cell entry."""
+    return IMPL.cell_create(context, values)
+
+
+def cell_update(context, cell_id, values):
+    """Update a child Cell entry."""
+    return IMPL.cell_update(context, cell_id, values)
+
+
+def cell_delete(context, cell_id):
+    """Delete a child Cell."""
+    return IMPL.cell_delete(context, cell_id)
+
+
+def cell_get(context, cell_id):
+    """Get a specific child Cell."""
+    return IMPL.cell_get(context, cell_id)
+
+
+def cell_get_all(context):
+    """Get all child Cells."""
+    return IMPL.cell_get_all(context)
+
+
+####################
+
+
 def instance_metadata_get(context, instance_uuid):
     """Get all metadata for an instance."""
     return IMPL.instance_metadata_get(context, instance_uuid)
@@ -1498,10 +1546,19 @@ def instance_metadata_delete(context, instance_uuid, key):
     IMPL.instance_metadata_delete(context, instance_uuid, key)
 
 
-def instance_metadata_update(context, instance_uuid, metadata, delete):
+def instance_metadata_update(context, instance_uuid, metadata, delete,
+        update_cells=True):
     """Update metadata if it exists, otherwise create it."""
-    return IMPL.instance_metadata_update(context, instance_uuid,
+    metadata = IMPL.instance_metadata_update(context, instance_uuid,
                                              metadata, delete)
+    if update_cells:
+        try:
+            cells_api.instance_metadata_update(context, instance_uuid,
+                    metadata, delete)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_metadata "
+                    "update"))
+    return metadata
 
 
 ####################
@@ -1561,12 +1618,21 @@ def bw_usage_get_by_uuids(context, uuids, start_period):
 
 
 def bw_usage_update(context, uuid, mac, start_period, bw_in, bw_out,
-                    last_refreshed=None):
+                    last_refreshed=None, update_cells=True):
     """Update cached bandwidth usage for an instance's network based on mac
     address.  Creates new record if needed.
     """
-    return IMPL.bw_usage_update(context, uuid, mac, start_period, bw_in,
-            bw_out, last_refreshed=last_refreshed)
+    rv = IMPL.bw_usage_update(context, uuid, mac, start_period, bw_in,
+                              bw_out, last_refreshed=last_refreshed)
+
+    if update_cells:
+        try:
+            cells_api.bw_usage_update(context,
+                    uuid, mac, start_period, bw_in, bw_out,
+                    last_refreshed)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of bw_usage update"))
+    return rv
 
 
 ####################
@@ -1852,9 +1918,15 @@ def aggregate_host_delete(context, aggregate_id, host):
 ####################
 
 
-def instance_fault_create(context, values):
+def instance_fault_create(context, values, update_cells=True):
     """Create a new Instance Fault."""
-    return IMPL.instance_fault_create(context, values)
+    rv = IMPL.instance_fault_create(context, values)
+    if update_cells:
+        try:
+            cells_api.instance_fault_create(context, rv)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance fault"))
+    return rv
 
 
 def instance_fault_get_by_instance_uuids(context, instance_uuids):
