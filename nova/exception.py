@@ -803,6 +803,38 @@ class FlavorAccessNotFound(NotFound):
                 "%(project_id) combination.")
 
 
+class CellNotFound(NotFound):
+    message = _("Cell %(cell_id)s could not be found.")
+
+
+class CellRoutingInconsistency(NovaException):
+    message = _("Inconsistency in cell routing: %(reason)s")
+
+
+class CellServiceAPIMethodNotFound(NotFound):
+    message = _("Service API method not found: %(detail)s")
+
+
+class CellTimeout(NotFound):
+    message = _("Timeout waiting for response from cell")
+
+
+class NoCellsAvailable(NovaException):
+    message = _("No cells available matching scheduling criteria.")
+
+
+class CellsFilterError(NovaException):
+    message = _("Error filtering during scheduling: %(reason)s")
+
+
+class InstanceUnknownCell(NotFound):
+    message = _("Cell is not known for instance %(instance_id)s")
+
+
+class CellNotFound(NotFound):
+    message = _("Cell %(cell_id)s could not be found.")
+
+
 class SchedulerHostFilterNotFound(NotFound):
     message = _("Scheduler Host Filter %(filter_name)s could not be found.")
 

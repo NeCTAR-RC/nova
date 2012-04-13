@@ -1246,9 +1246,69 @@ class GetLogCommands(object):
             print "No nova entries in syslog!"
 
 
+class CellCommands(object):
+    def help(self, topic=None):
+        if topic is None:
+            print "Usage: nova-manage cell help <topic>"
+            print "Available topics are:"
+            print "\tcreate"
+            print "\tdelete"
+            print "\tlist"
+            return
+
+        topics = {
+                'create': 'Usage: nova-manage cell create <name> <type> '
+                          '<username> <hostname> <port> <password> '
+                          '<vhost> <weight_offset> <weight_scale>',
+                'delete': 'Usage: nova-manage cell delete <cell_id>',
+                'list': 'Usage: nova-manage cell list'}
+        print topics.get(topic, 'Unknown topic')
+
+    def create(self, name, cell_type, username, hostname, port,
+            password, virtual_host, woffset, wscale):
+
+        if cell_type not in ['parent', 'child']:
+            print "Error: cell type must be 'parent' or 'child'"
+            sys.exit(2)
+
+        is_parent = cell_type == 'parent'
+        values = {'name': name,
+                  'is_parent': is_parent,
+                  'username': username,
+                  'password': password,
+                  'rpc_host': hostname,
+                  'rpc_port': int(port),
+                  'rpc_virtual_host': virtual_host,
+                  'weight_offset': float(woffset),
+                  'weight_scale': float(wscale)}
+        ctxt = context.get_admin_context()
+        db.cell_create(ctxt, values)
+
+    def delete(self, cell_id):
+        ctxt = context.get_admin_context()
+        db.cell_delete(ctxt, cell_id)
+
+    def list(self):
+        ctxt = context.get_admin_context()
+        cells = db.cell_get_all(ctxt)
+        fmt = "%3s  %-10s  %-6s  %-10s  %-15s  %-5s  %-10s"
+        print fmt % ('Id', 'Name', 'Type', 'Username', 'Hostname',
+                'Port', 'VHost')
+        print fmt % ('-' * 3, '-' * 10, '-' * 6, '-' * 10, '-' * 15,
+                '-' * 5, '-' * 10)
+        for cell in cells:
+            print fmt % (cell.id, cell.name,
+                    'parent' if cell.is_parent else 'child',
+                    cell.username, cell.rpc_host,
+                    cell.rpc_port, cell.rpc_virtual_host)
+        print fmt % ('-' * 3, '-' * 10, '-' * 6, '-' * 10, '-' * 15,
+                '-' * 5, '-' * 10)
+
+
 CATEGORIES = [
     ('account', AccountCommands),
     ('agent', AgentBuildCommands),
+    ('cell', CellCommands),
     ('config', ConfigCommands),
     ('db', DbCommands),
     ('fixed', FixedIpCommands),

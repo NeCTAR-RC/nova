@@ -4492,6 +4492,24 @@ class ComputeAPITestCase(BaseTestCase):
         self.assertTrue(called.get('fake_reserve_volume'))
         self.assertTrue(called.get('fake_rpc_attach_volume'))
 
+    def test_attach_volume_no_device(self):
+
+        def fake_check_attach(*args, **kwargs):
+            pass
+
+        def fake_reserve_volume(*args, **kwargs):
+            pass
+
+        def fake_volume_get(self, context, volume_id):
+            return {'id': volume_id}
+
+        self.stubs.Set(nova.volume.api.API, 'get', fake_volume_get)
+        self.stubs.Set(nova.volume.api.API, 'check_attach', fake_check_attach)
+        self.stubs.Set(nova.volume.api.API, 'reserve_volume',
+                       fake_reserve_volume)
+        instance = self._create_fake_instance()
+        self.compute_api.attach_volume(self.context, instance, 1, None)
+
     def test_inject_network_info(self):
         instance = self._create_fake_instance(params={'host': FLAGS.host})
         self.compute.run_instance(self.context,
