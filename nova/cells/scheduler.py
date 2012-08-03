@@ -95,7 +95,7 @@ class CellsScheduler(base.Base):
         self.manager.broadcast_message(context, **bcast_msg['args'])
 
     def _get_possible_cells(self):
-        cells = set(self.manager.get_child_cells())
+        cells = set(self.manager._get_child_cells())
         our_cell = self.manager.my_cell_info
         # Include our cell in the list, if we have any capacity info
         if not cells or our_cell.capacities:
@@ -236,7 +236,7 @@ class CellsScheduler(base.Base):
             instance_uuid = instance['uuid']
             LOG.exception(_("Error scheduling"),
                     instance_uuid=instance_uuid)
-            if self.manager.get_parent_cells():
+            if self.manager._get_parent_cells():
                 self.cells_rpcapi.instance_update(context,
                         {'uuid': instance_uuid,
                          'vm_state': vm_states.ERROR})
