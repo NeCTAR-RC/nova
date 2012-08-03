@@ -27,12 +27,14 @@ import nova.openstack.common.rpc.proxy
 
 LOG = logging.getLogger(__name__)
 
-driver_opt = cfg.StrOpt('cells_driver',
+driver_opt = cfg.StrOpt('driver',
                         default='nova.cells.rpc_driver.CellsRPCDriver',
                         help='Cells driver to use')
 
+flags.DECLARE('cells', 'nova.cells.opts')
+
 FLAGS = flags.FLAGS
-FLAGS.register_opt(driver_opt)
+FLAGS.register_opt(driver_opt, group='cells')
 
 
 class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
@@ -51,11 +53,11 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
     BASE_RPC_API_VERSION = '1.0'
 
     def __init__(self, cells_driver_cls=None):
-        super(CellsAPI, self).__init__(topic=FLAGS.cells_topic,
+        super(CellsAPI, self).__init__(topic=FLAGS.cells.topic,
                 default_version=self.BASE_RPC_API_VERSION)
 
         if not cells_driver_cls:
-            cells_driver_cls = importutils.import_class(FLAGS.cells_driver)
+            cells_driver_cls = importutils.import_class(FLAGS.cells.driver)
         self.driver = cells_driver_cls(self)
 
     def cell_call(self, context, cell_name, method, **kwargs):
@@ -131,14 +133,14 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
         bcast_message = cells_utils.form_broadcast_message('up',
                 'call_dbapi_method',
                 {'db_method_info': db_method_info})
-        topic = FLAGS.cells_topic
+        topic = FLAGS.cells.topic
         if sub_topic:
             topic += '.' + sub_topic
         self.cast(context, bcast_message, topic)
 
     def instance_update(self, context, instance):
         """Broadcast upwards that an instance was updated."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         bcast_message = cells_utils.form_instance_update_broadcast_message(
                 instance)
@@ -146,7 +148,7 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
 
     def instance_destroy(self, context, instance):
         """Broadcast upwards that an instance was destroyed."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         bcast_message = cells_utils.form_instance_destroy_broadcast_message(
                 instance)
@@ -154,7 +156,7 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
 
     def instance_fault_create(self, context, instance_fault):
         """Broadcast upwards that an instance fault was created."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         instance_fault = dict(instance_fault.iteritems())
         items_to_remove = ['id']
@@ -165,14 +167,14 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
 
     def bw_usage_update(self, context, *args, **kwargs):
         """Broadcast upwards that bw_usage was updated."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         self.call_dbapi_method(context, 'bw_usage_update',
                 args, kwargs=kwargs, sub_topic='bw_updates')
 
     def instance_metadata_update(self, context, *args, **kwargs):
         """Broadcast upwards that bw_usage was updated."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         self.call_dbapi_method(context, 'instance_metadata_update', args,
                 kwargs=kwargs)
@@ -186,7 +188,7 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
     def sync_instances(self, context, project_id=None, updated_since=None,
             deleted=False):
         """Broadcast message down to tell cells to sync instance data."""
-        if not FLAGS.enable_cells:
+        if not FLAGS.cells.enable:
             return
         bcast_message = cells_utils.form_broadcast_message('down',
                 'sync_instances', {'project_id': project_id,

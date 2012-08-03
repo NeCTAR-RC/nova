@@ -24,7 +24,7 @@ from nova.openstack.common import rpc
 from nova import test
 from nova.tests.cells import fakes
 
-
+flags.DECLARE('cells', 'nova.cells.opts')
 FLAGS = flags.FLAGS
 
 
@@ -33,14 +33,15 @@ class CellsSchedulerTestCase(test.TestCase):
 
     def setUp(self):
         super(CellsSchedulerTestCase, self).setUp()
-        self.flags(cell_name='me', host='host0')
+        self.flags(name='me', group='cells')
+        self.flags(host='host0')
         fakes.init()
 
         rpcapi_obj = cells_rpcapi.CellsAPI(
                 cells_driver_cls=fakes.FakeCellsDriver)
         self.cells_manager = fakes.FakeCellsManager(
                 _test_case=self,
-                _my_name=FLAGS.cell_name,
+                _my_name=FLAGS.cells.name,
                 cells_scheduler_cls=cells_scheduler.CellsScheduler)
         self.scheduler = self.cells_manager.scheduler
         # Fudge our child cells so we only have 'cell2' as a child

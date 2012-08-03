@@ -28,6 +28,7 @@ from nova import test
 
 
 FLAGS = flags.FLAGS
+flags.DECLARE('cells', 'nova.cells.opts')
 LOG = logging.getLogger(__name__)
 HOST_LIST = [
         {"host_name": "host_c1", "service": "compute"},
@@ -335,7 +336,7 @@ class HostSerializerTest(test.TestCase):
 
 class TestCellsListHosts(test.TestCase):
     """
-    Tests that _list_hosts calls the child cells when FLAGS.enable_cells is on
+    Tests that _list_hosts calls the child cells when FLAGS.cells.enable is on
     """
 
     fakeHosts = [
@@ -396,7 +397,7 @@ class TestCellsListHosts(test.TestCase):
         self._stop_func = _cleanup_func
 
         # Make sure we're in the cells envinronment
-        self.flags(enable_cells=True)
+        self.flags(enable=True, group='cells')
 
         # Get the controller that we're going to call index on
         self.controller = os_hosts.HostController()

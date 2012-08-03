@@ -27,7 +27,7 @@ from nova import flags
 from nova import utils
 
 FLAGS = flags.FLAGS
-
+flags.DECLARE('cells', 'nova.cells.opts')
 
 authorize = extensions.extension_authorizer('compute',
                            'instance_usage_audit_log')
@@ -170,7 +170,7 @@ class Instance_usage_audit_log(extensions.ExtensionDescriptor):
     updated = "2012-07-06T01:00:00+00:00"
 
     def get_resources(self):
-        if FLAGS.enable_cells:
+        if FLAGS.cells.enable:
             controller = CellsInstanceUsageAuditLogController()
         else:
             controller = InstanceUsageAuditLogController()
