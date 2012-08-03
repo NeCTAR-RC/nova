@@ -215,7 +215,7 @@ class CellsManager(manager.Manager):
             # create the rpc queues inside of __init__() and then start
             # consuming in Service.start().
             eventlet.sleep(2)
-            if self.get_child_cells():
+            if self._get_child_cells():
                 self._ask_children_for_capabilities(ctxt)
                 self._ask_children_for_capacities(ctxt)
             else:
@@ -365,7 +365,7 @@ class CellsManager(manager.Manager):
     def _get_our_capabilities(self, include_children=True):
         capabs = copy.deepcopy(self.my_cell_info.capabilities)
         if include_children:
-            for cell in self.get_child_cells():
+            for cell in self._get_child_cells():
                 for capab_name, values in cell.capabilities.items():
                     if capab_name not in capabs:
                         capabs[capab_name] = set([])
@@ -382,7 +382,7 @@ class CellsManager(manager.Manager):
         for key, values in capabs.items():
             capabs[key] = list(values)
         self.cells_rpcapi.update_capabilities(context, self.my_cell_info.name,
-                capabs, self.get_parent_cells())
+                capabs, self._get_parent_cells())
 
     def _add_to_dict(self, target, src):
         for key, value in src.items():
@@ -396,7 +396,7 @@ class CellsManager(manager.Manager):
     def _get_our_capacities(self, include_children=True):
         capacities = copy.deepcopy(self.my_cell_info.capacities)
         if include_children:
-            for cell in self.get_child_cells():
+            for cell in self._get_child_cells():
                 self._add_to_dict(capacities, cell.capacities)
         return capacities
 
@@ -406,7 +406,7 @@ class CellsManager(manager.Manager):
         LOG.debug(_("Updating parents with our capacities: %(capacities)s"),
                 locals())
         self.cells_rpcapi.update_capacities(context, self.my_cell_info.name,
-                capacities, self.get_parent_cells())
+                capacities, self._get_parent_cells())
 
     def update_capabilities(self, context, cell_name, capabilities):
         """A child cell told us about their capabilities."""
@@ -441,7 +441,7 @@ class CellsManager(manager.Manager):
         """Tell child cells to send us capabilities.  We do this on
         startup of cells service.
         """
-        child_cells = self.get_child_cells()
+        child_cells = self._get_child_cells()
         self.cells_rpcapi.request_capabilities(context, self.our_path,
                                                child_cells)
 
@@ -449,15 +449,15 @@ class CellsManager(manager.Manager):
         """Tell child cells to send us capacities.  We do this on
         startup of cells service.
         """
-        child_cells = self.get_child_cells()
+        child_cells = self._get_child_cells()
         self.cells_rpcapi.request_capacities(context, self.our_path,
                                              child_cells)
 
-    def get_child_cells(self):
+    def _get_child_cells(self):
         """Return list of child cell_infos."""
         return self.child_cells.values()
 
-    def get_parent_cells(self):
+    def _get_parent_cells(self):
         """Return list of parent cell_infos."""
         return self.parent_cells.values()
 
@@ -641,9 +641,9 @@ class CellsManager(manager.Manager):
         response_direction = 'down' if direction == 'up' else 'up'
 
         if direction == 'down':
-            dest_cells = self.get_child_cells()
+            dest_cells = self._get_child_cells()
         else:
-            dest_cells = self.get_parent_cells()
+            dest_cells = self._get_parent_cells()
 
         if dest_cells:
             broadcast_msg = cells_utils.form_broadcast_call_message(direction,
@@ -699,9 +699,9 @@ class CellsManager(manager.Manager):
                 topic = self.bw_updates_topic
         # Forward request on to other cells
         if direction == 'up':
-            cells = self.get_parent_cells()
+            cells = self._get_parent_cells()
         else:
-            cells = self.get_child_cells()
+            cells = self._get_child_cells()
         self.cells_rpcapi.send_message_to_cells(context, cells, bcast_msg,
                 topic=topic)
         # Now let's process it.
@@ -845,7 +845,7 @@ class CellsManager(manager.Manager):
             msg = cells_utils.form_instance_update_broadcast_message(
                 instance, routing_path=self.our_path, hopcount=1)
         self.cells_rpcapi.send_message_to_cells(context,
-                self.get_parent_cells(), msg)
+                self._get_parent_cells(), msg)
 
     def sync_instances(self, context, routing_path, project_id=None,
             updated_since=None, deleted=False, **kwargs):
@@ -866,7 +866,7 @@ class CellsManager(manager.Manager):
     def instance_update(self, context, instance_info, routing_path,
             **kwargs):
         """Update an instance in the DB if we're a top level cell."""
-        if self.get_parent_cells() or self._path_is_us(routing_path):
+        if self._get_parent_cells() or self._path_is_us(routing_path):
             # Only update the DB if we're at the very top and the
             # call didn't originate from ourselves
             return
@@ -898,7 +898,7 @@ class CellsManager(manager.Manager):
     def instance_destroy(self, context, instance_info, routing_path=None,
             **kwargs):
         """Destroy an instance from the DB if we're a top level cell."""
-        if self.get_parent_cells() or self._path_is_us(routing_path):
+        if self._get_parent_cells() or self._path_is_us(routing_path):
             # Only update the DB if we're at the very top and the
             # call didn't originate from ourselves
             return
@@ -914,7 +914,7 @@ class CellsManager(manager.Manager):
     def call_dbapi_method(self, context, db_method_info, routing_path,
             **kwargs):
         """Call a DB API method if we're a top level cell."""
-        if self.get_parent_cells() or self._path_is_us(routing_path):
+        if self._get_parent_cells() or self._path_is_us(routing_path):
             # Only update the DB if we're at the very top and the
             # call didn't originate from ourselves
             return

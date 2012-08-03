@@ -258,11 +258,11 @@ class CellsManagerClassTestCase(test.TestCase):
                 **bcast_message['args'])
 
         self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
-            'send_message'], len(self.cells_manager.get_child_cells()))
+            'send_message'], len(self.cells_manager._get_child_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
         self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
-                len(z2_mgr.get_child_cells()))
+                len(z2_mgr._get_child_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
         gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
         self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
@@ -281,14 +281,14 @@ class CellsManagerClassTestCase(test.TestCase):
         gc_mgr.broadcast_message(fake_context, **bcast_message['args'])
 
         self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
-                len(gc_mgr.get_parent_cells()))
+                len(gc_mgr._get_parent_cells()))
         self.assertEqual(gc_mgr._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
         self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
-                len(z2_mgr.get_parent_cells()))
+                len(z2_mgr._get_parent_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
         self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
-            'send_message'], len(self.cells_manager.get_parent_cells()))
+            'send_message'], len(self.cells_manager._get_parent_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
 
     def test_broadcast_message_max_hops(self):
@@ -304,11 +304,11 @@ class CellsManagerClassTestCase(test.TestCase):
                 **bcast_message['args'])
 
         self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
-            'send_message'], len(self.cells_manager.get_child_cells()))
+            'send_message'], len(self.cells_manager._get_child_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
         self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
-                len(z2_mgr.get_child_cells()))
+                len(z2_mgr._get_child_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
         gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
         self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
