@@ -1247,25 +1247,27 @@ class GetLogCommands(object):
 
 
 class CellCommands(object):
-    def help(self, topic=None):
-        if topic is None:
-            print "Usage: nova-manage cell help <topic>"
-            print "Available topics are:"
-            print "\tcreate"
-            print "\tdelete"
-            print "\tlist"
-            return
+    """Commands for managing cells."""
 
-        topics = {
-                'create': 'Usage: nova-manage cell create <name> <type> '
-                          '<username> <hostname> <port> <password> '
-                          '<vhost> <weight_offset> <weight_scale>',
-                'delete': 'Usage: nova-manage cell delete <cell_id>',
-                'list': 'Usage: nova-manage cell list'}
-        print topics.get(topic, 'Unknown topic')
-
-    def create(self, name, cell_type, username, hostname, port,
-            password, virtual_host, woffset, wscale):
+    @args('--name', dest='name', metavar='<name>',
+            help='Name for the new cell')
+    @args('--cell_type', dest='cell_type', metavar='<parent|child>',
+         help='Whether the cell is a parent or child')
+    @args('--username', dest='username', metavar='<username>',
+         help='Username for the message broker in this cell')
+    @args('--password', dest='password', metavar='<password>',
+         help='Password for the message broker in this cell')
+    @args('--hostname', dest='hostname', metavar='<hostname>',
+         help='Address of the message broker in this cell')
+    @args('--port', dest='port', metavar='<number>',
+         help='Port number of the message broker in this cell')
+    @args('--virtual_host', dest='virtual_host', metavar='<virtual_host>',
+         help='The virtual host of the message broker in this cell')
+    @args('--woffset', dest='woffset', metavar='<float>')
+    @args('--wscale', dest='wscale', metavar='<float>')
+    def create(self, name, cell_type='child', username=None, password=None,
+               hostname=None, port=None, virtual_host=None,
+               woffset=None, wscale=None):
 
         if cell_type not in ['parent', 'child']:
             print "Error: cell type must be 'parent' or 'child'"
@@ -1284,6 +1286,8 @@ class CellCommands(object):
         ctxt = context.get_admin_context()
         db.cell_create(ctxt, values)
 
+    @args('--cell_id', dest='cell_id', metavar='<cell_id>',
+         help='ID of the cell to delete')
     def delete(self, cell_id):
         ctxt = context.get_admin_context()
         db.cell_delete(ctxt, cell_id)
