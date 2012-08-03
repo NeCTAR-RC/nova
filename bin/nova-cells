@@ -16,7 +16,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-"""Starter script for Nova Zones Service."""
+"""Starter script for Nova Cells Service."""
 
 import eventlet
 eventlet.monkey_patch()
