@@ -23,6 +23,9 @@ from nova.openstack.common import log as logging
 from nova.openstack.common import rpc
 
 LOG = logging.getLogger('nova.cells.rpc_driver')
+
+flags.DECLARE('cells', 'nova.cells.opts')
+
 FLAGS = flags.FLAGS
 
 
@@ -48,7 +51,7 @@ class CellsRPCDriver(driver.BaseCellsDriver):
             rpc_proxy, fanout=False, topic=None):
         server_params = self._get_server_params_for_cell(cell_info)
         if topic is None:
-            topic = FLAGS.cells_topic
+            topic = FLAGS.cells.topic
         if fanout:
             rpc_proxy.fanout_cast_to_server(context, server_params, message,
                     topic)

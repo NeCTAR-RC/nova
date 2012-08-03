@@ -22,20 +22,20 @@ from nova import flags
 from nova.openstack.common import cfg
 
 flag_opts = [
-        cfg.FloatOpt('cells_spread_by_ram_weighter_multiplier',
+        cfg.FloatOpt('spread_by_ram_weighter_multiplier',
                 default=10.0,
                 help="How much to weight this weighter")
 ]
 
 FLAGS = flags.FLAGS
-FLAGS.register_opts(flag_opts)
+FLAGS.register_opts(flag_opts, group='cells')
 
 
 class CellSpreadByRamWeighter(weights.BaseCellWeighter):
     """Weight cell by ram needed."""
 
     def fn_weight(self):
-        return FLAGS.cells_spread_by_ram_weighter_multiplier
+        return FLAGS.cells.spread_by_ram_weighter_multiplier
 
     def cell_weight(self, cell, weight_properties):
         """

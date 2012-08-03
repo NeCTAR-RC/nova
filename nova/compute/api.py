@@ -59,6 +59,7 @@ LOG = logging.getLogger(__name__)
 
 FLAGS = flags.FLAGS
 flags.DECLARE('consoleauth_topic', 'nova.consoleauth')
+flags.DECLARE('cells', 'nova.cells.opts')
 
 MAX_USERDATA_SIZE = 65535
 QUOTAS = quota.QUOTAS
@@ -934,8 +935,8 @@ class API(base.Base):
 
             is_up = True
             services = []
-            if (not FLAGS.enable_cells or
-                    (FLAGS.enable_cells and not instance['cell_name'])):
+            if (not FLAGS.cells.enable or
+                    (FLAGS.cells.enable and not instance['cell_name'])):
                 # If cells is disabled or we are actually in the cell that
                 # contains this instance. Otherwise, this will fail to find
                 # the compute host.
@@ -1541,7 +1542,7 @@ class API(base.Base):
 
         # With cells, the best we can do right now is commit the reservations
         # immediately...
-        if FLAGS.enable_cells and reservations:
+        if FLAGS.cells.enable and reservations:
             QUOTAS.commit(context, reservations)
             reservations = []
 
@@ -1574,7 +1575,7 @@ class API(base.Base):
 
         # With cells, the best we can do right now is commit the reservations
         # immediately...
-        if FLAGS.enable_cells and reservations:
+        if FLAGS.cells.enable and reservations:
             QUOTAS.commit(context, reservations)
             reservations = []
 
@@ -1744,7 +1745,7 @@ class API(base.Base):
 
         # With cells, the best we can do right now is commit the reservations
         # immediately...
-        if FLAGS.enable_cells and reservations:
+        if FLAGS.cells.enable and reservations:
             QUOTAS.commit(context, reservations)
             reservations = []
 

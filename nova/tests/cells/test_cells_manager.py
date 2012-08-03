@@ -30,7 +30,7 @@ from nova.openstack.common import timeutils
 from nova import test
 from nova.tests.cells import fakes
 
-
+flags.DECLARE('cells', 'nova.cells.opts')
 FLAGS = flags.FLAGS
 
 
@@ -39,18 +39,19 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def setUp(self):
         super(CellsManagerClassTestCase, self).setUp()
-        self.flags(cell_name='me', host='fake.host.name')
+        self.flags(host='fake.host.name')
+        self.flags(name='me', group='cells')
         fakes.init()
 
         self.cells_manager = fakes.FakeCellsManager(
                 _test_case=self,
-                _my_name=FLAGS.cell_name,
+                _my_name=FLAGS.cells.name,
                 cells_driver_cls=fakes.FakeCellsDriver,
                 cells_scheduler_cls=fakes.FakeCellsScheduler)
 
     def test_setup(self):
         self.assertEqual(self.cells_manager.my_cell_info.name,
-                FLAGS.cell_name)
+                FLAGS.cells.name)
         self.assertTrue(self.cells_manager.my_cell_info.is_me)
 
     def test_refresh_cells(self):
@@ -68,7 +69,7 @@ class CellsManagerClassTestCase(test.TestCase):
                             self.cells_manager.child_cells)
             self.assertEqual(len(cells), total_cells_found)
 
-        verify_cells(fakes.FAKE_CELLS[FLAGS.cell_name])
+        verify_cells(fakes.FAKE_CELLS[FLAGS.cells.name])
 
         # Different list of cells
         fakes.stubout_cell_get_all_for_refresh(self.cells_manager)
@@ -114,9 +115,9 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def test_find_next_hop_direct_child_cell(self):
         # Find a child cell that we stubbed
-        child_cell = fakes.find_a_child_cell(FLAGS.cell_name)
+        child_cell = fakes.find_a_child_cell(FLAGS.cells.name)
 
-        dest_cell = FLAGS.cell_name + '!' + child_cell['name']
+        dest_cell = FLAGS.cells.name + '!' + child_cell['name']
         routing_path = 'me'
 
         cell_info, _host = self._find_next_hop(dest_cell, routing_path,
@@ -125,9 +126,9 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def test_find_next_hop_grandchild_cell(self):
         # Find a child cell that we stubbed
-        child_cell = fakes.find_a_child_cell(FLAGS.cell_name)
+        child_cell = fakes.find_a_child_cell(FLAGS.cells.name)
 
-        dest_cell = FLAGS.cell_name + '!' + child_cell['name'] + '!grandchild'
+        dest_cell = FLAGS.cells.name + '!' + child_cell['name'] + '!grandchild'
         routing_path = 'me'
 
         cell_info, _host = self._find_next_hop(dest_cell, routing_path,
@@ -136,10 +137,10 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def test_find_next_hop_direct_parent_cell(self):
         # Find a parent cell that we stubbed
-        parent_cell = fakes.find_a_parent_cell(FLAGS.cell_name)
+        parent_cell = fakes.find_a_parent_cell(FLAGS.cells.name)
 
         # When going up, the path is reversed
-        dest_cell = FLAGS.cell_name + '!' + parent_cell['name']
+        dest_cell = FLAGS.cells.name + '!' + parent_cell['name']
         routing_path = 'me'
         cell_info, _host = self._find_next_hop(dest_cell, routing_path,
                 'up')
@@ -154,10 +155,10 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def test_find_next_hop_grandparent_cell(self):
         # Find a parent cell that we stubbed
-        parent_cell = fakes.find_a_parent_cell(FLAGS.cell_name)
+        parent_cell = fakes.find_a_parent_cell(FLAGS.cells.name)
 
         # When going up, the path is reversed
-        dest_cell = (FLAGS.cell_name + '!' + parent_cell['name'] +
+        dest_cell = (FLAGS.cells.name + '!' + parent_cell['name'] +
                 '!grandparent')
         routing_path = 'me'
         cell_info, _host = self._find_next_hop(dest_cell, routing_path,
@@ -177,7 +178,7 @@ class CellsManagerClassTestCase(test.TestCase):
         fake_context = 'fake_context'
         message = {'method': 'test_method',
                    'args': fakes.TEST_METHOD_EXPECTED_KWARGS}
-        args = {'dest_cell_name': FLAGS.cell_name,
+        args = {'dest_cell_name': FLAGS.cells.name,
                 'routing_path': None,
                 'direction': 'down',
                 'message': message,
@@ -292,7 +293,7 @@ class CellsManagerClassTestCase(test.TestCase):
 
     def test_broadcast_message_max_hops(self):
         """Test broadcast stops when reaching max hops."""
-        self.flags(cell_max_broadcast_hop_count=1)
+        self.flags(max_broadcast_hop_count=1, group='cells')
         fake_context = 'fake_context'
 
         bcast_message = cells_utils.form_broadcast_message('down',
@@ -604,10 +605,11 @@ class CellsManagerClassTestCase(test.TestCase):
         self.assertEqual(call_info['shuffle'], 2)
 
     def test_heal_instances(self):
-        self.flags(cell_instance_updated_at_threshold=1000,
-                 cell_instance_update_num_instances=2,
-                 # force to update on every call
-                 cell_instance_update_interval=-1)
+        self.flags(instance_updated_at_threshold=1000,
+                   instance_update_num_instances=2,
+                   # force to update on every call
+                   instance_update_interval=-1,
+                   group='cells')
 
         fake_context = context.RequestContext('fake', 'fake')
         stalled_time = timeutils.utcnow()

@@ -34,28 +34,29 @@ from nova.openstack.common import rpc
 from nova.scheduler import rpcapi as scheduler_rpcapi
 
 flag_opts = [
-        cfg.ListOpt('cell_scheduler_filters',
+        cfg.ListOpt('scheduler_filters',
                 default=['nova.cells.filters.standard_filters'],
                 help='Filter classes the cells scheduler should use.  '
                         'An entry of "nova.cells.filters.standard_filters"'
                         'maps to all cells filters included with nova.'),
-        cfg.ListOpt('cell_scheduler_weighters',
+        cfg.ListOpt('scheduler_weighters',
                 default=['nova.cells.weights.standard_weighters'],
                 help='Weighter classes the cells scheduler should use.  '
                         'An entry of "nova.cells.weights.standard_weighters"'
                         'maps to all cell weighters included with nova.'),
-        cfg.IntOpt('cell_scheduler_retries',
+        cfg.IntOpt('scheduler_retries',
                 default=10,
                 help='How many retries when no cells are available.'),
-        cfg.IntOpt('cell_scheduler_retry_delay',
+        cfg.IntOpt('scheduler_retry_delay',
                 default=2,
                 help='How often to retry in seconds when no cells are '
                         'available.')
 ]
 
 LOG = logging.getLogger(__name__)
+
 FLAGS = flags.FLAGS
-FLAGS.register_opts(flag_opts)
+FLAGS.register_opts(flag_opts, group='cells')
 
 
 class CellsScheduler(base.Base):
@@ -67,9 +68,9 @@ class CellsScheduler(base.Base):
         self.cells_rpcapi = cells_rpcapi.CellsAPI()
         self.compute_api = compute.API()
         self.filter_classes = filters.get_filter_classes(
-                FLAGS.cell_scheduler_filters)
+                FLAGS.cells.scheduler_filters)
         self.weighter_classes = weights.get_weighter_classes(
-                FLAGS.cell_scheduler_weighters)
+                FLAGS.cells.scheduler_weighters)
 
         self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
 
@@ -218,14 +219,14 @@ class CellsScheduler(base.Base):
         via 'route_message'.  This means routing_path is already updated.
         """
         try:
-            for i in xrange(max(0, FLAGS.cell_scheduler_retries) + 1):
+            for i in xrange(max(0, FLAGS.cells.scheduler_retries) + 1):
                 try:
                     return self._schedule_run_instance(context,
                             routing_path, **kwargs)
                 except exception.NoCellsAvailable:
-                    if i == max(0, FLAGS.cell_scheduler_retries):
+                    if i == max(0, FLAGS.cells.scheduler_retries):
                         raise
-                    sleep_time = max(1, FLAGS.cell_scheduler_retry_delay)
+                    sleep_time = max(1, FLAGS.cells.scheduler_retry_delay)
                     LOG.info(_("No cells available when scheduling.  Will "
                             "retry in %(sleep_time)s second(s)"), locals())
                     time.sleep(sleep_time)

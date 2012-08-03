@@ -35,6 +35,7 @@ from nova.openstack.common import timeutils
 
 
 LOG = logging.getLogger("nova.api.openstack.compute.contrib.cells")
+flags.DECLARE('cells', 'nova.cells.opts')
 FLAGS = flags.FLAGS
 authorize = extensions.extension_authorizer('compute', 'cells')
 
@@ -158,12 +159,12 @@ class Controller(object):
         context = req.environ['nova.context']
         authorize(context)
         cell_capabs = {}
-        my_caps = FLAGS.cell_capabilities
+        my_caps = FLAGS.cells.capabilities
         for cap in my_caps:
             key, value = cap.split('=')
             cell_capabs[key] = value
         cell = {'id': 0,
-                'name': FLAGS.cell_name,
+                'name': FLAGS.cells.name,
                 'type': 'self',
                 'rpc_host': None,
                 'rpc_port': 0,

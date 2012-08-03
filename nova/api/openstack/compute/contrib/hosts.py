@@ -32,6 +32,7 @@ from nova.openstack.common import log as logging
 
 LOG = logging.getLogger(__name__)
 FLAGS = flags.FLAGS
+flags.DECLARE('cells', 'nova.cells.opts')
 authorize = extensions.extension_authorizer('compute', 'hosts')
 
 
@@ -97,7 +98,7 @@ def _list_hosts(req, service=None):
     """Returns a summary list of enabled hosts, optionally filtering
     by service type.
     """
-    if FLAGS.enable_cells:
+    if FLAGS.cells.enable:
         return _cells_list_hosts(req, service)
     else:
         return _no_cells_list_hosts(req, service)

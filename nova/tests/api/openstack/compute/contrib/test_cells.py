@@ -281,7 +281,7 @@ class CellsTest(test.TestCase):
 
     def test_cell_info(self):
         caps = ['cap1=a;b', 'cap2=c;d']
-        self.flags(cell_name='darksecret', cell_capabilities=caps)
+        self.flags(name='darksecret', capabilities=caps, group='cells')
 
         req = self._get_request("cells/info")
         res_dict = self.controller.info(req)

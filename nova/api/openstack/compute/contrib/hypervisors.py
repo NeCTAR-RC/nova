@@ -29,6 +29,7 @@ from nova.openstack.common import log as logging
 
 
 FLAGS = flags.FLAGS
+flags.DECLARE('cells', 'nova.cells.opts')
 LOG = logging.getLogger(__name__)
 authorize = extensions.extension_authorizer('compute', 'hypervisors')
 
@@ -398,7 +399,7 @@ class CellsHypervisorsController(object):
         return dict(hypervisor_statistics=stats)
 
 
-if FLAGS.enable_cells:
+if FLAGS.cells.enable:
     controller = CellsHypervisorsController()
 else:
     controller = HypervisorsController()

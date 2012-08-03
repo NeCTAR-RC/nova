@@ -28,7 +28,8 @@ FLAGS = flags.FLAGS
 class TestWeightOffsetTestCase(test.TestCase):
     def setUp(self):
         super(TestWeightOffsetTestCase, self).setUp()
-        self.flags(cell_name='me', host='host1')
+        self.flags(name='me', group='cells')
+        self.flags(host='host1')
         fakes.init()
         # Tell cell5 who it's parent is, so it can tell it's capacity to its
         # parent so that it's parent can make informed choices with the
@@ -52,7 +53,7 @@ class TestWeightOffsetTestCase(test.TestCase):
         # it a capacity
         self.top_cell_manager = fakes.FakeCellsManager(
                 _test_case=self,
-                _my_name=FLAGS.cell_name,
+                _my_name=FLAGS.cells.name,
                 cells_driver_cls=fakes.FakeCellsDriver,
                 cells_scheduler_cls=cells_scheduler.CellsScheduler)
         self.scheduler = self.top_cell_manager.scheduler
