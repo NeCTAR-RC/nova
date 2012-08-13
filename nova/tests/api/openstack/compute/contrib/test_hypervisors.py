@@ -13,7 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
 from lxml import etree
+import mock
 from webob import exc
 
 from nova.api.openstack.compute.contrib import hypervisors
@@ -330,6 +332,94 @@ class HypervisorsTest(test.TestCase):
                     current_workload=4,
                     running_vms=4,
                     disk_available_least=200)))
+
+
+class TestCellsHypervisorsController(test.TestCase):
+
+    def setUp(self):
+        """
+        Run before each test.
+        """
+        super(TestCellsHypervisorsController, self).setUp()
+        self.fake_context = context.RequestContext('fake', 'fake_project',
+                read_deleted='no', is_admin=True)
+
+        # Fake/Mock WSGI Request
+        self.fake_req = mock.MagicMock()
+        self.fake_req.environ = {"nova.context": self.fake_context}
+        self.fake_req.application_url = "http://test/v1"
+
+        # Mock/Patch the cell_broadcast_call method
+        bc_patch = mock.patch("nova.cells.api.cell_broadcast_call")
+        self.bc_mock = bc_patch.start()
+
+        def _cleanup_func():
+            bc_patch.stop()
+
+        self._stop_func = _cleanup_func
+
+        # Create controller to be used in each test
+        self.controller = hypervisors.CellsHypervisorsController()
+
+    def tearDown(self):
+        self._stop_func()
+        super(TestCellsHypervisorsController, self).tearDown()
+
+    def test_empty_index(self):
+        """
+        Test showing empty index of hypervisors.
+        """
+        self.bc_mock.return_value = [([], "c0001")]
+        response = self.controller.index(self.fake_req)
+        self.assertEqual({"hypervisors": []}, response)
+
+    def test_index(self):
+        """
+        Test showing index of hypervisors.
+        """
+        self.bc_mock.return_value = [(copy.deepcopy(TEST_HYPERS), "c0001")]
+        response = self.controller.index(self.fake_req)
+        self.assertEqual(response, dict(hypervisors=[
+                    dict(id='c0001-1', hypervisor_hostname="hyper1"),
+                    dict(id='c0001-2', hypervisor_hostname="hyper2")]))
+
+    def test_index_two_cells(self):
+        """
+        Test showing index of hypervisors.
+        """
+        self.bc_mock.return_value = [([copy.deepcopy(TEST_HYPERS[0])],
+                                        "c0001"),
+                                    ([copy.deepcopy(TEST_HYPERS[1])],
+                                        "c0002")]
+        response = self.controller.index(self.fake_req)
+        self.assertEqual(response, dict(hypervisors=[
+                    dict(id='c0001-1', hypervisor_hostname="hyper1"),
+                    dict(id='c0002-2', hypervisor_hostname="hyper2")]))
+
+    def test_show(self):
+        self.maxDiff = None
+        self.bc_mock.return_value = [(copy.deepcopy(TEST_HYPERS[0]),
+                                        "c0001")]
+        response = self.controller.show(self.fake_req, 'c0001-1')
+
+        self.assertEqual(response, dict(hypervisor=dict(
+                    id='c0001-1',
+                    service=dict(id='c0001-1', host="compute1"),
+                    vcpus=4,
+                    memory_mb=10 * 1024,
+                    local_gb=250,
+                    vcpus_used=2,
+                    memory_mb_used=5 * 1024,
+                    local_gb_used=125,
+                    hypervisor_type="xen",
+                    hypervisor_version=3,
+                    hypervisor_hostname="hyper1",
+                    free_ram_mb=5 * 1024,
+                    free_disk_gb=125,
+                    current_workload=2,
+                    running_vms=2,
+                    cpu_info='cpu_info',
+                    disk_available_least=100)))
 
 
 class HypervisorsSerializersTest(test.TestCase):
