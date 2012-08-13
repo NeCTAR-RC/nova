@@ -958,3 +958,21 @@ class CellsManager(manager.Manager):
         begin = kwargs.get('begin')
         end = kwargs.get('end')
         return db.task_log_get_all(context, task_name, begin, end)
+
+    def list_compute_nodes(self, context, routing_path,
+                           hypervisor_match=None):
+        if hypervisor_match:
+            return db.compute_node_search_by_hypervisor(context,
+                                                        hypervisor_match)
+        else:
+            return db.compute_node_get_all(context)
+
+    def compute_node_get(self, context, routing_path, **kwargs):
+        compute_id = kwargs.get("compute_id")
+        try:
+            return db.compute_node_get(context, compute_id)
+        except exception.ComputeHostNotFound:
+            return None
+
+    def compute_node_stats(self, context, routing_path):
+        return [db.compute_node_statistics(context)]
