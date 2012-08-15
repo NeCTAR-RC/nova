@@ -19,6 +19,7 @@ import re
 
 from nova.cells import api as cells_api
 from nova.compute import api as compute_api
+from nova.compute import instance_types
 from nova.compute import task_states
 from nova.compute import vm_states
 from nova import exception
@@ -232,22 +233,46 @@ class ComputeCellsAPI(compute_api.API):
     @validate_cell
     def revert_resize(self, context, instance):
         """Reverts a resize, deleting the 'new' instance in the process."""
-        # NOTE(markwash): regular api manipulates the migration here, but we
-        # don't have access to it. So to preserve the interface just update the
-        # vm and task state.
-        self.update(context, instance,
-                    task_state=task_states.RESIZE_REVERTING)
+        # FIXME(johannes): This is for backwards compatibility with
+        # migrations started before we started storing the migration
+        # record on the API cell. In that case, calling the superclass
+        # revert_size() method will cause an exception since it can't load
+        # the non-existant migration record. As a temporary workaround,
+        # just update the vm_state and continue. This is necessary only
+        # until all in-process migrations are confirmed or reverted, which
+        # should be FLAGS.resize_confirm_window seconds. After that,
+        # this code can call the superclass method directly and then
+        # cast to the cell.
+        migration_ref = self.db.migration_get_by_instance_and_status(
+                            context.elevated(), instance['uuid'], 'finished')
+        if migration_ref:
+            super(ComputeCellsAPI, self).revert_resize(context, instance)
+        else:
+            self.update(context, instance,
+                        task_state=task_states.RESIZE_REVERTING)
         self._cast_to_cells(context, instance, 'revert_resize')
 
     @check_instance_state(vm_state=[vm_states.RESIZED])
     @validate_cell
     def confirm_resize(self, context, instance):
         """Confirms a migration/resize and deletes the 'old' instance."""
-        # NOTE(markwash): regular api manipulates migration here, but we don't
-        # have the migration in the api database. So to preserve the interface
-        # just update the vm and task state without calling super()
-        self.update(context, instance, task_state=None,
-                    vm_state=vm_states.ACTIVE)
+        # FIXME(johannes): This is for backwards compatibility with
+        # migrations started before we started storing the migration
+        # record on the API cell. In that case, calling the superclass
+        # confirm_resize() method will cause an exception since it can't load
+        # the non-existant migration record. As a temporary workaround,
+        # just update the vm_state and continue. This is necessary only
+        # until all in-process migrations are confirmed or reverted, which
+        # should be FLAGS.resize_confirm_window seconds. After that,
+        # this code can call the superclass method directly and then
+        # cast to the cell.
+        migration_ref = self.db.migration_get_by_instance_and_status(
+                            context.elevated(), instance['uuid'], 'finished')
+        if migration_ref:
+            super(ComputeCellsAPI, self).confirm_resize(context, instance)
+        else:
+            self.update(context, instance, task_state=None,
+                        vm_state=vm_states.ACTIVE)
         self._cast_to_cells(context, instance, 'confirm_resize')
 
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED],
@@ -260,8 +285,36 @@ class ComputeCellsAPI(compute_api.API):
         the original flavor_id. If flavor_id is not None, the instance should
         be migrated to a new host and resized to the new flavor_id.
         """
-        super(ComputeCellsAPI, self).resize(context, instance, *args,
-                **kwargs)
+        super(ComputeCellsAPI, self).resize(context, instance, *args, **kwargs)
+
+        # NOTE(johannes): If we get to this point, then we know the
+        # specified flavor_id is valid and exists. We'll need to load
+        # it again, but that should be safe.
+
+        old_instance_type_id = instance['instance_type_id']
+        old_instance_type = instance_types.get_instance_type(
+                old_instance_type_id)
+
+        flavor_id = kwargs.get('flavor_id')
+
+        if not flavor_id:
+            new_instance_type = old_instance_type
+        else:
+            new_instance_type = instance_types.get_instance_type_by_flavor_id(
+                    flavor_id)
+
+        # NOTE(johannes): Later, when the resize is confirmed or reverted,
+        # the superclass implementations of those methods will need access
+        # to a local migration record for quota reasons. We don't need
+        # source and/or destination information, just the old and new
+        # instance_types. Status is set to 'finished' since nothing else
+        # will update the status along the way.
+        migration_ref = self.db.migration_create(context.elevated(),
+                    {'instance_uuid': instance['uuid'],
+                     'old_instance_type_id': old_instance_type['id'],
+                     'new_instance_type_id': new_instance_type['id'],
+                     'status': 'finished'})
+
         # FIXME(comstud): pass new instance_type object down to a method
         # that'll unfold it
         self._cast_to_cells(context, instance, 'resize', *args, **kwargs)

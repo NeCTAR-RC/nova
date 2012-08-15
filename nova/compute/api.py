@@ -1512,6 +1512,12 @@ class API(base.Base):
                                task_state=task_states.RESIZE_REVERTING,
                                expected_task_state=None)
 
+        # With cells, the best we can do right now is commit the reservations
+        # immediately...
+        if FLAGS.enable_cells and reservations:
+            QUOTAS.commit(context, reservations)
+            reservations = []
+
         self.compute_rpcapi.revert_resize(context,
                 instance=instance, migration_id=migration_ref['id'],
                 host=migration_ref['dest_compute'], reservations=reservations)
@@ -1538,6 +1544,12 @@ class API(base.Base):
         instance = self.update(context, instance, vm_state=vm_states.ACTIVE,
                                task_state=None,
                                expected_task_state=None)
+
+        # With cells, the best we can do right now is commit the reservations
+        # immediately...
+        if FLAGS.enable_cells and reservations:
+            QUOTAS.commit(context, reservations)
+            reservations = []
 
         self.compute_rpcapi.confirm_resize(context,
                 instance=instance, migration_id=migration_ref['id'],
@@ -1702,6 +1714,12 @@ class API(base.Base):
 
         if not FLAGS.allow_resize_to_same_host:
             filter_properties['ignore_hosts'].append(instance['host'])
+
+        # With cells, the best we can do right now is commit the reservations
+        # immediately...
+        if FLAGS.enable_cells and reservations:
+            QUOTAS.commit(context, reservations)
+            reservations = []
 
         args = {
             "instance": instance,
