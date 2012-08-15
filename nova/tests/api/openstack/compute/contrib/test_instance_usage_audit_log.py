@@ -16,6 +16,7 @@
 import datetime
 
 from nova.api.openstack.compute.contrib import instance_usage_audit_log as ial
+from nova.cells import api as cells_api
 from nova import context
 from nova import db
 from nova.openstack.common import timeutils
@@ -80,6 +81,10 @@ TEST_LOGS3 = [
     ]
 
 
+def dont_call_me(*args, **kw):
+    raise AssertionError("Called a method that should not be called")
+
+
 def fake_service_get_all(context):
     return TEST_COMPUTE_SERVICES
 
@@ -106,6 +111,28 @@ def fake_last_completed_audit_period(unit=None, before=None):
                 return begin, end
         raise AssertionError("Invalid before date %s" % (before))
     return begin1, end1
+
+
+def fake_cell_broadcast_call(context, direction, method, **kw):
+    assert direction == 'down'
+    assert method in ("task_logs", "list_services")
+
+    if method == "task_logs":
+        assert "task_name" in kw
+        task_name = kw.get('task_name')
+        begin = kw.get('begin')
+        end = kw.get('end')
+        tlogs = fake_task_log_get_all(context, task_name, begin, end)
+        return (([l for l in tlogs if l['host'].startswith('b')],
+                'toobee'),
+                ([l for l in tlogs if not l['host'].startswith('b')],
+                'nottoobee'))
+    elif method == "list_services":
+        svcs = fake_service_get_all(context)
+        return (([s for s in svcs if s['host'].startswith('b')],
+                'toobee'),
+                ([s for s in svcs if not s['host'].startswith('b')],
+                'nottoobee'))
 
 
 class InstanceUsageAuditLogTest(test.TestCase):
@@ -186,3 +213,16 @@ class InstanceUsageAuditLogTest(test.TestCase):
         self.assertEquals(0, logs['num_hosts_not_run'])
         self.assertEquals("ALL hosts done. 3 errors.",
                           logs['overall_status'])
+
+
+class CellsInstanceUsageAuditLogTest(InstanceUsageAuditLogTest):
+
+    def setUp(self):
+        super(CellsInstanceUsageAuditLogTest, self).setUp()
+        self.controller = ial.CellsInstanceUsageAuditLogController()
+        self.stubs.Set(cells_api, 'cell_broadcast_call',
+                            fake_cell_broadcast_call)
+        self.stubs.Set(db, 'service_get_all',
+                            dont_call_me)
+        self.stubs.Set(db, 'task_log_get_all',
+                            dont_call_me)
