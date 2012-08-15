@@ -21,6 +21,7 @@ import datetime
 import webob.exc
 
 from nova.api.openstack import extensions
+from nova.cells import api as cells_api
 from nova import db
 from nova import flags
 from nova import utils
@@ -57,6 +58,17 @@ class InstanceUsageAuditLogController(object):
                                                      before=before_date)
         return {'instance_usage_audit_log': task_log}
 
+    def _get_task_logs(self, context, begin, end):
+        return db.task_log_get_all(context, "instance_usage_audit",
+                                        begin, end)
+
+    def _get_hosts(self, context):
+        # We do this this way to include disabled compute services,
+        # which can have instances on them. (mdragon)
+        services = [svc for svc in db.service_get_all(context)
+                if svc['topic'] == 'compute']
+        return set(serv['host'] for serv in services)
+
     def _get_audit_task_logs(self, context, begin=None, end=None,
                              before=None):
         """Returns a full log for all instance usage audit tasks on all
@@ -77,13 +89,8 @@ class InstanceUsageAuditLogController(object):
             begin = defbegin
         if end is None:
             end = defend
-        task_logs = db.task_log_get_all(context, "instance_usage_audit",
-                                        begin, end)
-        # We do this this way to include disabled compute services,
-        # which can have instances on them. (mdragon)
-        services = [svc for svc in db.service_get_all(context)
-                    if svc['topic'] == 'compute']
-        hosts = set(serv['host'] for serv in services)
+        task_logs = self._get_task_logs(context, begin, end)
+        hosts = self._get_hosts(context)
         seen_hosts = set()
         done_hosts = set()
         running_hosts = set()
@@ -120,6 +127,37 @@ class InstanceUsageAuditLogController(object):
                     log=log)
 
 
+class CellsInstanceUsageAuditLogController(InstanceUsageAuditLogController):
+
+    def _get_hosts(self, context):
+        hosts = set()
+        responses = cells_api.cell_broadcast_call(context,
+                                                  "down",
+                                                  "list_services")
+        for (response, cell_name) in responses:
+            for service in response:
+                # We do this this way to include disabled compute services,
+                # which can have instances on them. (mdragon)
+                if service['topic'] == 'compute':
+                    #host.add("%s %s" % (cell_name, service['host']))
+                    hosts.add(service['host'])
+        return hosts
+
+    def _get_task_logs(self, context, begin, end):
+        logs = []
+        responses = cells_api.cell_broadcast_call(context,
+                                      "down",
+                                      "task_logs",
+                                      task_name="instance_usage_audit",
+                                      begin=begin,
+                                      end=end)
+        for (response, cell_name) in responses:
+            for tlog in response:
+                #tlog['host'] = "%s %s" % (cell_name, tlog['host'])
+                logs.append(tlog)
+        return logs
+
+
 class Instance_usage_audit_log(extensions.ExtensionDescriptor):
     """Admin-only Task Log Monitoring"""
     name = "OSInstanceUsageAuditLog"
@@ -128,6 +166,11 @@ class Instance_usage_audit_log(extensions.ExtensionDescriptor):
     updated = "2012-07-06T01:00:00+00:00"
 
     def get_resources(self):
+        if FLAGS.enable_cells:
+            controller = CellsInstanceUsageAuditLogController()
+        else:
+            controller = InstanceUsageAuditLogController()
+
         ext = extensions.ResourceExtension('os-instance_usage_audit_log',
-                                           InstanceUsageAuditLogController())
+                                           controller)
         return [ext]

@@ -952,3 +952,9 @@ class CellsManager(manager.Manager):
 
     def list_services(self, context, routing_path):
         return db.service_get_all(context)
+
+    def task_logs(self, context, routing_path, **kwargs):
+        task_name = kwargs.get('task_name')
+        begin = kwargs.get('begin')
+        end = kwargs.get('end')
+        return db.task_log_get_all(context, task_name, begin, end)
