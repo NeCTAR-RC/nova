@@ -89,6 +89,17 @@ FLAGS = flags.FLAGS
 FLAGS.register_opts(quota_opts)
 
 
+class NoopQuotaDriver(object):
+    """Quota Driver to use to disable quota checking."""
+    def count(self, *args, **kwargs):
+        return 0
+
+    def __getattr__(self, key):
+        def _noop_func(*args, **kwargs):
+            return
+        return _noop_func
+
+
 class DbQuotaDriver(object):
     """
     Driver to perform necessary checks to enforce quotas and obtain
