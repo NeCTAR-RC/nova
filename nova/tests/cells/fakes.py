@@ -28,6 +28,7 @@ cell0
 """
 
 from nova.cells import manager
+from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
 from nova import context
 from nova import flags
@@ -95,10 +96,29 @@ class FakeCellsScheduler(object):
 
 class FakeCellsDriver(object):
     def __init__(self, manager, *args, **kwargs):
+        self._test_call_info = {'test_method': 0, 'send_message': 0,
+                'send_message_fanout': 0}
         pass
 
-    def send_message_to_cell(self, context, cell_info, dest_host, message):
+    def send_message_to_cell(self, context, cell_info, dest_host, message,
+                             rpc_proxy, fanout=False, topic=None):
         pass
+
+
+class FakeCellsRpcAPI(cells_rpcapi.CellsAPI):
+    def __init__(self, *args, **kwargs):
+        self._test_call_info = {'send_message': 0, 'send_message_fanout': 0}
+        super(FakeCellsRpcAPI, self).__init__(*args, **kwargs)
+
+    def send_message_to_cell(self, context, cell, message,
+            dest_host=None, fanout=False, topic=None):
+        self._test_call_info['send_message'] += 1
+        if fanout:
+            self._test_call_info['send_message_fanout'] += 1
+        mgr = FAKE_CELL_MANAGERS.get(cell.name)
+        if mgr:
+            method = getattr(mgr, message['method'])
+            method(context, **message['args'])
 
 
 class FakeCellsManager(manager.CellsManager):
@@ -106,11 +126,11 @@ class FakeCellsManager(manager.CellsManager):
         self._test_case = kwargs.pop('_test_case')
         _my_name = kwargs.pop('_my_name')
         _my_host = kwargs.pop('_my_host', FLAGS.host)
-        self._test_call_info = {'test_method': 0, 'send_message': 0,
-                'send_message_fanout': 0}
+        self._test_call_info = {'test_method': 0}
         # Pretend to have a capacity
         self.capacities = kwargs.pop('capacities', {})
         super(FakeCellsManager, self).__init__(**kwargs)
+        self.cells_rpcapi = FakeCellsRpcAPI()
         # Now fudge some things for testing
         self.my_cell_info.name = _my_name
         self.our_path = cells_utils.PATH_CELL_HOST_SEP.join(
@@ -141,16 +161,6 @@ class FakeCellsManager(manager.CellsManager):
         self._test_call_info['test_method'] += 1
         self._test_call_info['routing_path'] = routing_path
         return TEST_METHOD_EXPECTED_RESULT
-
-    def send_raw_message_to_cell(self, context, cell, message,
-            dest_host=None, fanout=False, topic=None):
-        self._test_call_info['send_message'] += 1
-        if fanout:
-            self._test_call_info['send_message_fanout'] += 1
-        mgr = FAKE_CELL_MANAGERS.get(cell.name)
-        if mgr:
-            method = getattr(mgr, message['method'])
-            method(context, **message['args'])
 
 
 def stubout_cell_get_all_for_refresh(mgr):

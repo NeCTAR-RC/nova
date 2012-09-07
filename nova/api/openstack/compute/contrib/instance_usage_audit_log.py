@@ -21,7 +21,7 @@ import datetime
 import webob.exc
 
 from nova.api.openstack import extensions
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova import db
 from nova import flags
 from nova import utils
@@ -129,9 +129,13 @@ class InstanceUsageAuditLogController(object):
 
 class CellsInstanceUsageAuditLogController(InstanceUsageAuditLogController):
 
+    def __init__(self):
+        super(CellsInstanceUsageAuditLogController, self).__init__()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
+
     def _get_hosts(self, context):
         hosts = set()
-        responses = cells_api.cell_broadcast_call(context,
+        responses = self.cells_rpcapi.cell_broadcast_call(context,
                                                   "down",
                                                   "list_services")
         for (response, cell_name) in responses:
@@ -145,7 +149,7 @@ class CellsInstanceUsageAuditLogController(InstanceUsageAuditLogController):
 
     def _get_task_logs(self, context, begin, end):
         logs = []
-        responses = cells_api.cell_broadcast_call(context,
+        responses = self.cells_rpcapi.cell_broadcast_call(context,
                                       "down",
                                       "task_logs",
                                       task_name="instance_usage_audit",

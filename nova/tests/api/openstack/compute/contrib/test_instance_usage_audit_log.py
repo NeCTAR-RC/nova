@@ -16,7 +16,7 @@
 import datetime
 
 from nova.api.openstack.compute.contrib import instance_usage_audit_log as ial
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova import context
 from nova import db
 from nova.openstack.common import timeutils
@@ -113,7 +113,7 @@ def fake_last_completed_audit_period(unit=None, before=None):
     return begin1, end1
 
 
-def fake_cell_broadcast_call(context, direction, method, **kw):
+def fake_cell_broadcast_call(self, context, direction, method, **kw):
     assert direction == 'down'
     assert method in ("task_logs", "list_services")
 
@@ -220,7 +220,7 @@ class CellsInstanceUsageAuditLogTest(InstanceUsageAuditLogTest):
     def setUp(self):
         super(CellsInstanceUsageAuditLogTest, self).setUp()
         self.controller = ial.CellsInstanceUsageAuditLogController()
-        self.stubs.Set(cells_api, 'cell_broadcast_call',
+        self.stubs.Set(cells_rpcapi.CellsAPI, 'cell_broadcast_call',
                             fake_cell_broadcast_call)
         self.stubs.Set(db, 'service_get_all',
                             dont_call_me)

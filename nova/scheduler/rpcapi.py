@@ -58,9 +58,10 @@ class SchedulerAPI(nova.openstack.common.rpc.proxy.RpcProxy):
     #
     BASE_RPC_API_VERSION = '2.0'
 
-    def __init__(self):
+    def __init__(self, rpc_version=None):
+        rpc_version = rpc_version or self.BASE_RPC_API_VERSION
         super(SchedulerAPI, self).__init__(topic=FLAGS.scheduler_topic,
-                default_version=self.BASE_RPC_API_VERSION)
+                default_version=rpc_version)
 
     def run_instance(self, ctxt, request_spec, admin_password,
             injected_files, requested_networks, is_first_time,

@@ -20,7 +20,7 @@ from webob import exc
 
 from nova.api.openstack.compute.contrib import cells as cells_ext
 from nova.api.openstack import xmlutil
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova import context
 from nova import db
 from nova import exception
@@ -85,7 +85,7 @@ class CellsTest(test.TestCase):
         self.stubs.Set(db, 'cell_get_all', fake_db_cell_get_all)
         self.stubs.Set(db, 'cell_update', fake_db_cell_update)
         self.stubs.Set(db, 'cell_create', fake_db_cell_create)
-        self.stubs.Set(cells_api, 'get_all_cell_info',
+        self.stubs.Set(cells_rpcapi.CellsAPI, 'get_all_cell_info',
                 fake_cells_api_get_all_cell_info)
 
         self.controller = cells_ext.Controller()
@@ -295,11 +295,11 @@ class CellsTest(test.TestCase):
     def test_sync_instances(self):
         call_info = {}
 
-        def sync_instances(context, **kwargs):
+        def sync_instances(self, context, **kwargs):
             call_info['project_id'] = kwargs.get('project_id')
             call_info['updated_since'] = kwargs.get('updated_since')
 
-        self.stubs.Set(cells_api, 'sync_instances', sync_instances)
+        self.stubs.Set(cells_rpcapi.CellsAPI, 'sync_instances', sync_instances)
 
         req = self._get_request("cells/sync_instances")
         body = {}

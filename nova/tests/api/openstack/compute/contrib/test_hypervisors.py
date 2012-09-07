@@ -350,7 +350,7 @@ class TestCellsHypervisorsController(test.TestCase):
         self.fake_req.application_url = "http://test/v1"
 
         # Mock/Patch the cell_broadcast_call method
-        bc_patch = mock.patch("nova.cells.api.cell_broadcast_call")
+        bc_patch = mock.patch("nova.cells.rpcapi.CellsAPI.cell_broadcast_call")
         self.bc_mock = bc_patch.start()
 
         def _cleanup_func():

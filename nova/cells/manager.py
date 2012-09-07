@@ -28,6 +28,7 @@ import eventlet
 from eventlet import greenthread
 from eventlet import queue
 
+from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
 from nova import compute
 from nova import context
@@ -47,9 +48,6 @@ from nova import utils
 from nova import volume
 
 flag_opts = [
-        cfg.StrOpt('cells_driver',
-                default='nova.cells.rpc_driver.CellsRPCDriver',
-                help='Cells driver to use'),
         cfg.StrOpt('cells_scheduler',
                 default='nova.cells.scheduler.CellsScheduler',
                 help='Cells scheduler to use'),
@@ -120,6 +118,14 @@ class CellInfo(object):
 
 class CellsBWUpdateManager(manager.Manager):
     """Cells RPC consumer manager for BW updates."""
+
+    # NOTE(belliott) Should probably get bumped to 2.0 to be consistent
+    # with other nova services.  Leaving at 1.0 for the moment to avoid
+    # version mismatch errors due to nova-api potentially getting
+    # updated before nova-cells.  After the versioned RPC API gets some
+    # testing, this should be addressed
+    RPC_API_VERSION = '1.0'
+
     def __init__(self, cells_manager):
         self.cells_manager = cells_manager
 
@@ -129,6 +135,14 @@ class CellsBWUpdateManager(manager.Manager):
 
 class CellsReplyManager(manager.Manager):
     """Cells RPC consumer manager for replies."""
+
+    # NOTE(belliott) Should probably get bumped to 2.0 to be consistent
+    # with other nova services.  Leaving at 1.0 for the moment to avoid
+    # version mismatch errors due to nova-api potentially getting
+    # updated before nova-cells.  After the versioned RPC API gets some
+    # testing, this should be addressed
+    RPC_API_VERSION = '1.0'
+
     def __init__(self, cells_manager):
         self.cells_manager = cells_manager
 
@@ -139,22 +153,29 @@ class CellsReplyManager(manager.Manager):
 class CellsManager(manager.Manager):
     """Handles cell communication."""
 
+    # NOTE(belliott) Should probably get bumped to 2.0 to be consistent
+    # with other nova services.  Leaving at 1.0 for the moment to avoid
+    # version mismatch errors due to nova-api potentially getting
+    # updated before nova-cells.  After the versioned RPC API gets some
+    # testing, this should be addressed
+    RPC_API_VERSION = '1.0'
+
     def __init__(self, cells_driver_cls=None, cells_scheduler_cls=None,
             cell_info_cls=None, *args, **kwargs):
         super(CellsManager, self).__init__(*args, **kwargs)
         self.api_map = {'compute': compute.API(),
                         'network': network.API(),
                         'volume': volume.API()}
-        if not cells_driver_cls:
-            cells_driver_cls = importutils.import_class(FLAGS.cells_driver)
+
         if not cells_scheduler_cls:
             cells_scheduler_cls = importutils.import_class(
                     FLAGS.cells_scheduler)
         if not cell_info_cls:
             cell_info_cls = CellInfo
+
+        self.cells_rpcapi = cells_rpcapi.CellsAPI(cells_driver_cls)
         self.bw_updates_topic = FLAGS.cells_topic + '.bw_updates'
         self.replies_topic = FLAGS.cells_topic + '.replies'
-        self.driver = cells_driver_cls(self)
         self.scheduler = cells_scheduler_cls(self)
         self.cell_info_cls = cell_info_cls
         self.my_cell_info = cell_info_cls(FLAGS.cell_name, is_me=True)
@@ -357,11 +378,8 @@ class CellsManager(manager.Manager):
         # be json encoded when the raw message is sent.
         for key, values in capabs.items():
             capabs[key] = list(values)
-        msg = {'method': 'update_capabilities',
-               'args': {'cell_name': self.my_cell_info.name,
-                        'capabilities': capabs}}
-        self.send_raw_message_to_cells(context,
-                    self.get_parent_cells(), msg, fanout=True)
+        self.cells_rpcapi.update_capabilities(context, self.my_cell_info.name,
+                capabs, self.get_parent_cells())
 
     def _add_to_dict(self, target, src):
         for key, value in src.items():
@@ -384,11 +402,8 @@ class CellsManager(manager.Manager):
         capacities = self._get_our_capacities()
         LOG.debug(_("Updating parents with our capacities: %(capacities)s"),
                 locals())
-        msg = {'method': 'update_capacities',
-               'args': {'cell_name': self.my_cell_info.name,
-                        'capacities': capacities}}
-        self.send_raw_message_to_cells(context,
-                    self.get_parent_cells(), msg, fanout=True)
+        self.cells_rpcapi.update_capacities(context, self.my_cell_info.name,
+                capacities, self.get_parent_cells())
 
     def update_capabilities(self, context, cell_name, capabilities):
         """A child cell told us about their capabilities."""
@@ -423,21 +438,17 @@ class CellsManager(manager.Manager):
         """Tell child cells to send us capabilities.  We do this on
         startup of cells service.
         """
-        bcast_msg = cells_utils.form_broadcast_message('down',
-                'announce_capabilities', {},
-                routing_path=self.our_path, hopcount=1)
-        self.send_raw_message_to_cells(context,
-                self.get_child_cells(), bcast_msg)
+        child_cells = self.get_child_cells()
+        self.cells_rpcapi.request_capabilities(context, self.our_path,
+                                               child_cells)
 
     def _ask_children_for_capacities(self, context):
         """Tell child cells to send us capacities.  We do this on
         startup of cells service.
         """
-        bcast_msg = cells_utils.form_broadcast_message('down',
-                'announce_capacities', {},
-                routing_path=self.our_path, hopcount=1)
-        self.send_raw_message_to_cells(context,
-                self.get_child_cells(), bcast_msg)
+        child_cells = self.get_child_cells()
+        self.cells_rpcapi.request_capacities(context, self.our_path,
+                                             child_cells)
 
     def get_child_cells(self):
         """Return list of child cell_infos."""
@@ -455,12 +466,6 @@ class CellsManager(manager.Manager):
         fn = getattr(self, method)
         return fn(context, routing_path=routing_path, **args)
 
-    def send_raw_message_to_cell(self, context, cell, message,
-            dest_host=None, fanout=False, topic=None):
-        """Send a raw message to a cell."""
-        self.driver.send_message_to_cell(context, cell, dest_host, message,
-                fanout=fanout, topic=topic)
-
     def send_routing_message(self, context, dest_cell_name, message):
         """Send a routing message to a cell by name."""
         routing_path = self.our_path
@@ -468,21 +473,9 @@ class CellsManager(manager.Manager):
                 routing_path, 'down')
         if next_hop.is_me:
             return self._process_message_for_me(context, message['message'])
-        self.driver.send_message_to_cell(context, next_hop, None, message)
 
-    def send_raw_message_to_cells(self, context, cells, msg, dest_host=None,
-            fanout=False, ignore_exceptions=True, topic=None):
-        """Send a broadcast message to multiple cells."""
-        for cell in cells:
-            try:
-                self.send_raw_message_to_cell(context, cell, msg,
-                        dest_host=dest_host, fanout=fanout, topic=topic)
-            except Exception, e:
-                if not ignore_exceptions:
-                    raise
-                cell_name = cell.name
-                LOG.exception(_("Error sending broadcast to cell "
-                    "'%(cell_name)s': %(e)s") % locals())
+        self.cells_rpcapi.send_message_to_cell(context, next_hop, None,
+                                               message)
 
     def _path_is_us(self, routing_path):
         return (cells_utils.path_without_hosts(routing_path) ==
@@ -521,13 +514,10 @@ class CellsManager(manager.Manager):
             # Response was for me!  Just call the method directly.
             self.send_response(context, response_uuid, result_info)
             return
-        kwargs = {'response_uuid': response_uuid,
-                  'result_info': result_info}
-        routing_message = cells_utils.form_routing_message(dest_cell,
-                direction, 'send_response', kwargs,
-                routing_path=resp_routing_path)
-        self.send_raw_message_to_cell(context, next_hop, routing_message,
-                dest_host=hop_host, topic=self.replies_topic)
+
+        self.cells_rpcapi.forward_response(context, dest_cell, direction,
+                resp_routing_path, response_uuid, result_info, next_hop,
+                hop_host, self.replies_topic)
 
     def send_response(self, context, response_uuid, result_info, **kwargs):
         """This method is called when a another cell has responded to a
@@ -570,17 +560,14 @@ class CellsManager(manager.Manager):
                 resp_direction, result, failure=False)
         else:
             # Forward the message to the next hop
-            routing_message = cells_utils.form_routing_message(
-                    dest_cell_name, direction, message['method'],
-                    message['args'], response_uuid=resp_uuid,
-                    routing_path=routing_path)
             if resp_uuid:
                 topic = self.replies_topic
             else:
                 topic = None
-            self.send_raw_message_to_cell(context, next_hop,
-                    routing_message, dest_host=hop_host,
-                    topic=topic)
+
+            self.cells_rpcapi.forward_routing_message(context, dest_cell_name,
+                    direction, routing_path, resp_uuid, message['method'],
+                    message['args'], next_hop, hop_host, topic)
 
     @cells_utils.update_routing_path
     def route_message(self, context, dest_cell_name, routing_path,
@@ -659,7 +646,8 @@ class CellsManager(manager.Manager):
             broadcast_msg = cells_utils.form_broadcast_call_message(direction,
                     message['method'], message['args'], response_uuid,
                     routing_path)
-            self.send_raw_message_to_cells(context, dest_cells, broadcast_msg)
+            self.cells_rpcapi.send_message_to_cells(context, dest_cells,
+                                                    broadcast_msg)
 
         our_response = self._process_message_for_me(context, message,
                 routing_path=routing_path, **kwargs)
@@ -711,7 +699,7 @@ class CellsManager(manager.Manager):
             cells = self.get_parent_cells()
         else:
             cells = self.get_child_cells()
-        self.send_raw_message_to_cells(context, cells, bcast_msg,
+        self.cells_rpcapi.send_message_to_cells(context, cells, bcast_msg,
                 topic=topic)
         # Now let's process it.
         self._process_message_for_me(context, message,
@@ -853,7 +841,7 @@ class CellsManager(manager.Manager):
         else:
             msg = cells_utils.form_instance_update_broadcast_message(
                 instance, routing_path=self.our_path, hopcount=1)
-        self.send_raw_message_to_cells(context,
+        self.cells_rpcapi.send_message_to_cells(context,
                 self.get_parent_cells(), msg)
 
     def sync_instances(self, context, routing_path, project_id=None,
