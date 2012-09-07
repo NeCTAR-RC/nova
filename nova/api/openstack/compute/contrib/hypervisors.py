@@ -20,7 +20,7 @@ import webob.exc
 from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova.compute import api as compute_api
 from nova import db
 from nova import exception
@@ -248,6 +248,7 @@ class CellsHypervisorsController(object):
 
     def __init__(self):
         self.api = compute_api.HostAPI()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
         super(CellsHypervisorsController, self).__init__()
 
     def _view_hypervisor(self, hypervisor, detail, servers=None, **kwargs):
@@ -294,7 +295,7 @@ class CellsHypervisorsController(object):
             cell_name, compute_id = compute_id.split("-")
         except (ValueError, AttributeError):
             raise webob.exc.HTTPNotFound()
-        responses = cells_api.cell_broadcast_call(context, "down",
+        responses = self.cells_rpcapi.cell_broadcast_call(context, "down",
                 "compute_node_get", compute_id=compute_id)
         hyp = self._find_single_response(responses, match_cell_name=cell_name)
         hyp["id"] = "%s-%s" % (cell_name, hyp["id"])
@@ -303,7 +304,7 @@ class CellsHypervisorsController(object):
         return hyp
 
     def _get_all_hypervisors(self, context, match=None, **kwargs):
-        responses = cells_api.cell_broadcast_call(context,
+        responses = self.cells_rpcapi.cell_broadcast_call(context,
                                                   "down",
                                                   "list_compute_nodes",
                                                   **kwargs)
@@ -382,7 +383,7 @@ class CellsHypervisorsController(object):
     def statistics(self, req):
         context = req.environ['nova.context']
         authorize(context)
-        responses = cells_api.cell_broadcast_call(context,
+        responses = self.cells_rpcapi.cell_broadcast_call(context,
                                                   "down",
                                                   "compute_node_stats")
         stats = {}

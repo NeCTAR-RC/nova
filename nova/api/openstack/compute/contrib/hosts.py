@@ -22,7 +22,7 @@ from xml.parsers import expat
 from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova.compute import api as compute_api
 from nova import db
 from nova import exception
@@ -137,10 +137,11 @@ def _cells_list_hosts(req, service=None):
         ]
     """
     context = req.environ['nova.context']
-    responses = cells_api.cell_broadcast_call(context,
-                                              "down",
-                                              "list_services",
-                                              disabled=False)
+    rpcapi = cells_rpcapi.CellsAPI()
+    responses = rpcapi.cell_broadcast_call(context,
+                                           "down",
+                                           "list_services",
+                                           disabled=False)
     result = []
     for (hosts, cell_name) in responses:
         result.extend([

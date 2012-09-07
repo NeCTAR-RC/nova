@@ -85,11 +85,16 @@ class TestWeightOffsetTestCase(test.TestCase):
 
         # Detect when the rpc message is sent
         def fake_rpc_cast(context, topic, message):
-            args = {'topic': fake_topic,
-                    'request_spec': fake_request_spec,
-                    'filter_properties': fake_filter_properties}
+            args = {'request_spec': fake_request_spec,
+                    'filter_properties': fake_filter_properties,
+                    'admin_password': 'foo',
+                    'injected_files': [],
+                    'requested_networks': None,
+                    'is_first_time': True,
+                    }
             expected_message = {'method': 'run_instance',
-                                'args': args}
+                                'args': args,
+                                'version': '2.0'}
             self.assertEqual(context, fake_context)
             self.assertEqual(message, expected_message)
             call_info['cast_called'] += 1
@@ -134,6 +139,10 @@ class TestWeightOffsetTestCase(test.TestCase):
         self.top_cell_manager.schedule_run_instance(fake_context,
                 topic=fake_topic,
                 request_spec=fake_request_spec,
+                admin_password='foo',
+                injected_files=[],
+                requested_networks=None,
+                is_first_time=True,
                 filter_properties=fake_filter_properties)
 
         self.assertEqual(call_info['create_called'], 1)

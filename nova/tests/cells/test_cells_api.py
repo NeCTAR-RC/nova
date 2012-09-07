@@ -16,7 +16,7 @@
 Tests For Cells API
 """
 
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
 from nova import flags
 from nova.openstack.common import rpc
@@ -31,6 +31,7 @@ class CellsAPITestCase(test.TestCase):
 
     def setUp(self):
         super(CellsAPITestCase, self).setUp()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
 
     def test_cell_call(self):
         fake_context = 'fake_context'
@@ -38,7 +39,7 @@ class CellsAPITestCase(test.TestCase):
         fake_method = 'fake_method'
         fake_method_kwargs = {'kwarg1': 10, 'kwarg2': 20}
         fake_response = 'fake_response'
-        fake_wrapped_message = 'fake_wrapped_message'
+        fake_wrapped_message = {'msg': 'fake_wrapped_message'}
 
         def fake_form_routing_message(name, direction, method,
                 method_kwargs, need_response=False):
@@ -49,7 +50,7 @@ class CellsAPITestCase(test.TestCase):
             self.assertTrue(need_response)
             return fake_wrapped_message
 
-        def fake_rpc_call(context, topic, message):
+        def fake_rpc_call(context, topic, message, timeout=None):
             self.assertEqual(context, fake_context)
             self.assertEqual(topic, FLAGS.cells_topic)
             self.assertEqual(message, fake_wrapped_message)
@@ -59,7 +60,7 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_routing_message)
         self.stubs.Set(rpc, 'call', fake_rpc_call)
 
-        result = cells_api.cell_call(fake_context,
+        result = self.cells_rpcapi.cell_call(fake_context,
                 fake_cell_name, fake_method,
                 **fake_method_kwargs)
         self.assertEqual(result, fake_response)
@@ -69,7 +70,7 @@ class CellsAPITestCase(test.TestCase):
         fake_cell_name = 'fake_cell_name'
         fake_method = 'fake_method'
         fake_method_kwargs = {'kwarg1': 10, 'kwarg2': 20}
-        fake_wrapped_message = 'fake_wrapped_message'
+        fake_wrapped_message = {'msg': 'fake_wrapped_message'}
 
         def fake_form_routing_message(name, direction, method,
                 method_kwargs, need_response=False):
@@ -92,7 +93,7 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_routing_message)
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.cell_cast(fake_context, fake_cell_name, fake_method,
+        self.cells_rpcapi.cell_cast(fake_context, fake_cell_name, fake_method,
                 **fake_method_kwargs)
         self.assertEqual(call_info['cast_called'], 1)
 
@@ -101,7 +102,7 @@ class CellsAPITestCase(test.TestCase):
         fake_method = 'fake_method'
         fake_direction = 'fake_direction'
         fake_method_kwargs = {'kwarg1': 10, 'kwarg2': 20}
-        fake_wrapped_message = 'fake_wrapped_message'
+        fake_wrapped_message = {'msg': 'fake_wrapped_message'}
 
         def fake_form_broadcast_message(direction, method, method_kwargs):
             self.assertEqual(direction, fake_direction)
@@ -121,8 +122,8 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_broadcast_message)
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.cell_broadcast(fake_context, fake_direction, fake_method,
-                **fake_method_kwargs)
+        self.cells_rpcapi.cell_broadcast(fake_context, fake_direction,
+                fake_method, **fake_method_kwargs)
         self.assertEqual(call_info['cast_called'], 1)
 
     def test_cast_service_api_method(self):
@@ -149,9 +150,9 @@ class CellsAPITestCase(test.TestCase):
             self.assertFalse(is_broadcast)
             call_info['cast_called'] += 1
 
-        self.stubs.Set(cells_api, 'cell_cast', fake_cell_cast)
+        self.stubs.Set(self.cells_rpcapi, 'cell_cast', fake_cell_cast)
 
-        cells_api.cast_service_api_method(fake_context,
+        self.cells_rpcapi.cast_service_api_method(fake_context,
                 fake_cell_name, fake_service, fake_method,
                 *fake_method_args, **fake_method_kwargs)
         self.assertEqual(call_info['cast_called'], 1)
@@ -179,9 +180,9 @@ class CellsAPITestCase(test.TestCase):
             self.assertFalse(is_broadcast)
             return fake_response
 
-        self.stubs.Set(cells_api, 'cell_call', fake_cell_call)
+        self.stubs.Set(self.cells_rpcapi, 'cell_call', fake_cell_call)
 
-        result = cells_api.call_service_api_method(fake_context,
+        result = self.cells_rpcapi.call_service_api_method(fake_context,
                 fake_cell_name, fake_service, fake_method,
                 *fake_method_args, **fake_method_kwargs)
         self.assertEqual(result, fake_response)
@@ -209,10 +210,12 @@ class CellsAPITestCase(test.TestCase):
             self.assertTrue(is_broadcast)
             call_info['bcast_called'] += 1
 
-        self.stubs.Set(cells_api, 'cell_broadcast', fake_cell_broadcast)
+        self.stubs.Set(self.cells_rpcapi, 'cell_broadcast',
+                fake_cell_broadcast)
 
-        cells_api.broadcast_service_api_method(fake_context, fake_service,
-                fake_method, *fake_method_args, **fake_method_kwargs)
+        self.cells_rpcapi.broadcast_service_api_method(fake_context,
+                fake_service, fake_method, *fake_method_args,
+                **fake_method_kwargs)
         self.assertEqual(call_info['bcast_called'], 1)
 
     def test_schedule_run_instance(self):
@@ -220,7 +223,8 @@ class CellsAPITestCase(test.TestCase):
         fake_kwargs = {'kwarg1': 10, 'kwarg2': 20}
 
         expected_message = {'method': 'schedule_run_instance',
-                            'args': fake_kwargs}
+                            'args': fake_kwargs,
+                            'version': self.cells_rpcapi.BASE_RPC_API_VERSION}
 
         call_info = {'cast_called': 0}
 
@@ -232,7 +236,7 @@ class CellsAPITestCase(test.TestCase):
 
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.schedule_run_instance(fake_context,
+        self.cells_rpcapi.schedule_run_instance(fake_context,
                 **fake_kwargs)
         self.assertEqual(call_info['cast_called'], 1)
 
@@ -240,7 +244,7 @@ class CellsAPITestCase(test.TestCase):
         self.flags(enable_cells=True)
         fake_context = 'fake_context'
         fake_instance = 'fake_instance'
-        fake_formed_message = 'fake_formed_message'
+        fake_formed_message = {'msg': 'fake_formed_message'}
 
         call_info = {'cast_called': 0}
 
@@ -259,14 +263,14 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_instance_update_broadcast_message)
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.instance_update(fake_context, fake_instance)
+        self.cells_rpcapi.instance_update(fake_context, fake_instance)
         self.assertEqual(call_info['cast_called'], 1)
 
     def test_instance_destroy(self):
         self.flags(enable_cells=True)
         fake_context = 'fake_context'
         fake_instance = 'fake_instance'
-        fake_formed_message = 'fake_formed_message'
+        fake_formed_message = {'msg': 'fake_formed_message'}
 
         call_info = {'cast_called': 0}
 
@@ -285,13 +289,13 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_instance_destroy_broadcast_message)
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.instance_destroy(fake_context, fake_instance)
+        self.cells_rpcapi.instance_destroy(fake_context, fake_instance)
         self.assertEqual(call_info['cast_called'], 1)
 
     def test_sync_instances(self):
         self.flags(enable_cells=True)
         fake_context = 'fake_context'
-        fake_formed_message = 'fake_formed_message'
+        fake_formed_message = {'msg': 'fake_formed_message'}
         fake_updated_since = 'fake_updated_since'
         fake_project_id = 'fake_project_id'
         fake_deleted = 'fake_deleted'
@@ -318,7 +322,7 @@ class CellsAPITestCase(test.TestCase):
                 fake_form_broadcast_message)
         self.stubs.Set(rpc, 'cast', fake_rpc_cast)
 
-        cells_api.sync_instances(fake_context,
+        self.cells_rpcapi.sync_instances(fake_context,
                 project_id=fake_project_id,
                 updated_since=fake_updated_since,
                 deleted=fake_deleted)

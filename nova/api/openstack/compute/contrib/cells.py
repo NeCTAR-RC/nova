@@ -25,7 +25,7 @@ from nova.api.openstack import common
 from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
-from nova.cells import api as cells_api
+from nova.cells import rpcapi as cells_rpcapi
 from nova.compute import api as compute
 from nova import db
 from nova import exception
@@ -128,11 +128,12 @@ class Controller(object):
 
     def __init__(self):
         self.compute_api = compute.API()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
 
     def _get_cells(self, ctxt, req, detail=False):
         """Return all cells."""
         # Ask the CellsManager for the most recent data
-        items = cells_api.get_all_cell_info(ctxt)
+        items = self.cells_rpcapi.get_all_cell_info(ctxt)
         items = common.limited(items, req)
         items = [_scrub_cell(item, detail=detail) for item in items]
         return dict(cells=items)
@@ -288,7 +289,7 @@ class Controller(object):
             except ValueError:
                 msg = _('Invalid changes-since value')
                 raise exc.HTTPBadRequest(explanation=msg)
-        cells_api.sync_instances(context, project_id=project_id,
+        self.cells_rpcapi.sync_instances(context, project_id=project_id,
                 updated_since=updated_since, deleted=deleted)
 
 

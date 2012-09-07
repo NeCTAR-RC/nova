@@ -199,10 +199,10 @@ class CellsManagerClassTestCase(test.TestCase):
                 'need_response': True}
 
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
-        orig_send = z2_mgr.send_raw_message_to_cell
+        orig_send = z2_mgr.cells_rpcapi.send_message_to_cell
         info = {}
 
-        def send_raw_message_to_cell(context, cell, message,
+        def send_message_to_cell(context, cell, message,
                 dest_host=None, topic=None):
             # Catch response coming up and store the dest_host
             # so we can make sure responses send to the
@@ -212,8 +212,8 @@ class CellsManagerClassTestCase(test.TestCase):
             return orig_send(context, cell, message,
                     dest_host=dest_host)
 
-        self.stubs.Set(z2_mgr, 'send_raw_message_to_cell',
-                send_raw_message_to_cell)
+        self.stubs.Set(z2_mgr.cells_rpcapi, 'send_message_to_cell',
+                send_message_to_cell)
 
         result = self.cells_manager.route_message(fake_context, **args)
         self.assertEqual(result, fakes.TEST_METHOD_EXPECTED_RESULT)
@@ -256,15 +256,16 @@ class CellsManagerClassTestCase(test.TestCase):
         self.cells_manager.broadcast_message(fake_context,
                 **bcast_message['args'])
 
-        self.assertEqual(self.cells_manager._test_call_info['send_message'],
-                len(self.cells_manager.get_child_cells()))
+        self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
+            'send_message'], len(self.cells_manager.get_child_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
-        self.assertEqual(z2_mgr._test_call_info['send_message'],
+        self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
                 len(z2_mgr.get_child_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
         gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
-        self.assertEqual(gc_mgr._test_call_info['send_message'], 0)
+        self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
+                0)
         self.assertEqual(gc_mgr._test_call_info['test_method'], 1)
 
     def test_broadcast_message_up(self):
@@ -278,15 +279,15 @@ class CellsManagerClassTestCase(test.TestCase):
 
         gc_mgr.broadcast_message(fake_context, **bcast_message['args'])
 
-        self.assertEqual(gc_mgr._test_call_info['send_message'],
+        self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
                 len(gc_mgr.get_parent_cells()))
         self.assertEqual(gc_mgr._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
-        self.assertEqual(z2_mgr._test_call_info['send_message'],
+        self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
                 len(z2_mgr.get_parent_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
-        self.assertEqual(self.cells_manager._test_call_info['send_message'],
-                len(self.cells_manager.get_parent_cells()))
+        self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
+            'send_message'], len(self.cells_manager.get_parent_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
 
     def test_broadcast_message_max_hops(self):
@@ -301,15 +302,16 @@ class CellsManagerClassTestCase(test.TestCase):
         self.cells_manager.broadcast_message(fake_context,
                 **bcast_message['args'])
 
-        self.assertEqual(self.cells_manager._test_call_info['send_message'],
-                len(self.cells_manager.get_child_cells()))
+        self.assertEqual(self.cells_manager.cells_rpcapi._test_call_info[
+            'send_message'], len(self.cells_manager.get_child_cells()))
         self.assertEqual(self.cells_manager._test_call_info['test_method'], 1)
         z2_mgr = fakes.FAKE_CELL_MANAGERS['cell2']
-        self.assertEqual(z2_mgr._test_call_info['send_message'],
+        self.assertEqual(z2_mgr.cells_rpcapi._test_call_info['send_message'],
                 len(z2_mgr.get_child_cells()))
         self.assertEqual(z2_mgr._test_call_info['test_method'], 1)
         gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
-        self.assertEqual(gc_mgr._test_call_info['send_message'], 0)
+        self.assertEqual(gc_mgr.cells_rpcapi._test_call_info['send_message'],
+                0)
         self.assertEqual(gc_mgr._test_call_info['test_method'], 0)
 
     def test_run_service_api_method(self):
@@ -514,16 +516,18 @@ class CellsManagerClassTestCase(test.TestCase):
         call_info = {'send_message': 0}
 
         def fake_send_message_to_cell(context, cell, dest_host, message,
-                fanout=False, topic=None):
+                rpc_proxy, fanout=False, topic=None):
             self.assertEqual(context, fake_context)
             self.assertEqual(cell, fake_cell)
             self.assertEqual(message, fake_message)
+            self.assertEqual(rpc_proxy, mgr.cells_rpcapi)
             call_info['send_message'] += 1
 
-        self.stubs.Set(mgr.driver, 'send_message_to_cell',
+        self.stubs.Set(mgr.cells_rpcapi.driver, 'send_message_to_cell',
                 fake_send_message_to_cell)
 
-        mgr.send_raw_message_to_cell(fake_context, fake_cell, fake_message)
+        mgr.cells_rpcapi.send_message_to_cell(fake_context, fake_cell,
+                fake_message)
         self.assertEqual(call_info['send_message'], 1)
 
     def test_schedule_calls_get_proxied(self):
@@ -663,7 +667,7 @@ class CellsManagerClassTestCase(test.TestCase):
 
         call_info = {'broadcast': 0}
 
-        def send_raw_message_to_cells(context, cells, bcast_message,
+        def send_message_to_cells(context, cells, bcast_message,
                 **kwargs):
             self.assertEqual(context, fake_context)
             self.assertEqual(bcast_message['method'], 'broadcast_message')
@@ -671,8 +675,8 @@ class CellsManagerClassTestCase(test.TestCase):
             call_info['method'] = message['method']
             call_info['broadcast'] += 1
 
-        self.stubs.Set(self.cells_manager, 'send_raw_message_to_cells',
-                send_raw_message_to_cells)
+        self.stubs.Set(self.cells_manager.cells_rpcapi,
+                'send_message_to_cells', send_message_to_cells)
 
         instance = {'uuid': 'fake', 'deleted': True}
         self.cells_manager._sync_instance(fake_context, instance)

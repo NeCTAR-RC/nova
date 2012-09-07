@@ -45,14 +45,14 @@ class CellsRPCDriver(driver.BaseCellsDriver):
         return server_params
 
     def send_message_to_cell(self, context, cell_info, dest_host, message,
-            fanout=False, topic=None):
+            rpc_proxy, fanout=False, topic=None):
         server_params = self._get_server_params_for_cell(cell_info)
         if topic is None:
             topic = FLAGS.cells_topic
         if fanout:
-            rpc.fanout_cast_to_server(context, server_params, topic,
-                    message)
+            rpc_proxy.fanout_cast_to_server(context, server_params, message,
+                    topic)
             return
         if dest_host:
             topic += '.%s' % dest_host
-        rpc.cast_to_server(context, server_params, topic, message)
+        rpc_proxy.cast_to_server(context, server_params, message, topic)
