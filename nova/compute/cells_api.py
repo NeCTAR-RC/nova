@@ -123,14 +123,22 @@ class ComputeCellsAPI(compute_api.API):
         return
 
     def _create_image(self, context, instance, name, image_type,
-            backup_type=None, rotation=None, extra_properties=None):
+                      backup_type=None, rotation=None,
+                      extra_properties=None, image_id=None):
+
+        recv_meta = super(ComputeCellsAPI, self)._create_image(
+                          context, instance, name, image_type, backup_type,
+                          rotation, extra_properties, image_id)
+        image_id = recv_meta['id']
         if backup_type:
-            return self._call_to_cells(context, instance, 'backup',
-                    name, backup_type, rotation,
-                    extra_properties=extra_properties)
+            self._cast_to_cells(context, instance, 'backup', name,
+                backup_type=backup_type, rotation=rotation, image_id=image_id,
+                extra_properties=extra_properties)
         else:
-            return self._call_to_cells(context, instance, 'snapshot',
-                    name, extra_properties=extra_properties)
+            self._cast_to_cells(context, instance, 'snapshot',
+                    name, image_id=image_id, extra_properties=extra_properties)
+
+        return recv_meta
 
     def create(self, *args, **kwargs):
         """We can use the base functionality, but I left this here just
