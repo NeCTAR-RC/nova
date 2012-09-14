@@ -3414,7 +3414,7 @@ class ComputeAPITestCase(BaseTestCase):
         """Ensure a snapshot of an instance can be created"""
         instance = self._create_fake_instance()
         image = self.compute_api.snapshot(self.context, instance, 'snap1',
-                                        {'extra_param': 'value1'})
+                                          {'extra_param': 'value1'})
 
         self.assertEqual(image['name'], 'snap1')
         properties = image['properties']
@@ -3422,6 +3422,27 @@ class ComputeAPITestCase(BaseTestCase):
         self.assertEqual(properties['image_type'], 'snapshot')
         self.assertEqual(properties['instance_uuid'], instance['uuid'])
         self.assertEqual(properties['extra_param'], 'value1')
+
+        db.instance_destroy(self.context, instance['uuid'])
+
+    def test_snapshot_given_image_uuid(self):
+        """Ensure a snapshot of an instance can be created"""
+        instance = self._create_fake_instance()
+        name = 'snap1'
+        extra_properties = {'extra_param': 'value1'}
+        recv_meta = self.compute_api.snapshot(self.context, instance, name,
+                                          extra_properties)
+        image_id = recv_meta['id']
+
+        def fake_show(meh, context, id):
+            return recv_meta
+
+        fake_image.stub_out_image_service(self.stubs)
+        self.stubs.Set(fake_image._FakeImageService, 'show', fake_show)
+        image = self.compute_api.snapshot(self.context, instance, name,
+                                          extra_properties,
+                                          image_id=image_id)
+        self.assertEqual(image, recv_meta)
 
         db.instance_destroy(self.context, instance['uuid'])
 
@@ -3443,8 +3464,7 @@ class ComputeAPITestCase(BaseTestCase):
         instance['instance_type'].update(inst_params)
 
         image = self.compute_api.snapshot(self.context, instance, 'snap1',
-                                        {'extra_param': 'value1'})
-
+                                          {'extra_param': 'value1'})
         self.assertEqual(image['name'], 'snap1')
         self.assertEqual(image['min_ram'], 256)
         self.assertEqual(image['min_disk'], 2)
@@ -3475,7 +3495,7 @@ class ComputeAPITestCase(BaseTestCase):
         instance = self._create_fake_instance()
 
         image = self.compute_api.snapshot(self.context, instance, 'snap1',
-                                        {'extra_param': 'value1'})
+                                          {'extra_param': 'value1'})
 
         self.assertEqual(image['name'], 'snap1')
         self.assertEqual(image['min_ram'], 512)
@@ -3504,7 +3524,7 @@ class ComputeAPITestCase(BaseTestCase):
         instance = self._create_fake_instance()
 
         image = self.compute_api.snapshot(self.context, instance, 'snap1',
-                                        {'extra_param': 'value1'})
+                                          {'extra_param': 'value1'})
 
         self.assertEqual(image['name'], 'snap1')
         self.assertFalse('min_ram' in image)
@@ -3527,12 +3547,13 @@ class ComputeAPITestCase(BaseTestCase):
         def fake_show(*args):
             raise exception.ImageNotFound
 
-        self.stubs.Set(fake_image._FakeImageService, 'show', fake_show)
+        if not self.__class__.__name__ == "CellsComputeAPITestCase":
+            self.stubs.Set(fake_image._FakeImageService, 'show', fake_show)
 
         instance = self._create_fake_instance()
 
         image = self.compute_api.snapshot(self.context, instance, 'snap1',
-                                        {'extra_param': 'value1'})
+                                          {'extra_param': 'value1'})
 
         self.assertEqual(image['name'], 'snap1')
 
