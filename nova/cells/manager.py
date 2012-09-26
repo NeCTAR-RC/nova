@@ -719,7 +719,11 @@ class CellsManager(manager.Manager):
 
     def run_service_api_method(self, context, service_name, method_info,
             is_broadcast=False, routing_path=None, **kwargs):
-        """Caller wants us to call a method in a service API"""
+        """Caller wants us to call a method in a service API
+
+        :param routing_path: the path to the cell that sent this message, or
+                             None if it came straight from OSAPI service
+        """
         api = self.api_map.get(service_name)
         if not api:
             detail = _("Unknown service API: %s") % service_name
@@ -950,8 +954,15 @@ class CellsManager(manager.Manager):
         except exception.ServiceNotFound:
             return None
 
-    def list_services(self, context, routing_path):
-        return db.service_get_all(context)
+    def list_services(self, context, routing_path, include_disabled=True):
+        """
+        :param include_disabled: if True (the default), includes disabled
+                                 services in the Result
+        """
+        if include_disabled:
+            return db.service_get_all(context)
+        else:
+            return db.service_get_all(context, disabled=False)
 
     def task_logs(self, context, routing_path, **kwargs):
         task_name = kwargs.get('task_name')

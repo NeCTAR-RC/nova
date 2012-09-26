@@ -14,6 +14,7 @@
 #    under the License.
 
 from lxml import etree
+import mock
 import webob.exc
 
 from nova.api.openstack.compute.contrib import hosts as os_hosts
@@ -330,3 +331,137 @@ class HostSerializerTest(test.TestCase):
         result = self.deserializer.deserialize(intext)
 
         self.assertEqual(dict(body=exemplar), result)
+
+
+class TestCellsListHosts(test.TestCase):
+    """
+    Tests that _list_hosts calls the child cells when FLAGS.enable_cells is on
+    """
+
+    fakeHosts = [
+        {'host': 'cells1.host.com',
+         'topic': 'cells'},
+        {'host': 'cells2.host.com',
+         'topic': 'cells'},
+        {'host': 'cells3.host.com',
+         'topic': 'cells'},
+        {'host': 'compute.host.com',
+         'topic': 'compute'},
+        {'host': 'console.host.com',
+         'topic': 'consoleauth'},
+        {'host': 'network1.host.com',
+         'topic': 'network'},
+        {'host': 'network1.host.com',
+         'topic': 'network'},
+        {'host': 'network1.host.com',
+         'topic': 'network'},
+        {'host': 'scheduler1.host.com',
+         'topic': 'scheduler'},
+        {'host': 'scheduler2.host.com',
+         'topic': 'scheduler'},
+        {'host': 'scheduler3.host.com',
+         'topic': 'volume'},
+        {'host': 'compute1.host.com',
+         'topic': 'compute'},
+        {'host': 'compute2.host.com',
+         'topic': 'compute'},
+        {'host': 'compute3.host.com',
+         'topic': 'compute'},
+    ]
+
+    def setUp(self):
+        super(TestCellsListHosts, self).setUp()
+        # Fake/Mock Nova Context
+        self.fake_context = mock.Mock()
+        self.fake_context.project_id = "fake_project"
+        self.fake_context.to_dict = lambda: {'is_admin': 'True'}
+
+        # Fake/Mock WSGI Request
+        self.fake_req = mock.MagicMock()
+        self.fake_req.environ = {"nova.context": self.fake_context}
+        self.fake_req.application_url = "http://test/v2"
+
+        # Mock/Patch the cell_broadcast_call method
+        bc_patch = mock.patch("nova.cells.api.cell_broadcast_call")
+        self.bc_mock = bc_patch.start()
+
+        # Mock/Patch db.instance_get_all_by_host
+        db_get_all_patch = mock.patch('nova.db.instance_get_all_by_host')
+        self.db_get_all_mock = db_get_all_patch.start()
+
+        def _cleanup_func():
+            bc_patch.stop()
+            db_get_all_patch.stop()
+
+        self._stop_func = _cleanup_func
+
+        # Make sure we're in the cells envinronment
+        self.flags(enable_cells=True)
+
+        # Get the controller that we're going to call index on
+        self.controller = os_hosts.HostController()
+
+    def tearDown(self):
+        self._stop_func()
+        super(TestCellsListHosts, self).tearDown()
+
+    def testEmptyList(self):
+        self.bc_mock.return_value = [([], "c0001")]
+        response = self.controller.index(self.fake_req)
+        self.assertEqual({"hosts": []}, response)
+
+    def testEmptyListFromTwoCells(self):
+        self.bc_mock.return_value = [([], "c0001"), ([], "c0002")]
+        response = self.controller.index(self.fake_req)
+        self.assertEqual({"hosts": []}, response)
+
+    def testCellNamePrepending(self):
+        self.bc_mock.return_value = [(self.fakeHosts, "c0001")]
+        response = self.controller.index(self.fake_req)
+        responseHosts = response.get('hosts', [])
+        for responseHost, fakeHost in zip(responseHosts, self.fakeHosts):
+            self.assertEqual(responseHost['host_name'],
+                             'c0001-%s' % fakeHost['host'])
+            self.assertEqual(responseHost['service'], fakeHost['topic'])
+
+    def testCellNamePrependingWith2Cells(self):
+        self.bc_mock.return_value = [(self.fakeHosts, "c0001"),
+                                     (self.fakeHosts, "c0002")]
+        response = self.controller.index(self.fake_req)
+        responseHosts = response.get('hosts', [])
+        ln = len(self.fakeHosts)
+        self.assertEqual(len(responseHosts), ln * 2)
+        for responseHost, fakeHost in zip(responseHosts, self.fakeHosts):
+            self.assertEqual(responseHost['host_name'],
+                             'c0001-%s' % fakeHost['host'])
+            self.assertEqual(responseHost['service'], fakeHost['topic'])
+        for responseHost, fakeHost in zip(responseHosts[ln:], self.fakeHosts):
+            self.assertEqual(responseHost['host_name'],
+                             'c0002-%s' % fakeHost['host'])
+            self.assertEqual(responseHost['service'], fakeHost['topic'])
+
+    def testLowLevelFiltering(self):
+        """
+        Tests the lower level _cells_list_hosts method and its filtering
+        feature
+        """
+        half = len(self.fakeHosts)
+        half1 = self.fakeHosts[:half]
+        half2 = self.fakeHosts[half + 1:]
+        half1Filtered = [
+            host for host in half1 if host['topic'] == 'compute']
+        half2Filtered = [
+            host for host in half2 if host['topic'] == 'compute']
+        self.bc_mock.return_value = [(half1, "c0001"),
+                                     (half2, "c0002")]
+        output = os_hosts._cells_list_hosts(self.fake_req, 'compute')
+        self.assertEqual(len(half1Filtered) + len(half2Filtered), len(output))
+        for in_row, out_row in zip(half1Filtered, output):
+            self.assertEqual(out_row['host_name'],
+                             'c0001-%s' % in_row['host'])
+            self.assertEqual(in_row['topic'], out_row['service'])
+
+        for in_row, out_row in zip(half2Filtered, output[len(half1) + 1:]):
+            self.assertEqual(out_row['host_name'],
+                             'c0002-%s' % in_row['host'])
+            self.assertEqual(in_row['topic'], out_row['service'])

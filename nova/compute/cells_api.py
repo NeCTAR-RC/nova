@@ -545,9 +545,3 @@ class ComputeCellsAPI(compute_api.API):
         except exception.InstanceUnknownCell:
             pass
         return rv
-
-    def get_instance_faults(self, context, instances):
-        """Get all faults for a list of instance uuids."""
-        # FIXME(comstud): We'll need to cache these
-        return super(ComputeCellsAPI, self).get_instance_faults(context,
-                instances)
