@@ -123,15 +123,15 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
         self.cast(context, message)
 
     def call_dbapi_method(self, context, method, args, kwargs=None,
-            sub_topic=None):
+            sub_topic=None, direction='up'):
         """Broadcast message up, saying to call a DB API method."""
         if kwargs is None:
             kwargs = {}
         db_method_info = {'method': method,
                           'method_args': args,
                           'method_kwargs': kwargs}
-        bcast_message = cells_utils.form_broadcast_message('up',
-                'call_dbapi_method',
+        bcast_message = cells_utils.form_broadcast_message(direction,
+                'call_dbapi_method_%s' % direction,
                 {'db_method_info': db_method_info})
         topic = FLAGS.cells.topic
         if sub_topic:
