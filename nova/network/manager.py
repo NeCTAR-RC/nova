@@ -2037,10 +2037,10 @@ class VlanManager(RPCAllocateFixedIP, FloatingIP, NetworkManager):
         self._convert_int_args(kwargs)
 
         # Check that num_networks + vlan_start is not > 4094, fixes lp708025
-        if kwargs['num_networks'] + kwargs['vlan_start'] > 4094:
-            raise ValueError(_('The sum between the number of networks and'
-                               ' the vlan start cannot be greater'
-                               ' than 4094'))
+        #if kwargs['num_networks'] + kwargs['vlan_start'] > 4094:
+        #    raise ValueError(_('The sum between the number of networks and'
+        #                       ' the vlan start cannot be greater'
+        #                       ' than 4094'))
 
         # check that num networks and network size fits in fixed_net
         fixed_net = netaddr.IPNetwork(kwargs['cidr'])
