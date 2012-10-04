@@ -938,9 +938,9 @@ class CellsManager(manager.Manager):
             **kwargs):
         """Call a DB API method."""
 
-         if self._path_is_us(routing_path):
-             # Don't update the DB if the call originated from ourselves'
-             return
+        if self._path_is_us(routing_path):
+            # Don't update the DB if the call originated from ourselves
+            return
         method = db_method_info['method']
         args = db_method_info['method_args']
         kwargs = db_method_info['method_kwargs']
