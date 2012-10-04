@@ -557,8 +557,8 @@ class Security_groups(extensions.ExtensionDescriptor):
 
         return resources
 
-
-class NativeSecurityGroupAPI(compute.api.SecurityGroupAPI):
+from nova.compute import SecurityGroupAPI
+class NativeSecurityGroupAPI(SecurityGroupAPI):
     @staticmethod
     def raise_invalid_property(msg):
         raise exc.HTTPBadRequest(explanation=msg)
