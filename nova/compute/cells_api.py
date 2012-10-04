@@ -73,6 +73,7 @@ class ComputeCellsAPI(compute_api.API):
         self.compute_rpcapi = ComputeRPCAPINoOp()
         # Redirect scheduler run_instance to cells.
         self.scheduler_rpcapi = SchedulerRPCAPIRedirect(self.cells_rpcapi)
+        self.security_group_api = SecurityGroupCellsAPI()
 
     def _cell_read_only(self, cell_name):
         """Is the target cell in a read-only mode?"""
@@ -549,3 +550,37 @@ class ComputeCellsAPI(compute_api.API):
         except exception.InstanceUnknownCell:
             pass
         return rv
+
+
+class SecurityGroupRPCAPIRedirect(object):
+    def __getattr__(self, key):
+        def _noop_rpc_wrapper(*args, **kwargs):
+            return None
+        return _noop_rpc_wrapper
+
+class SecurityGroupCellsAPI(compute_api.SecurityGroupAPI):
+    def __init__(self, *args, **kwargs):
+        super(SecurityGroupCellsAPI, self).__init__(*args, **kwargs)
+        self.security_group_rpcapi =  SecurityGroupRPCAPIRedirect()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
+
+    def trigger_rules_refresh(self, context, id):
+        """Called when a rule is added to or removed from a security_group."""
+        security_group = self.db.security_group_get(context, id)
+        # Dirty hack, race condition between DB updating on child and this 
+        # code being executed
+        import time
+        time.sleep(3)
+        hosts = set()
+        for instance in security_group['instances']:
+            if instance['host'] is not None:
+                if not instance['cell_name']:
+                    raise exception.InstanceUnknownCell(instance_id=instance['uuid'])
+                cell_name = instance['cell_name']
+                hosts.add((instance, cell_name))
+
+        for instance, cell_name in hosts:
+            msg = _("Refreshing instance security group rules for %s on cell %s")
+            LOG.debug(msg, instance, cell_name, context=context)
+            self.cells_rpcapi.cast_service_api_method(context, cell_name, 'securitygroup_rpc',
+                'refresh_instance_security_rules', instance['host'], instance)
