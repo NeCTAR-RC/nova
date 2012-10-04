@@ -1302,9 +1302,17 @@ def security_group_in_use(context, group_id):
     return IMPL.security_group_in_use(context, group_id)
 
 
-def security_group_create(context, values):
+def security_group_create(context, values, update_cells=True):
     """Create a new security group."""
-    return IMPL.security_group_create(context, values)
+    rv = IMPL.security_group_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'security_group_create',
+                                                            values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of security_group_create"))
+    return rv
 
 
 def security_group_ensure_default(context):
@@ -1317,9 +1325,17 @@ def security_group_ensure_default(context):
     return IMPL.security_group_ensure_default(context)
 
 
-def security_group_destroy(context, security_group_id):
+def security_group_destroy(context, security_group_id, update_cells=True):
     """Deletes a security group."""
-    return IMPL.security_group_destroy(context, security_group_id)
+    rv = IMPL.security_group_destroy(context, security_group_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'security_group_destroy',
+                                                            security_group_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of security_group_destroy"))
+    return rv
 
 
 def security_group_count_by_project(context, project_id, session=None):
@@ -1331,9 +1347,17 @@ def security_group_count_by_project(context, project_id, session=None):
 ####################
 
 
-def security_group_rule_create(context, values):
+def security_group_rule_create(context, values, update_cells=True):
     """Create a new security group."""
-    return IMPL.security_group_rule_create(context, values)
+    rv = IMPL.security_group_rule_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'security_group_rule_create',
+                                                            values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of security_group_rule_create"))
+    return rv
 
 
 def security_group_rule_get_by_security_group(context, security_group_id):
@@ -1349,9 +1373,17 @@ def security_group_rule_get_by_security_group_grantee(context,
                                                              security_group_id)
 
 
-def security_group_rule_destroy(context, security_group_rule_id):
+def security_group_rule_destroy(context, security_group_rule_id, update_cells=True):
     """Deletes a security group rule."""
-    return IMPL.security_group_rule_destroy(context, security_group_rule_id)
+    rv = IMPL.security_group_rule_destroy(context, security_group_rule_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'security_group_rule_destroy',
+                                                            security_group_rule_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of security_group_rule_destroy"))
+    return rv
 
 
 def security_group_rule_get(context, security_group_rule_id):
