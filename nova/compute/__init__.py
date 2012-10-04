@@ -21,5 +21,10 @@
 import nova.flags
 import nova.openstack.common.importutils
 
+
+
 API = nova.openstack.common.importutils.import_class(
-        nova.flags.FLAGS.compute_api_class)
+    nova.flags.FLAGS.compute_api_class)
+
+SecurityGroupAPI = nova.openstack.common.importutils.import_class(
+    nova.flags.FLAGS.securitygroup_api_class)
