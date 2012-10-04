@@ -1315,15 +1315,21 @@ def security_group_create(context, values, update_cells=True):
     return rv
 
 
-def security_group_ensure_default(context):
+def security_group_ensure_default(context, update_cells=True):
     """Ensure default security group exists for a project_id.
 
     Returns a tuple with the first element being a bool indicating
     if the default security group previously existed. Second
     element is the dict used to create the default security group.
     """
-    return IMPL.security_group_ensure_default(context)
-
+    rv = IMPL.security_group_ensure_default(context)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'security_group_ensure_default')
+        except Exception:
+            LOG.exception(_("Failed to notify cells of security_group_ensure_default"))
+    return rv
 
 def security_group_destroy(context, security_group_id, update_cells=True):
     """Deletes a security group."""
