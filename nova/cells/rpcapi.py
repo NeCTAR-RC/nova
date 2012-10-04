@@ -263,3 +263,10 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
                 routing_path=resp_routing_path)
         self.send_message_to_cell(context, next_hop, routing_message,
                 dest_host=hop_host, topic=reply_topic)
+
+    def broadcast_dbmethod_down(self, context, dbmethod, *args, **kwargs):
+        """Broadcast db method downward"""
+        if not FLAGS.cells.enable:
+            return
+        self.call_dbapi_method(context, dbmethod, args,
+                               kwargs=kwargs, direction='down')
