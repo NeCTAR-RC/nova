@@ -753,20 +753,41 @@ def instance_info_cache_delete(context, instance_uuid):
 ###################
 
 
-def key_pair_create(context, values):
+def key_pair_create(context, values, update_cells=True):
     """Create a key_pair from the values dictionary."""
-    return IMPL.key_pair_create(context, values)
+    rv = IMPL.key_pair_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                          'key_pair_create',
+                                                          values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of key_pair_create"))
+    return rv
 
-
-def key_pair_destroy(context, user_id, name):
+def key_pair_destroy(context, user_id, name, update_cells=True):
     """Destroy the key_pair or raise if it does not exist."""
-    return IMPL.key_pair_destroy(context, user_id, name)
+    rv = IMPL.key_pair_destroy(context, user_id, name)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                          'key_pair_destroy',
+                                                          user_id, name)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of key_pair_destroy"))
+    return rv
 
-
-def key_pair_destroy_all_by_user(context, user_id):
+def key_pair_destroy_all_by_user(context, user_id, update_cells=True):
     """Destroy all key_pairs by user."""
-    return IMPL.key_pair_destroy_all_by_user(context, user_id)
-
+    rv = IMPL.key_pair_destroy_all_by_user(context, user_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                          'key_pair_destroy_all_by_user',
+                                                          user_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of  key_pair_destroy_all_by_user"))
+    return rv
 
 def key_pair_get(context, user_id, name):
     """Get a key_pair or raise if it does not exist."""
