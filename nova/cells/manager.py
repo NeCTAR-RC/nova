@@ -915,13 +915,32 @@ class CellsManager(manager.Manager):
         except exception.InstanceNotFound:
             pass
 
-    def call_dbapi_method(self, context, db_method_info, routing_path,
+    def call_dbapi_method_up(self, context, db_method_info, routing_path,
             **kwargs):
         """Call a DB API method if we're a top level cell."""
         if self._get_parent_cells() or self._path_is_us(routing_path):
             # Only update the DB if we're at the very top and the
             # call didn't originate from ourselves
             return
+        method = db_method_info['method']
+        args = db_method_info['method_args']
+        kwargs = db_method_info['method_kwargs']
+        LOG.debug(_("Got message to call DB API method %(method)s "
+                "with args %(args)s and kwargs %(kwargs)s"),
+                locals())
+        db_method = getattr(self.db, method)
+        try:
+            db_method(context, *args, update_cells=False, **kwargs)
+        except exception.NotFound:
+            pass
+
+    def call_dbapi_method_down(self, context, db_method_info, routing_path,
+            **kwargs):
+        #"""Call a DB API method if we're a top level cell."""
+        #if self._get_parent_cells() or self._path_is_us(routing_path):
+        #    # Only update the DB if we're at the very top and the
+        #    # call didn't originate from ourselves
+        #    return
         method = db_method_info['method']
         args = db_method_info['method_args']
         kwargs = db_method_info['method_kwargs']
