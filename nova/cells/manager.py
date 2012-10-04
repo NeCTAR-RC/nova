@@ -172,7 +172,8 @@ class CellsManager(manager.Manager):
         super(CellsManager, self).__init__(*args, **kwargs)
         self.api_map = {'compute': compute.API(),
                         'network': network.API(),
-                        'volume': volume.API()}
+                        'volume': volume.API(),
+                        'securitygroup_rpc': compute.rpcapi.SecurityGroupAPI()}
 
         if not cells_scheduler_cls:
             cells_scheduler_cls = importutils.import_class(
