@@ -936,11 +936,11 @@ class CellsManager(manager.Manager):
 
     def call_dbapi_method_down(self, context, db_method_info, routing_path,
             **kwargs):
-        #"""Call a DB API method if we're a top level cell."""
-        #if self._get_parent_cells() or self._path_is_us(routing_path):
-        #    # Only update the DB if we're at the very top and the
-        #    # call didn't originate from ourselves
-        #    return
+        """Call a DB API method."""
+
+         if self._path_is_us(routing_path):
+             # Don't update the DB if the call originated from ourselves'
+             return
         method = db_method_info['method']
         args = db_method_info['method_args']
         kwargs = db_method_info['method_kwargs']
