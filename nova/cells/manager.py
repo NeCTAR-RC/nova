@@ -481,8 +481,7 @@ class CellsManager(manager.Manager):
         if next_hop.is_me:
             return self._process_message_for_me(context, message['message'])
 
-        self.cells_rpcapi.send_message_to_cell(context, next_hop, None,
-                                               message)
+        self.cells_rpcapi.send_message_to_cell(context, next_hop, message)
 
     def _path_is_us(self, routing_path):
         return (cells_utils.path_without_hosts(routing_path) ==
