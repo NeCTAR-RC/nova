@@ -24,8 +24,18 @@ from nova import exception
 from nova.openstack.common import importutils
 
 
+cell_filters = []
+
+class FilterRegisterMetaclass(type):
+    def __init__(cls, name, bases, attrs):
+        type.__init__(cls, name, bases, attrs)
+        if not object in bases:
+            cell_filters.append(cls)
+
 class BaseCellFilter(object):
     """Base class for cell filters."""
+    __metaclass__ = FilterRegisterMetaclass
+
     def filter_cells(self, cells, filter_properties):
         raise NotImplemented()
 
@@ -63,6 +73,8 @@ def standard_filters():
             module_name = "%s%s.%s" % (__package__, relpkg, root)
             mod_classes = _get_filter_classes_from_module(module_name)
             classes.extend(mod_classes)
+        # hurr
+        classes = cell_filters
     return classes
 
 
