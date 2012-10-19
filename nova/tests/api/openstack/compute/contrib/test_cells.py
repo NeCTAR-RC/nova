@@ -17,20 +17,29 @@ import copy
 
 from lxml import etree
 from webob import exc
+import webob
 
 from nova.api.openstack.compute.contrib import cells as cells_ext
 from nova.api.openstack import xmlutil
 from nova.cells import rpcapi as cells_rpcapi
+from nova import compute
 from nova import context
 from nova import db
 from nova import exception
 from nova import flags
+from nova.openstack.common import jsonutils
 from nova.openstack.common import timeutils
 from nova import test
 from nova.tests.api.openstack import fakes
 
 
 FLAGS = flags.FLAGS
+
+
+UUID1 = '00000000-0000-0000-0000-000000000001'
+UUID2 = '00000000-0000-0000-0000-000000000002'
+UUID3 = '00000000-0000-0000-0000-000000000003'
+
 
 FAKE_CELLS = [
         dict(id=1, name='cell1', username='bob', is_parent=True,
@@ -404,3 +413,80 @@ class TestCellsXMLDeserializer(test.TestCase):
         deserializer = cells_ext.CellDeserializer()
         result = deserializer.deserialize(intext)
         self.assertEqual(dict(body=expected), result)
+
+
+def fake_compute_get(*args, **kwargs):
+    return fakes.stub_instance(1, uuid=UUID3, cell_name="top!child3!gchild1")
+
+
+def fake_compute_get_all(*args, **kwargs):
+    return [
+        fakes.stub_instance(1, uuid=UUID1, cell_name="top!child1!gchild1"),
+        fakes.stub_instance(2, uuid=UUID2, cell_name="top!child2!gchild1"),
+    ]
+
+
+class CellsServerTest(test.TestCase):
+    content_type = 'application/json'
+    prefix = 'os-cells:'
+
+    def setUp(self):
+        super(ExtendedStatusTest, self).setUp()
+        fakes.stub_out_nw_api(self.stubs)
+        self.stubs.Set(compute.api.API, 'get', fake_compute_get)
+        self.stubs.Set(compute.api.API, 'get_all', fake_compute_get_all)
+
+    def _make_request(self, url):
+        req = webob.Request.blank(url)
+        req.headers['Accept'] = self.content_type
+        res = req.get_response(fakes.wsgi_app())
+        return res
+
+    def _get_server(self, body):
+        return jsonutils.loads(body).get('server')
+
+    def _get_servers(self, body):
+        return jsonutils.loads(body).get('servers')
+
+    def assertServerStates(self, server, **kwargs):
+        for k, v in kwargs:
+            self.assertEqual(server.get('%s%s' % (self.prefix, k), v)
+
+    def test_show(self):
+        url = '/v2/fake/servers/%s' % UUID3
+        res = self._make_request(url)
+
+        self.assertEqual(res.status_int, 200)
+        self.assertServerStates(self._get_server(res.body),
+                                cell_name='top!child3!gchild1')
+
+    def test_detail(self):
+        url = '/v2/fake/servers/detail'
+        res = self._make_request(url)
+
+        self.assertEqual(res.status_int, 200)
+        for i, server in enumerate(self._get_servers(res.body)):
+            self.assertServerStates(server,
+                                    cell_name='top!child%s!gchild1' % (i+1))
+
+    def test_no_instance_passthrough_404(self):
+
+        def fake_compute_get(*args, **kwargs):
+            raise exception.InstanceNotFound()
+
+        self.stubs.Set(compute.api.API, 'get', fake_compute_get)
+        url = '/v2/fake/servers/70f6db34-de8d-4fbd-aafb-4065bdfa6115'
+        res = self._make_request(url)
+
+        self.assertEqual(res.status_int, 404)
+
+
+class CellsServerXmlTest(CellsServerTest):
+    content_type = 'application/xml'
+    prefix = '{%s}' % cells_ext.Cells.namespace
+
+    def _get_server(self, body):
+        return etree.XML(body)
+
+    def _get_servers(self, body):
+        return etree.XML(body).getchildren()
