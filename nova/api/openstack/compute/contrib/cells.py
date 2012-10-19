@@ -38,6 +38,7 @@ LOG = logging.getLogger("nova.api.openstack.compute.contrib.cells")
 flags.DECLARE('cells', 'nova.cells.opts')
 FLAGS = flags.FLAGS
 authorize = extensions.extension_authorizer('compute', 'cells')
+authorize_server = extensions.soft_extension_authorizer('compute', 'cells:server')
 
 
 def make_cell(elem):
@@ -294,6 +295,65 @@ class Controller(object):
                 updated_since=updated_since, deleted=deleted)
 
 
+
+class ServerCellsController(wsgi.Controller):
+    def __init__(self, *args, **kwargs):
+        super(ServerCellsController, self).__init__(*args, **kwargs)
+        self.compute_api = compute.API()
+
+    def _extend_server(self, server, instance):
+        for attr in ['cell_name', ]:
+            key = "%s:%s" % (Cells.alias, attr)
+            server[key] = instance[attr]
+
+    @wsgi.extends
+    def show(self, req, resp_obj, id):
+        context = req.environ['nova.context']
+        if authorize_server(context):
+            # Attach our slave template to the response object
+            resp_obj.attach(xml=ServerCellTemplate())
+            server = resp_obj.obj['server']
+            db_instance = req.get_db_instance(server['id'])
+            # server['id'] is guaranteed to be in the cache due to
+            # the core API adding it in its 'show' method.
+            self._extend_server(server, db_instance)
+
+    @wsgi.extends
+    def detail(self, req, resp_obj):
+        context = req.environ['nova.context']
+        if authorize_server(context):
+            # Attach our slave template to the response object
+            resp_obj.attach(xml=ServerCellsTemplate())
+            servers = list(resp_obj.obj['servers'])
+            for server in servers:
+                db_instance = req.get_db_instance(server['id'])
+                # server['id'] is guaranteed to be in the cache due to
+                # the core API adding it in its 'detail' method.
+                self._extend_server(server, db_instance)
+
+
+def make_server(elem):
+    elem.set('{%s}cell_name' % Cells.namespace,
+             '%s:cell_name' % Cells.alias)
+
+
+class ServerCellTemplate(xmlutil.TemplateBuilder):
+    def construct(self):
+        root = xmlutil.TemplateElement('server', selector='server')
+        make_server(root)
+        return xmlutil.SlaveTemplate(root, 1, nsmap={
+            Cells.alias: Cells.namespace})
+
+
+class ServerCellsTemplate(xmlutil.TemplateBuilder):
+    def construct(self):
+        root = xmlutil.TemplateElement('servers')
+        elem = xmlutil.SubTemplateElement(root, 'server', selector='servers')
+        make_server(elem)
+        return xmlutil.SlaveTemplate(root, 1, nsmap={
+            Cells.alias: Cells.namespace})
+
+
 class Cells(extensions.ExtensionDescriptor):
     """Enables cells-related functionality such as adding child cells,
     listing child cells, getting the capabilities of the local cell,
@@ -315,3 +375,8 @@ class Cells(extensions.ExtensionDescriptor):
         res = extensions.ResourceExtension('os-cells',
                 Controller(), collection_actions=coll_actions)
         return [res]
+
+    def get_controller_extensions(self):
+        controller = ServerCellsController()
+        extension = extensions.ControllerExtension(self, 'servers', controller)
+        return [extension]
