@@ -29,6 +29,7 @@ from nova.api.ec2 import ec2utils
 from nova.api.ec2 import inst_state
 from nova.api import validator
 from nova import block_device
+from nova.cells import rpcapi as cells_rpcapi
 from nova import compute
 from nova.compute import instance_types
 from nova.compute import vm_states
@@ -224,7 +225,10 @@ class CloudController(object):
                      if not service['availability_zone'] in available_zones]:
             if not zone in not_available_zones:
                 not_available_zones.append(zone)
-
+        if FLAGS.cells.enable:
+            api = cells_rpcapi.CellsAPI()
+            cells = api.get_subcell_names(context)
+            available_zones = cells
         return (available_zones, not_available_zones)
 
     def _describe_availability_zones(self, context, **kwargs):
@@ -1084,7 +1088,12 @@ class CloudController(object):
                                       i['rootDeviceName'], i)
             host = instance['host']
             services = db.service_get_all_by_host(context.elevated(), host)
-            zone = ec2utils.get_availability_zone_by_host(services, host)
+            #zone = ec2utils.get_availability_zone_by_host(services, host)
+            zone = instance.get('cell_name', "")
+            if zone:
+                zone = zone.replace('!', '-')
+            else:
+                zone = 'unknown zone'
             i['placement'] = {'availabilityZone': zone}
             if instance['reservation_id'] not in reservations:
                 r = {}
@@ -1214,6 +1223,12 @@ class CloudController(object):
         if image_state != 'available':
             raise exception.EC2APIError(_('Image must be available'))
 
+        zone = kwargs.get('placement', {}).get('availability_zone')
+        if zone:
+            scheduler_hints = { 'use_cell': zone }
+        else:
+            scheduler_hints = None
+
         (instances, resv_id) = self.compute_api.create(context,
             instance_type=instance_types.get_instance_type_by_name(
                 kwargs.get('instance_type', None)),
@@ -1225,8 +1240,7 @@ class CloudController(object):
             key_name=kwargs.get('key_name'),
             user_data=kwargs.get('user_data'),
             security_group=kwargs.get('security_group'),
-            availability_zone=kwargs.get('placement', {}).get(
-                                  'availability_zone'),
+            scheduler_hints=scheduler_hints,
             block_device_mapping=kwargs.get('block_device_mapping', {}))
         return self._format_run_instances(context, resv_id)
 
