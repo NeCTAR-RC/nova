@@ -185,6 +185,12 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
                'args': {}}
         return self.call(context, msg)
 
+    def get_subcell_names(self, context):
+        """Get the name of each subcell (not just immediate children)."""
+        msg = {'method': 'get_subcell_names',
+               'args': {}}
+        return self.call(context, msg)
+
     def sync_instances(self, context, project_id=None, updated_since=None,
             deleted=False):
         """Broadcast message down to tell cells to sync instance data."""

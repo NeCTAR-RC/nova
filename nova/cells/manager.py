@@ -263,6 +263,17 @@ class CellsManager(manager.Manager):
                 for cell in self.parent_cells.itervalues()])
         return cell_list
 
+    def get_subcell_names(self, context):
+        """Get the names of each subcell (not just immediate children)."""
+        our_name = self.my_cell_info.name
+        cell_names = set()
+        for cell in self._get_child_cells():
+            cell_map = cell.capabilities.get('cell_map', [])
+            new_names = map(lambda s: '-'.join([our_name, s]),
+                            cell_map)
+            cell_names.update(new_names)
+        return list(cell_names)
+
     def _cell_get_all(self, context):
         """Get all cells from the DB.  Used to stub in tests."""
         return self.db.cell_get_all(context)
@@ -368,11 +379,24 @@ class CellsManager(manager.Manager):
 
     def _get_our_capabilities(self, include_children=True):
         capabs = copy.deepcopy(self.my_cell_info.capabilities)
+        capabs['cell_map'] = set([self.my_cell_info.name])
         if include_children:
             for cell in self._get_child_cells():
+                timesince = timeutils.utcnow() - cell.last_seen
+                if timesince > datetime.timedelta(seconds=120):
+                    continue
                 for capab_name, values in cell.capabilities.items():
                     if capab_name not in capabs:
                         capabs[capab_name] = set([])
+                    if capab_name == 'cell_map':
+                        prefix = self.my_cell_info.name + "-"
+                        for i in capabs['cell_map']:
+                            newvalues = []
+                            for v in values:
+                                if not v.startswith(prefix):
+                                    v = prefix + v
+                                newvalues.append(v)
+                            values = set(newvalues)
                     capabs[capab_name] |= values
         return capabs
 

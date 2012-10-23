@@ -39,14 +39,22 @@ flags.DECLARE('cells', 'nova.cells.opts')
 FLAGS = flags.FLAGS
 authorize = extensions.extension_authorizer('compute', 'cells')
 authorize_server = extensions.soft_extension_authorizer('compute', 'cells:server')
+authorize_info = extensions.extension_authorizer('compute', 'cells:info')
 
 
-def make_cell(elem):
+def make_cell(elem, subcells=False):
     elem.set('id')
     elem.set('name')
     elem.set('type')
     elem.set('rpc_host')
     elem.set('rpc_port')
+
+    if subcells:
+        cells = xmlutil.SubTemplateElement(elem, 'subcells',
+                 selector='subcells')
+        cell = xmlutil.SubTemplateElement(cells, xmlutil.Selector(0),
+                selector=xmlutil.get_items)
+        cell.text = 1
 
     caps = xmlutil.SubTemplateElement(elem, 'capabilities',
             selector='capabilities')
@@ -62,6 +70,13 @@ class CellTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('cell', selector='cell')
         make_cell(root)
+        return xmlutil.MasterTemplate(root, 1, nsmap=cell_nsmap)
+
+
+class CellInfoTemplate(xmlutil.TemplateBuilder):
+    def construct(self):
+        root = xmlutil.TemplateElement('cell', selector='cell')
+        make_cell(root, subcells=True)
         return xmlutil.MasterTemplate(root, 1, nsmap=cell_nsmap)
 
 
@@ -154,22 +169,24 @@ class Controller(object):
         authorize(ctxt)
         return self._get_cells(ctxt, req, detail=True)
 
-    @wsgi.serializers(xml=CellTemplate)
+    @wsgi.serializers(xml=CellInfoTemplate)
     def info(self, req):
         """Return name and capabilities for this cell."""
         context = req.environ['nova.context']
-        authorize(context)
+        authorize_info(context)
         cell_capabs = {}
         my_caps = FLAGS.cells.capabilities
         for cap in my_caps:
             key, value = cap.split('=')
             cell_capabs[key] = value
+        subcells = self.cells_rpcapi.get_subcell_names(context)
         cell = {'id': 0,
                 'name': FLAGS.cells.name,
                 'type': 'self',
                 'rpc_host': None,
                 'rpc_port': 0,
-                'capabilities': cell_capabs}
+                'capabilities': cell_capabs,
+                'subcells': subcells}
         return dict(cell=cell)
 
     @wsgi.serializers(xml=CellTemplate)
