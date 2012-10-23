@@ -211,6 +211,12 @@ class CloudController(object):
 
     def _get_zones(self, context):
         """Return available and unavailable zones."""
+        if FLAGS.cells.enable:
+            return self._cells_get_zones(context)
+        else:
+            return self._no_cells_get_zones(context)
+
+    def _no_cells_get_zones(self, context):
         enabled_services = db.service_get_all(context, False)
         disabled_services = db.service_get_all(context, True)
 
@@ -225,10 +231,13 @@ class CloudController(object):
                      if not service['availability_zone'] in available_zones]:
             if not zone in not_available_zones:
                 not_available_zones.append(zone)
-        if FLAGS.cells.enable:
-            api = cells_rpcapi.CellsAPI()
-            cells = api.get_subcell_names(context)
-            available_zones = cells
+        return (available_zones, not_available_zones)
+
+    def _cells_get_zones(self, context):
+        api = cells_rpcapi.CellsAPI()
+        cells = api.get_subcell_names(context)
+        available_zones = cells
+        not_available_zones = []
         return (available_zones, not_available_zones)
 
     def _describe_availability_zones(self, context, **kwargs):
