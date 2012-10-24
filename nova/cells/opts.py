@@ -33,9 +33,6 @@ cells_opts = [
     cfg.StrOpt('topic',
                 default='cells',
                 help='the topic cells nodes listen on'),
-    cfg.StrOpt('manager',
-                default='nova.cells.manager.CellsManager',
-                help='Manager for cells'),
 ]
 
 FLAGS = cfg.CONF
