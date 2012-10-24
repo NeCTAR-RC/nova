@@ -50,10 +50,10 @@ class ConsoleAuthManager(manager.Manager):
     def __init__(self, scheduler_driver=None, *args, **kwargs):
         super(ConsoleAuthManager, self).__init__(*args, **kwargs)
 
-        if FLAGS.memcached_servers:
-            import memcache
-        else:
-            from nova.common import memorycache as memcache
+        #if FLAGS.memcached_servers:
+        #    import memcache
+        #else:
+        from nova.common import memorycache as memcache
         self.mc = memcache.Client(FLAGS.memcached_servers,
                                   debug=0)
 
