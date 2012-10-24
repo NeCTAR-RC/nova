@@ -463,7 +463,9 @@ class ComputeCellsAPI(compute_api.API):
         connect_info = self._call_to_cells(context, instance,
                 'get_vnc_connect_info', console_type)
 
-        self.consoleauth_rpcapi.authorize_console(context,
+        cell_name = instance['cell_name']
+        self.cells_rpcapi.call_service_api_method(context, cell_name,
+                'consoleauth_rpc', 'authorize_console',
                 connect_info['token'], console_type, connect_info['host'],
                 connect_info['port'], connect_info['internal_access_path'])
         return {'url': connect_info['access_url']}

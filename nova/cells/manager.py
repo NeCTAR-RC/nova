@@ -31,6 +31,7 @@ from eventlet import queue
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
 from nova import compute
+from nova.consoleauth import rpcapi as consoleauth_rpcapi
 from nova import context
 from nova import db
 from nova import exception
@@ -173,7 +174,8 @@ class CellsManager(manager.Manager):
         self.api_map = {'compute': compute.API(),
                         'network': network.API(),
                         'volume': volume.API(),
-                        'securitygroup_rpc': compute.rpcapi.SecurityGroupAPI()}
+                        'securitygroup_rpc': compute.rpcapi.SecurityGroupAPI(),
+                        'consoleauth_rpc': consoleauth_rpcapi.ConsoleAuthAPI()}
 
         if not cells_scheduler_cls:
             cells_scheduler_cls = importutils.import_class(
