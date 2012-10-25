@@ -17,6 +17,7 @@ Tests the cell weigting plugins
 """
 
 from nova.cells import scheduler as cells_scheduler
+from nova import context
 from nova import flags
 from nova.openstack.common import rpc
 from nova import test
@@ -65,7 +66,7 @@ class TestWeightOffsetTestCase(test.TestCase):
         Tests that the scheduler reads the weight_offset db field.
         Done with the plugin nova/cells/weights/weight_offset.py """
         self.assertEqual(self.scheduler.manager, self.top_cell_manager)
-        fake_context = 'fake_context'
+        fake_context = context.RequestContext('fake', 'fake')
         fake_topic = 'compute'
         fake_instance_props = {'vm_state': 'fake_vm_state',
                                'security_groups': 'meow'}

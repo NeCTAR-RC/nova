@@ -73,7 +73,6 @@ def standard_filters():
             module_name = "%s%s.%s" % (__package__, relpkg, root)
             mod_classes = _get_filter_classes_from_module(module_name)
             classes.extend(mod_classes)
-        # hurr
         classes = cell_filters
     return classes
 

@@ -63,7 +63,7 @@ class CellsSchedulerTestCase(test.TestCase):
                                'security_groups': 'meow'}
         fake_instance_type = {'memory_mb': 1024}
         fake_request_spec = {'instance_properties': fake_instance_props,
-                             'instance_uuids': ['fake_uuid'],
+                             'instance_uuids': ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
                              'image': 'fake_image',
                              'instance_type': fake_instance_type,
                              'security_group': 'fake_security_group',

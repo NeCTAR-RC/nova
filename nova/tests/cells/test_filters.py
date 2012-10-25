@@ -17,17 +17,17 @@ Unit Tests for testing cell scheduler filters.
 """
 
 from nova.cells import filters
-from nova.cells.filters import standard_filters, filter_cells
+from nova.cells.filters import standard_filters
 from nova.cells.filters.pick_cell_filter import PickCellFilter
 from nova import test
 
 class TestFilterRegistration(test.TestCase):
     """Makes sure filters placed in the filters director are all registered """
 
-    def test_fitlers_registered(self):
+    def test_filters_registered(self):
         filters = standard_filters()
         self.assert_(len(filters) >= 1)
-        names = [cls.__name for cls in filters]
+        names = [cls.__name__ for cls in filters]
         self.assert_('PickCellFilter' in names)
 
 class TestPickFilter(test.TestCase):
@@ -49,7 +49,7 @@ class TestPickFilter(test.TestCase):
             self.assert_(resp['action'] == 'direct_route')
             self.assert_('target' in resp)
             self.assert_(resp['target'] == 'this!is!a!test')
-            self.assert_(len(cells) = len_cells)
+            self.assert_(len(cells) == len_cells)
             self_assert('scheduler_hints' in filter_properties)
 
             # check the use_cell flag has been removed so it isnt propagated
@@ -67,4 +67,4 @@ class TestPickFilter(test.TestCase):
             # confirm that no action will be taken as we didnt get our flag
             self.assert_('action' not in resp)
             self.assert_('target' not in resp)
-            self.assert_(len(cells) = len_cells)
+            self.assert_(len(cells) == len_cells)
