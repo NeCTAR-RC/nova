@@ -90,6 +90,12 @@ class CellsComputeAPITestCase(test_compute.ComputeAPITestCase):
         # we test cells.
         pass
 
+    def test_vnc_console(self):
+        # Overriding this because cells takes instance['cell_name']
+        # and does the consoleauth on the parent of the actual compute
+        # node. This test should be reimplemented.
+        pass
+
 
 class CellsComputePolicyTestCase(test_compute.ComputePolicyTestCase):
     def setUp(self):

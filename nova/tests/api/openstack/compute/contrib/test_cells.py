@@ -416,14 +416,20 @@ class TestCellsXMLDeserializer(test.TestCase):
 
 
 def fake_compute_get(*args, **kwargs):
-    return fakes.stub_instance(1, uuid=UUID3, cell_name="top!child3!gchild1")
+    fake = fakes.stub_instance(1, uuid=UUID3)
+    fake['cell_name'] = "top!child3!gchild1"
+    return fake
 
 
 def fake_compute_get_all(*args, **kwargs):
-    return [
-        fakes.stub_instance(1, uuid=UUID1, cell_name="top!child1!gchild1"),
-        fakes.stub_instance(2, uuid=UUID2, cell_name="top!child2!gchild1"),
+    fake_instances = [
+        fakes.stub_instance(1, uuid=UUID1),
+        fakes.stub_instance(2, uuid=UUID2),
     ]
+    fake_instances[0]['cell_name'] = "top!child1!gchild1"
+    fake_instances[1]['cell_name'] = "top!child2!gchild1"
+    return fake_instances
+
 
 
 class CellsServerTest(test.TestCase):
@@ -431,7 +437,7 @@ class CellsServerTest(test.TestCase):
     prefix = 'os-cells:'
 
     def setUp(self):
-        super(ExtendedStatusTest, self).setUp()
+        super(CellsServerTest, self).setUp()
         fakes.stub_out_nw_api(self.stubs)
         self.stubs.Set(compute.api.API, 'get', fake_compute_get)
         self.stubs.Set(compute.api.API, 'get_all', fake_compute_get_all)
@@ -449,8 +455,8 @@ class CellsServerTest(test.TestCase):
         return jsonutils.loads(body).get('servers')
 
     def assertServerStates(self, server, **kwargs):
-        for k, v in kwargs:
-            self.assertEqual(server.get('%s%s' % (self.prefix, k), v)
+        for k, v in kwargs.iteritems():
+            self.assertEqual(server.get('%s%s' % (self.prefix, k)), v)
 
     def test_show(self):
         url = '/v2/fake/servers/%s' % UUID3

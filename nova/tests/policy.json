@@ -85,6 +85,8 @@
     "compute_extension:admin_actions:migrate": [],
     "compute_extension:aggregates": [],
     "compute_extension:cells": [],
+    "compute_extension:cells:info": [],
+    "compute_extension:cells:server": [],
     "compute_extension:certificates": [],
     "compute_extension:cloudpipe": [],
     "compute_extension:config_drive": [],
