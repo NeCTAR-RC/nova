@@ -28,7 +28,7 @@ class PickCellFilter(BaseCellFilter):
     def filter_cells(self, cells, filter_properties):
         """ """
         LOG.info(_("Filtering cells for a specific cell name"))
-        scheduler_hints = filter_properties.get('scheduler_hints', None)
+        scheduler_hints = filter_properties.get('scheduler_hints', {})
         cell_name = scheduler_hints.get('use_cell', None)
         if not cell_name:
             return {}
