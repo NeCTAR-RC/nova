@@ -441,6 +441,7 @@ class CellsServerTest(test.TestCase):
         fakes.stub_out_nw_api(self.stubs)
         self.stubs.Set(compute.api.API, 'get', fake_compute_get)
         self.stubs.Set(compute.api.API, 'get_all', fake_compute_get_all)
+        self.flags(enable=True, group='cells')
 
     def _make_request(self, url):
         req = webob.Request.blank(url)
