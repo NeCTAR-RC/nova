@@ -457,7 +457,7 @@ class ComputeCellsAPI(compute_api.API):
     @validate_cell
     def get_vnc_console(self, context, instance, console_type):
         """Get a url to a VNC Console."""
-        if not instance['host']:
+        if not instance['host'] or 'cell_name' not in instance:
             raise exception.InstanceNotReady(instance=instance)
 
         connect_info = self._call_to_cells(context, instance,
