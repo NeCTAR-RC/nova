@@ -395,6 +395,8 @@ class Cells(extensions.ExtensionDescriptor):
         return [res]
 
     def get_controller_extensions(self):
+        if not FLAGS.cells.enable:
+            return []
         controller = ServerCellsController()
         extension = extensions.ControllerExtension(self, 'servers', controller)
         return [extension]
