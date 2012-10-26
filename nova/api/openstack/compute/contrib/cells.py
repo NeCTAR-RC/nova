@@ -320,8 +320,9 @@ class ServerCellsController(wsgi.Controller):
 
     def _extend_server(self, server, instance):
         for attr in ['cell_name', ]:
-            key = "%s:%s" % (Cells.alias, attr)
-            server[key] = instance[attr]
+            if attr in instance:
+                key = "%s:%s" % (Cells.alias, attr)
+                server[key] = instance[attr]
 
     @wsgi.extends
     def show(self, req, resp_obj, id):
