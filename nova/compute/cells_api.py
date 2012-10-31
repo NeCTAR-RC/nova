@@ -553,6 +553,15 @@ class ComputeCellsAPI(compute_api.API):
             pass
         return rv
 
+    def live_migrate(self, context, instance, block_migration,
+        disk_over_commit, host):
+        """Migrate a server lively to a new host."""
+        super(ComputeCellsAPI, self).live_migrate(context, instance, block_migration,
+                      disk_over_commit, host)
+
+        self._cast_to_cells(context, instance, 'live_migrate',
+                    block_migration, disk_over_commit,  host)
+
 
 class SecurityGroupRPCAPIRedirect(object):
     def __getattr__(self, key):
