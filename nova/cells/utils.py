@@ -74,7 +74,7 @@ def form_instance_update_broadcast_message(instance, routing_path=None,
     # a child zone... and we don't want it to overwrite the column
     # in the parent.
     items_to_remove = ['id', 'security_groups', 'instance_type',
-            'volumes', 'cell_name', 'name']
+            'volumes', 'cell_name', 'name', 'metadata']
     for key in items_to_remove:
         instance.pop(key, None)
     # Fixup info_cache
@@ -83,11 +83,7 @@ def form_instance_update_broadcast_message(instance, routing_path=None,
         instance['info_cache'] = dict(info_cache.iteritems())
         instance['info_cache'].pop('id', None)
         instance['info_cache'].pop('instance', None)
-    # Fixup metadata (should be a dict for update, not a list)
-    if 'metadata' in instance and isinstance(instance['metadata'], list):
-        metadata = dict([(md['key'], md['value'])
-                for md in instance['metadata']])
-        instance['metadata'] = metadata
+
     # Fixup system_metadata (should be a dict for update, not a list)
     if ('system_metadata' in instance and
             isinstance(instance['system_metadata'], list)):

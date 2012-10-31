@@ -118,6 +118,10 @@ class CellInfo(object):
                 cell_info[field] = self.db_info[field]
         return cell_info
 
+    def __str__(self):
+        me = "me" if self.is_me else "not_me"
+        return "Cell '%s' (%s)" % (self.name, me)
+
 
 class CellsBWUpdateManager(manager.Manager):
     """Cells RPC consumer manager for BW updates."""
