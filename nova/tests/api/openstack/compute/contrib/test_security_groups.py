@@ -348,7 +348,7 @@ class TestSecurityGroups(test.TestCase):
                        return_instance)
 
         def return_security_groups(context, instance_id):
-            self.assertEquals(instance_id, 1)
+            self.assertEquals(instance_id, FAKE_UUID)
             return [security_group_db(sg) for sg in groups]
 
         self.stubs.Set(nova.db, 'security_group_get_by_instance',
