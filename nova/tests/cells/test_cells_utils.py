@@ -130,12 +130,9 @@ class CellsUtilsTestCase(test.TestCase):
         instance_info = fake_instance.copy()
         # This gets filtered
         instance_info.pop('security_groups')
-        # This gets converted
-        instance_info['metadata'] = {'key1': 'val1', 'key2': 'val2'}
+        instance_info.pop('metadata')
         # This gets 'id' stripped
         instance_info['info_cache'] = {'network_info': 'meow'}
-        message = {'method': 'instance_update',
-                   'args': {'instance_info': instance_info}}
         message = {'method': 'instance_update',
                    'args': {'instance_info': instance_info}}
         expected = {'method': 'broadcast_message',
