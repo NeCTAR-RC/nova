@@ -97,7 +97,7 @@ class InstanceMetadata():
         self.ip_info = ec2utils.get_ip_info_for_instance(ctxt, instance)
 
         self.security_groups = db.security_group_get_by_instance(ctxt,
-                                                            instance['id'])
+                                                            instance['uuid'])
 
         self.mappings = _format_instance_mapping(ctxt, instance)
 

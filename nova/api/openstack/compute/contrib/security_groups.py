@@ -391,7 +391,7 @@ class ServerSecurityGroupController(SecurityGroupControllerBase):
         except exception.InstanceNotFound as exp:
             raise exc.HTTPNotFound(explanation=unicode(exp))
 
-        groups = db.security_group_get_by_instance(context, instance['id'])
+        groups = db.security_group_get_by_instance(context, instance['uuid'])
 
         result = [self._format_security_group(context, group)
                     for group in groups]

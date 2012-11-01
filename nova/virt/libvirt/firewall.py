@@ -222,9 +222,9 @@ class IptablesFirewallDriver(base_firewall.IptablesFirewallDriver):
     def unfilter_instance(self, instance, network_info):
         # NOTE(salvatore-orlando):
         # Overriding base class method for applying nwfilter operation
-        if self.instances.pop(instance['id'], None):
+        if self.instances.pop(instance['uuid'], None):
             # NOTE(vish): use the passed info instead of the stored info
-            self.network_infos.pop(instance['id'])
+            self.network_infos.pop(instance['uuid'])
             self.remove_filters_for_instance(instance)
             self.iptables.apply()
             self.nwfilter.unfilter_instance(instance, network_info)

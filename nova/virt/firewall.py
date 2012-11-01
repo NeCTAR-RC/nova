@@ -166,9 +166,9 @@ class IptablesFirewallDriver(FirewallDriver):
         # make sure this is legacy nw_info
         network_info = self._handle_network_info_model(network_info)
 
-        if self.instances.pop(instance['id'], None):
+        if self.instances.pop(instance['uuid'], None):
             # NOTE(vish): use the passed info instead of the stored info
-            self.network_infos.pop(instance['id'])
+            self.network_infos.pop(instance['uuid'])
             self.remove_filters_for_instance(instance)
             self.iptables.apply()
         else:
@@ -179,8 +179,8 @@ class IptablesFirewallDriver(FirewallDriver):
         # make sure this is legacy nw_info
         network_info = self._handle_network_info_model(network_info)
 
-        self.instances[instance['id']] = instance
-        self.network_infos[instance['id']] = network_info
+        self.instances[instance['uuid']] = instance
+        self.network_infos[instance['uuid']] = network_info
         ipv4_rules, ipv6_rules = self.instance_rules(instance, network_info)
         self.add_filters_for_instance(instance, ipv4_rules, ipv6_rules)
         LOG.debug(_('Filters added to instance'), instance=instance)
@@ -220,7 +220,7 @@ class IptablesFirewallDriver(FirewallDriver):
 
     def add_filters_for_instance(self, instance, inst_ipv4_rules,
                                  inst_ipv6_rules):
-        network_info = self.network_infos[instance['id']]
+        network_info = self.network_infos[instance['uuid']]
         chain_name = self._instance_chain_name(instance)
         if FLAGS.use_ipv6:
             self.iptables.ipv6['filter'].add_chain(chain_name)
@@ -345,7 +345,7 @@ class IptablesFirewallDriver(FirewallDriver):
             self._do_ra_rules(ipv6_rules, network_info)
 
         security_groups = db.security_group_get_by_instance(ctxt,
-                                                            instance['id'])
+                                                            instance['uuid'])
 
         # then, security group chains and rules
         for security_group in security_groups:
@@ -438,13 +438,13 @@ class IptablesFirewallDriver(FirewallDriver):
 
     def do_refresh_security_group_rules(self, security_group):
         for instance in self.instances.values():
-            network_info = self.network_infos[instance['id']]
+            network_info = self.network_infos[instance['uuid']]
             ipv4_rules, ipv6_rules = self.instance_rules(instance,
                                                          network_info)
             self._inner_do_refresh_rules(instance, ipv4_rules, ipv6_rules)
 
     def do_refresh_instance_rules(self, instance):
-        network_info = self.network_infos[instance['id']]
+        network_info = self.network_infos[instance['uuid']]
         ipv4_rules, ipv6_rules = self.instance_rules(instance, network_info)
         self._inner_do_refresh_rules(instance, ipv4_rules, ipv6_rules)
 
