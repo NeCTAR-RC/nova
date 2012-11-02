@@ -14,7 +14,7 @@
 #    under the License.
 
 """
-Pick cell specified by the use_cell scheduler hint
+Pick cell specified by the cell scheduler hint
 """
 
 from nova.cells.filters import BaseCellFilter
@@ -23,19 +23,19 @@ import logging
 LOG = logging.getLogger(__name__)
 
 class PickCellFilter(BaseCellFilter):
-    """Pick cell specified by the use_cell scheduler hint"""
+    """Pick cell specified by the cell scheduler hint"""
 
     def filter_cells(self, cells, filter_properties):
         """ """
         LOG.info(_("Filtering cells for a specific cell name"))
         scheduler_hints = filter_properties.get('scheduler_hints', {})
-        cell_name = scheduler_hints.get('use_cell', None)
+        cell_name = scheduler_hints.get('cell', None)
         if not cell_name:
             return {}
         # remove this as once the call reaches the 
         # specified top cell, we want to proceed
         # using normal scheduling
-        scheduler_hints.pop('use_cell')
+        scheduler_hints.pop('cell')
         
         # FIXME: cell name will come in hyphen separated
         # from the CLI as bangs break it. This should be

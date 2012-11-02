@@ -41,7 +41,7 @@ class TestPickFilter(test.TestCase):
             cf = PickCellFilter()
             cells = {'first_cell':{}, 'second_cell':{}}
             len_cells = len(cells)
-            filter_properties = {'scheduler_hints': {'use_cell': 'this-is-a-test'}}
+            filter_properties = {'scheduler_hints': {'cell': 'this-is-a-test'}}
             
             resp = cf.filter_cells(cells, filter_properties)
             
@@ -52,9 +52,9 @@ class TestPickFilter(test.TestCase):
             self.assert_(len(cells) == len_cells)
             self_assert('scheduler_hints' in filter_properties)
 
-            # check the use_cell flag has been removed so it isnt propagated
+            # check the cell flag has been removed so it isnt propagated
             # on to the cell we'll be messaging
-            self_assert('use_cell' not in filter_properties['scheduler_hints'])
+            self_assert('cell' not in filter_properties['scheduler_hints'])
         
         def test_filter_on_no_flag(self):
             cf = PickCellFilter()
