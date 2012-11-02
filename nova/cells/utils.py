@@ -188,3 +188,19 @@ def update_routing_path(fn):
         return fn(self, *args, **kwargs)
     wrapper.__name__ = fn.__name__
     return wrapper
+
+
+def form_security_group_rule_create_broadcast_message(security_group_rule, group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for adding security group rules which
+    sends unique information about a parent group rather than the id,
+    which can get out of sync between child/parent cells"""
+    security_group_rule = dict(security_group_rule.iteritems())
+    parent_group_id = security_group_rule.pop('parent_group_id', None)
+    security_group_rule['parent_group_name'] = group.name
+    security_group_rule['parent_group_pid'] = group.project_id
+
+    return form_broadcast_message('down', 'security_group_rule_create',
+            {'security_group_rule': security_group_rule},
+            routing_path=routing_path, hopcount=hopcount)

@@ -1387,13 +1387,16 @@ def security_group_count_by_project(context, project_id, session=None):
 
 
 def security_group_rule_create(context, values, update_cells=True):
-    """Create a new security group."""
+    """Create a new security group rule"""
     rv = IMPL.security_group_rule_create(context, values)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
-                                                            'security_group_rule_create',
-                                                            values)
+            # Rather than directly calling a db method, use custom
+            # sync that maintains integrity of references between
+            # security groups and their rules on syncing
+            group = IMPL.security_group_get(context, values['parent_group_id'])
+            cells_rpcapi.CellsAPI().security_group_rule_create(context, values, group)
+
         except Exception:
             LOG.exception(_("Failed to notify cells of security_group_rule_create"))
     return rv

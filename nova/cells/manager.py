@@ -1024,3 +1024,52 @@ class CellsManager(manager.Manager):
 
     def compute_node_stats(self, context, routing_path):
         return [db.compute_node_statistics(context)]
+
+    def security_group_rule_create(self, context, security_group_rule, routing_path,
+            **kwargs):
+
+        # Don't add the rule if the message was sent from this cell
+        if self._path_is_us(routing_path):
+            return
+
+        # NOTE (shauno): The parent group id was (hopefully)replaced with the
+        # group name  and project id  when this message was created so we could
+        # link this rule back to the correct parent group even if ids get out of
+        # sync between parent and child cells. Use them to find the correct parent
+        # group and replace them with the id
+        security_group_name = security_group_rule.pop('parent_group_name', None)
+        security_group_pid = security_group_rule.pop('parent_group_pid', None)
+
+        if security_group_name and security_group_pid:
+
+            # Security group name and project id were included correctly
+            try:
+                group = self.db.security_group_get_by_name(
+                        context,
+                        security_group_pid,
+                        security_group_name
+                        )
+                LOG.debug(_( "%s" % group))
+            except exception.SecurityGroupNotFound:
+                LOG.debug(_( "Could not add rule %(security_group_rule)s "
+                        "to group '%(security_group_name)s' (group missing from db)"),
+                        locals())
+                return
+            except Exception, e:
+                LOG.error(_("%s" % e))
+
+            security_group_rule['parent_group_id'] = group.id
+
+        else:
+            # No security group name and project id. See if the parent_group_id
+            # was explicitly included
+            if security_group_rule.get('parent_group_id', None):
+                # No group name or project id was specified, but a parent_group_id
+                # was passed to us. This isn't the way things are meant to be done
+                # but will work 9 times out of 10.
+                sgr = security_group_rule
+                LOG.warning(_( "Forcing parent group id to %s for rule %s as no "
+                                "groupname/project id pair was specified." %
+                                (sgr['parent_group_id'], sgr)))
+
+        self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
