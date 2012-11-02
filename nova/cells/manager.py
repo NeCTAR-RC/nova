@@ -268,13 +268,10 @@ class CellsManager(manager.Manager):
 
     def get_subcell_names(self, context):
         """Get the names of each subcell (not just immediate children)."""
-        our_name = self.my_cell_info.name
         cell_names = set()
         for cell in self._get_child_cells():
             cell_map = cell.capabilities.get('cell_map', [])
-            new_names = map(lambda s: '-'.join([our_name, s]),
-                            cell_map)
-            cell_names.update(new_names)
+            cell_names.update(cell_map)
         return list(cell_names)
 
     def _cell_get_all(self, context):
