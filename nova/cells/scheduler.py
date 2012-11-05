@@ -163,7 +163,8 @@ class CellsScheduler(base.Base):
         filter_resp = self._filter_cells(cells, fw_properties)
         if filter_resp and 'action' in filter_resp:
             if filter_resp['action'] == 'direct_route':
-                target = filter_resp['target']
+                target = '!'.join((self.manager.my_cell_info.name,
+                                  filter_resp['target']))
                 if target == cells_utils.path_without_hosts(routing_path):
                     # Ah, it's for me.
                     cells = [self.manager.my_cell_info]
