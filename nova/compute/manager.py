@@ -392,6 +392,8 @@ class ComputeManager(manager.SchedulerDependentManager):
         Passes straight through to the virtualization driver.
 
         """
+        import time
+        time.sleep(3)
         return self.driver.refresh_instance_security_rules(instance)
 
     @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())

@@ -585,8 +585,6 @@ class SecurityGroupCellsAPI(compute_api.SecurityGroupAPI):
         security_group = self.db.security_group_get(context, id)
         # Dirty hack, race condition between DB updating on child and this
         # code being executed
-        import time
-        time.sleep(3)
         hosts = set()
         for instance in security_group['instances']:
             if instance['host'] is not None:
