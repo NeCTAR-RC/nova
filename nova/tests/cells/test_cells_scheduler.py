@@ -19,6 +19,7 @@ Tests For CellsScheduler
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import scheduler as cells_scheduler
 from nova import context
+from nova import exception
 from nova import flags
 from nova.openstack.common import rpc
 from nova import test
@@ -44,17 +45,47 @@ class CellsSchedulerTestCase(test.TestCase):
                 _my_name=FLAGS.cells.name,
                 cells_scheduler_cls=cells_scheduler.CellsScheduler)
         self.scheduler = self.cells_manager.scheduler
-        # Fudge our child cells so we only have 'cell2' as a child
-        for key in self.cells_manager.child_cells.keys():
-            if key != 'cell2':
-                del self.cells_manager.child_cells[key]
-        # Also nuke our parents so we can see the instance_update
-        self.cells_manager.parent_cells = {}
 
     def test_setup(self):
         self.assertEqual(self.scheduler.manager, self.cells_manager)
 
     def test_schedule_run_instance_happy_day(self):
+        # Fudge our child cells so we only have 'cell2' as a child
+        for key in self.cells_manager.child_cells.keys():
+            if key != 'cell2':
+                del self.cells_manager.child_cells[key]
+
+        self._call_schedule_run_instance(
+            'grandchild@host2!cell2@host1!me@host0')
+
+    def test_schedule_run_instance_hint_bottom_cell(self):
+        expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
+        call_info = self._call_schedule_run_instance(expected_routing_path,
+                                         scheduler_hints={
+                                             'cell': 'cell2!grandchild'})
+        self.assertEqual(call_info['create_called'], 1)
+        self.assertEqual(call_info['cast_called'], 1)
+        self.assertEqual(call_info['update_called'], 1)
+    
+    def test_schedule_run_instance_hint_middle_cell(self):
+        expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
+        call_info = self._call_schedule_run_instance(expected_routing_path,
+                                         scheduler_hints={
+                                             'cell': 'cell2'})
+        self.assertEqual(call_info['create_called'], 1)
+        self.assertEqual(call_info['cast_called'], 1)
+        self.assertEqual(call_info['update_called'], 1)
+
+    def test_schedule_run_instance_hint_missing_cell(self):
+        self.assertRaises(exception.CellNotFound,
+                          self._call_schedule_run_instance,
+                          expected_routing_path=None,
+                          scheduler_hints={'cell': 'cell2!missing'})
+
+    def _call_schedule_run_instance(self, expected_routing_path, scheduler_hints=None, error=False):
+        # Nuke our parents so we can see the instance_update
+        self.cells_manager.parent_cells = {}
+
         # Tests that requests make it to child cell, instance is created,
         # and an update is returned back upstream
         fake_context = context.RequestContext('fake', 'fake')
@@ -69,6 +100,8 @@ class CellsSchedulerTestCase(test.TestCase):
                              'security_group': 'fake_security_group',
                              'block_device_mapping': 'fake_bd_mapping'}
         fake_filter_properties = {'fake_filter_properties': 'meow'}
+        if scheduler_hints:
+            fake_filter_properties['scheduler_hints'] = scheduler_hints
 
         # The grandchild cell is where this should get scheduled
         gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
@@ -103,8 +136,7 @@ class CellsSchedulerTestCase(test.TestCase):
             props = fake_instance_props.copy()
             # This should get filtered out
             props.pop('security_groups')
-            self.assertEqual(routing_path,
-                    'grandchild@host2!cell2@host1!me@host0')
+            self.assertEqual(routing_path, expected_routing_path)
             self.assertEqual(context, fake_context)
             self.assertEqual(instance_info, props)
             call_info['update_called'] += 1
@@ -125,6 +157,4 @@ class CellsSchedulerTestCase(test.TestCase):
                 requested_networks=None,
                 is_first_time=True,
                 filter_properties=fake_filter_properties)
-        self.assertEqual(call_info['create_called'], 1)
-        self.assertEqual(call_info['cast_called'], 1)
-        self.assertEqual(call_info['update_called'], 1)
+        return call_info
