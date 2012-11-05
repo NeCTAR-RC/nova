@@ -869,10 +869,6 @@ class InstanceUnknownCell(NotFound):
     message = _("Cell is not known for instance %(instance_id)s")
 
 
-class CellNotFound(NotFound):
-    message = _("Cell %(cell_id)s could not be found.")
-
-
 class SchedulerHostFilterNotFound(NotFound):
     message = _("Scheduler Host Filter %(filter_name)s could not be found.")
 

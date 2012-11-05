@@ -29,6 +29,7 @@ from nova.db import base
 from nova import exception
 from nova import flags
 from nova.openstack.common import cfg
+from nova.openstack.common import excutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import rpc
 from nova.scheduler import rpcapi as scheduler_rpcapi
@@ -146,6 +147,12 @@ class CellsScheduler(base.Base):
                               'routing_path': routing_path,
                               'request_spec': request_spec})
 
+        scheduler_hints = fw_properties.get('scheduler_hints', {}) or {}
+        cell_route = scheduler_hints.get('cell', '').replace('-', '!')
+        if cell_route:
+            if cell_route not in self.manager.get_subcell_names(context):
+                raise exception.CellNotFound(cell_id=cell_route)
+
         LOG.debug(_("Scheduling with routing_path=%(routing_path)s"),
                 locals(), instance_uuid=instance_uuid)
 
@@ -234,16 +241,22 @@ class CellsScheduler(base.Base):
         except Exception:
             instance = kwargs['request_spec']['instance_properties']
             instance_uuid = instance['uuid']
-            LOG.exception(_("Error scheduling"),
-                    instance_uuid=instance_uuid)
             if self.manager._get_parent_cells():
-                self.cells_rpcapi.instance_update(context,
+                LOG.exception(_("Error scheduling"),
+                        instance_uuid=instance_uuid)
+                self.manager.cells_rpcapi.instance_update(context,
                         {'uuid': instance_uuid,
                          'vm_state': vm_states.ERROR})
             else:
-                self.db.instance_update(context,
-                        instance_uuid,
-                        {'vm_state': vm_states.ERROR})
+                with excutils.save_and_reraise_exception():
+                    # Instance may never have been created here.
+                    try:
+                        self.db.instance_update(context,
+                                instance_uuid,
+                                {'vm_state': vm_states.ERROR})
+                    except exception.InstanceNotFound:
+                        pass
+
 
     @cells_utils.update_routing_path
     def schedule_run_instance(self, context, routing_path, **kwargs):
