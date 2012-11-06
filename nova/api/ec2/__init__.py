@@ -491,6 +491,11 @@ class Executor(wsgi.Application):
             ec2_id = ec2utils.id_to_ec2_snap_id(ex.kwargs['snapshot_id'])
             message = ex.message % {'snapshot_id': ec2_id}
             return ec2_error(req, request_id, type(ex).__name__, message)
+        except exception.CellNotFound as ex:
+            LOG.info(_('CellNotFound raised: %s'), unicode(ex),
+                     context=context)
+            message = ex.message % {'cell_id': ex.kwargs['cell_id']}
+            return ec2_error(req, request_id, type(ex).__name__, message)
         except exception.NotFound as ex:
             LOG.info(_('NotFound raised: %s'), unicode(ex), context=context)
             return ec2_error(req, request_id, type(ex).__name__, unicode(ex))

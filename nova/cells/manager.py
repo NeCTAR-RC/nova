@@ -389,7 +389,7 @@ class CellsManager(manager.Manager):
                     if capab_name not in capabs:
                         capabs[capab_name] = set([])
                     if capab_name == 'cell_map':
-                        prefix = self.my_cell_info.name + "-"
+                        prefix = self.my_cell_info.name + "!"
                         for i in capabs['cell_map']:
                             newvalues = []
                             for v in values:

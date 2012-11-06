@@ -236,6 +236,7 @@ class CloudController(object):
     def _cells_get_zones(self, context):
         api = cells_rpcapi.CellsAPI()
         cells = api.get_subcell_names(context)
+        cells = map(lambda s: s.replace('!', '-'), cells)
         available_zones = cells
         not_available_zones = []
         return (available_zones, not_available_zones)
@@ -1108,12 +1109,13 @@ class CloudController(object):
 
             if FLAGS.cells.enable:
                 zone = instance.get('cell_name', "")
+                if zone:
+                    index = zone.find('!')
+                    zone = zone[index+1:].replace('!', '-')
             else:
                 zone = ec2utils.get_availability_zone_by_host(services, host)
 
-            if zone:
-                zone = zone.replace('!', '-')
-            else:
+            if not zone:
                 zone = 'unknown zone'
             i['placement'] = {'availabilityZone': zone}
 
@@ -1254,7 +1256,7 @@ class CloudController(object):
         zone = kwargs.get('placement', {}).get('availability_zone')
         if zone:
             if FLAGS.cells.enable:
-                scheduler_hints = { 'cell': zone }
+                scheduler_hints = { 'cell': zone.replace('-', '!') }
             else:
                 availability_zone = zone
 

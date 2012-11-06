@@ -893,6 +893,10 @@ class Controller(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=msg)
         except exception.SecurityGroupNotFound as error:
             raise exc.HTTPBadRequest(explanation=error.format_message())
+        except exception.CellNotFound as error:
+            raise exc.HTTPBadRequest(explanation=error.format_message())
+        except exception.NoCellsAvailable as error:
+            raise exc.HTTPBadRequest(explanation=error.format_message())
         except rpc_common.RemoteError as err:
             msg = "%(err_type)s: %(err_msg)s" % {'err_type': err.exc_type,
                                                  'err_msg': err.value}

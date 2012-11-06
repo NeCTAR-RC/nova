@@ -180,6 +180,7 @@ class Controller(object):
             key, value = cap.split('=')
             cell_capabs[key] = value
         subcells = self.cells_rpcapi.get_subcell_names(context)
+        subcells = map(lambda s: s.replace('!', '-'), subcells)
         cell = {'id': 0,
                 'name': FLAGS.cells.name,
                 'type': 'self',
