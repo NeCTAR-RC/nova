@@ -1060,14 +1060,11 @@ class CellsManager(manager.Manager):
                         security_group_pid,
                         security_group_name
                         )
-                LOG.debug(_( "%s" % group))
             except exception.SecurityGroupNotFound:
-                LOG.debug(_( "Could not add rule %(security_group_rule)s "
+                LOG.error(_( "Could not add rule %(security_group_rule)s "
                         "to group '%(security_group_name)s' (group missing from db)"),
                         locals())
                 return
-            except Exception, e:
-                LOG.error(_("%s" % e))
 
             security_group_rule['parent_group_id'] = group.id
 
