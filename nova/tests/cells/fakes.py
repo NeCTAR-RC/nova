@@ -147,12 +147,6 @@ class FakeCellsManager(manager.CellsManager):
                 FakeCellsManager(*args, _test_case=self._test_case,
                         _my_name=cell.name,
                         _my_host=my_host, **kwargs)
-        subcells = []
-        for cell in self.child_cells.values():
-            subcells.append(cell.name)
-            subsubcells = FAKE_CELL_MANAGERS[cell.name].get_subcell_names(context)
-            subcells.extend(map(lambda name: cell.name + '!' + name, subsubcells))
-        self._my_subcells = subcells
 
     def _ask_children_for_capabilities(self, context):
         pass
@@ -170,7 +164,12 @@ class FakeCellsManager(manager.CellsManager):
         return TEST_METHOD_EXPECTED_RESULT
 
     def get_subcell_names(self, context):
-        return self._my_subcells
+        subcells = []
+        for cell in self.child_cells.values():
+            subcells.append(cell.name)
+            subsubcells = FAKE_CELL_MANAGERS[cell.name].get_subcell_names(context)
+            subcells.extend(map(lambda name: cell.name + '!' + name, subsubcells))
+        return subcells
 
 
 def stubout_cell_get_all_for_refresh(mgr):
