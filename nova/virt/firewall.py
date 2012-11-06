@@ -258,9 +258,7 @@ class IptablesFirewallDriver(FirewallDriver):
         return 'nova-sg-%s' % (security_group_id,)
 
     def _instance_chain_name(self, instance):
-        ctxt = context.get_admin_context()
-        local_instance = db.instance_get_by_uuid(ctxt, instance['uuid'])
-        return 'inst-%s' % (local_instance['id'],)
+        return 'inst-%s' % (instance['id'],)
 
     def _do_basic_rules(self, ipv4_rules, ipv6_rules, network_info):
         # Always drop invalid packets

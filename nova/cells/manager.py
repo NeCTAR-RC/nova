@@ -778,6 +778,17 @@ class CellsManager(manager.Manager):
                 with excutils.save_and_reraise_exception():
                     _broadcast_instance_destroy(instance_uuid)
             args[0] = instance
+        if service_name == 'securitygroup_rpc':
+            # 1st arg is a dict of security group identifiers that we need to
+            # turn into the security group object.
+            security_group_name, security_group_pid = args[0]
+            try:
+                security_group = db.security_group_get_by_name(context, security_group_pid,
+                        security_group_name)
+            except exception.InstanceNotFound:
+                    return
+            args[0] = security_group
+
         return fn(context, *args, **method_info['method_kwargs'])
 
     def _get_instances_to_sync(self, context, updated_since=None,
