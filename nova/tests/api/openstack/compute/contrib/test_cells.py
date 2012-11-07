@@ -83,6 +83,12 @@ def fake_cells_api_get_all_cell_info(*args):
     return cells
 
 
+def fake_cells_api_get_subcell_names(self, context):
+    parent = FAKE_CELLS[0]['name']
+    child = '!'.join([parent, FAKE_CELLS[1]['name']])
+    return parent, child
+
+
 def fake_db_cell_get_all(context):
     return FAKE_CELLS
 
@@ -96,6 +102,8 @@ class CellsTest(test.TestCase):
         self.stubs.Set(db, 'cell_create', fake_db_cell_create)
         self.stubs.Set(cells_rpcapi.CellsAPI, 'get_all_cell_info',
                 fake_cells_api_get_all_cell_info)
+        self.stubs.Set(cells_rpcapi.CellsAPI, 'get_subcell_names',
+                fake_cells_api_get_subcell_names)
 
         self.controller = cells_ext.Controller()
         self.context = context.get_admin_context()
