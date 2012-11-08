@@ -327,3 +327,36 @@ class CellsAPITestCase(test.TestCase):
                 updated_since=fake_updated_since,
                 deleted=fake_deleted)
         self.assertEqual(call_info['cast_called'], 1)
+
+    def test_security_group_rule_create(self):
+
+        self.flags(enable=True, group='cells')
+        fake_context = 'fake_context'
+        fake_rule = 'fake_rule'
+        fake_group = 'fake_group'
+        fake_formed_message = {'msg': 'fake_formed_message'}
+
+        call_info = {'cast_called': 0, 'form_message_called': 0}
+
+        def fake_form_security_rule_message(rule, group,
+                routing_path=None, hopcount=0):
+            self.assertEqual(rule, 'fake_rule')
+            self.assertEqual(group, 'fake_group')
+            call_info['form_message_called'] += 1
+
+            return fake_formed_message
+
+        def fake_rpc_cast(context, topic, message):
+            self.assertEqual(context, fake_context)
+            self.assertEqual(topic, FLAGS.cells.topic)
+            self.assertEqual(message, fake_formed_message)
+            call_info['cast_called'] += 1
+
+        self.stubs.Set(cells_utils,
+                'form_security_group_rule_create_broadcast_message',
+                fake_form_security_rule_message)
+        self.stubs.Set(rpc, 'cast', fake_rpc_cast)
+
+        self.cells_rpcapi.security_group_rule_create(fake_context,
+                fake_rule, fake_group)
+        self.assertEqual(call_info['cast_called'], 1)

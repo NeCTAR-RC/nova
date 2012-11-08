@@ -187,3 +187,31 @@ class CellsUtilsTestCase(test.TestCase):
 
         for i, path in enumerate(expected_paths):
             self.assertEqual(path, found_routing_paths[i])
+
+    def test_security_group_rule_create_broadcast_message(self):
+        fake_rule = {'id': 'fake_uuid',
+                         'parent_group': 'fake_parent',
+                         'protocol': 'fake_protocol',
+                         'to_port': 'fake_to',
+                         'from_port': 'fake_from',
+                         'grantee_group': 'fake_group'}
+        fake_group = {'id': 'fake_group_id',
+            'name':'fake_group_name',
+            'project_id':'fake_project_id',
+            'description':'fake_description',
+                }
+        bcast_message = cells_utils.form_security_group_rule_create_broadcast_message(
+                fake_rule, fake_group)
+
+        rule_info = fake_rule.copy()
+        rule_info['parent_group_name'] = fake_group['name']
+        rule_info['parent_group_pid'] = fake_group['project_id']
+        message = {'method': 'security_group_rule_create',
+                   'args': {'security_group_rule': rule_info}}
+        expected = {'method': 'broadcast_message',
+                    'args': {'direction': 'down',
+                             'message': message,
+                             'routing_path': None,
+                             'hopcount': 0,
+                             'fanout': False}}
+        self.assertEqual(bcast_message, expected)

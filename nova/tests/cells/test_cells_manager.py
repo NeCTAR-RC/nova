@@ -689,3 +689,175 @@ class CellsManagerClassTestCase(test.TestCase):
         self.cells_manager._sync_instance(fake_context, instance)
         self.assertEqual(call_info['broadcast'], 2)
         self.assertEqual(call_info['method'], 'instance_update')
+
+    def test_security_group_rule_create(self):
+
+        call_info = {
+                'create': 0,
+                'get': 0,
+                }
+
+        fake_context = 'fake_context'
+        fake_routing_path = 'fake_routing_path'
+        fake_group_pid = 'fake_pid'
+        fake_group_name = 'fake_pid'
+        fake_group_id = 1
+        original_group_id = 2
+        fake_rule = {
+            'to_port':'fake_to_port',
+            'from_port':'fake_from_port',
+            'cidr': 'fake_cidr',
+            'parent_group_name': fake_group_name,
+            'parent_group_pid': fake_group_pid,
+            'parent_group_id': original_group_id,
+            }
+
+        class group(object):
+            def __getattribute__(self, attr):
+                if attr == 'id':
+                    return fake_group_id
+                else:
+                    return 'attribute'
+
+        def path_is_us_false(path):
+            self.assertEqual(path, fake_routing_path)
+            return False
+
+        def security_group_get_by_name_success(context, pid, name):
+            call_info['get'] += 1
+            self.assertEqual(pid, fake_group_pid)
+            self.assertEqual(name, fake_group_name)
+            return group()
+
+        def security_group_rule_create(context, security_group_rule, update_cells=False):
+            call_info['create'] += 1
+            self.assertFalse('parent_group_name' in security_group_rule)
+            self.assertFalse('parent_group_pid' in security_group_rule)
+            self.assertTrue('parent_group_id' in security_group_rule)
+            self.assertEqual(security_group_rule['parent_group_id'], fake_group_id)
+            self.assertEqual(update_cells, False)
+            return
+
+
+
+        self.stubs.Set(self.cells_manager,
+                '_path_is_us', path_is_us_false)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_get_by_name', security_group_get_by_name_success)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_rule_create', security_group_rule_create)
+
+        self.cells_manager.security_group_rule_create(fake_context,
+                fake_rule, fake_routing_path)
+
+        self.assertEqual(call_info['create'], 1)
+        self.assertEqual(call_info['get'], 1)
+
+
+
+    def test_security_group_rule_create_current_cell(self):
+
+        call_info = {
+                'create': 0,
+                'get': 0,
+                }
+
+        fake_context = 'fake_context'
+        fake_routing_path = 'fake_routing_path'
+        fake_group_id = 1
+        fake_group_pid = 'fake_pid'
+        fake_group_name = 'fake_pid'
+        fake_rule = {
+            'to_port':'fake_to_port',
+            'from_port':'fake_from_port',
+            'cidr': 'fake_cidr',
+            'parent_group_name': fake_group_name,
+            'parent_group_pid': fake_group_pid,
+            }
+
+        class group(object):
+            def __getattribute__(self, attr):
+                return 'attribute'
+
+        def path_is_us_true(path):
+            self.assertEqual(path, fake_routing_path)
+            return True
+
+        def security_group_get_by_name_success(context, pid, name):
+            call_info['get'] += 1
+            self.assertEqual(pid, fake_group_pid)
+            self.assertEqual(name, fake_group_name)
+            return group()
+
+        def security_group_rule_create(context, security_group_rule, update_cells=False):
+            call_info['create'] += 1
+            self.assertFalse('parent_group_name' in security_group_rule)
+            self.assertFalse('parent_group_pid' in security_group_rule)
+            self.assertTrue('parent_group_id' in security_group_rule)
+            self.assertEqual(update_cells, False)
+            return
+
+
+
+        self.stubs.Set(self.cells_manager,
+                '_path_is_us', path_is_us_true)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_get_by_name', security_group_get_by_name_success)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_rule_create', security_group_rule_create)
+
+        self.cells_manager.security_group_rule_create(fake_context,
+                fake_rule, fake_routing_path)
+
+        self.assertEqual(call_info['create'], 0)
+        self.assertEqual(call_info['get'], 0)
+
+
+    def test_security_group_rule_missing_parent_group(self):
+
+        call_info = {
+                'create': 0,
+                'get': 0,
+                }
+
+        fake_context = 'fake_context'
+        fake_routing_path = 'fake_routing_path'
+        fake_group_pid = 'fake_pid'
+        fake_group_name = 'fake_pid'
+        fake_rule = {
+            'to_port':'fake_to_port',
+            'from_port':'fake_from_port',
+            'cidr': 'fake_cidr',
+            'parent_group_name': fake_group_name,
+            'parent_group_pid': fake_group_pid,
+            }
+
+        def path_is_us_false(path):
+            self.assertEqual(path, fake_routing_path)
+            return False
+
+        def path_is_us_true(path):
+            self.assertEqual(path, fake_routing_path)
+            return True
+
+        def security_group_get_by_name_fail(context, pid, name):
+            call_info['get'] += 1
+            raise exception.SecurityGroupNotFound()
+
+        def security_group_rule_create(context, security_group_rule, update_cells=False):
+            call_info['create'] += 1
+            return
+
+        self.stubs.Set(self.cells_manager,
+                '_path_is_us', path_is_us_false)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_get_by_name', security_group_get_by_name_fail)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_rule_create', security_group_rule_create)
+
+        self.cells_manager.security_group_rule_create(fake_context,
+                fake_rule, fake_routing_path)
+
+        self.assertEqual(call_info['create'], 0)
+        self.assertEqual(call_info['get'], 1)
+
