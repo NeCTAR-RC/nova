@@ -1173,9 +1173,11 @@ class ComputeManager(manager.SchedulerDependentManager):
         context = context.elevated()
 
         current_power_state = self._get_power_state(context, instance)
+        current_task_state = instance['task_state']
         self._instance_update(context,
                               instance['uuid'],
-                              power_state=current_power_state)
+                              power_state=current_power_state,
+                              task_state=current_task_state)
 
         LOG.audit(_('instance snapshotting'), context=context,
                   instance=instance)
@@ -1200,7 +1202,7 @@ class ComputeManager(manager.SchedulerDependentManager):
             expected_task_state = task_states.IMAGE_BACKUP
 
         self._instance_update(context, instance['uuid'], task_state=None,
-                              expected_task_state=expected_task_state)
+                              expected_task_state=current_task_state)
 
         if image_type == 'snapshot' and rotation:
             raise exception.ImageRotationNotAllowed()
