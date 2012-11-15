@@ -241,7 +241,7 @@ class CellsScheduler(base.Base):
                     time.sleep(sleep_time)
                     continue
         except Exception:
-            instance = kwargs['request_spec']['instance_properties']
+            request_spec = kwargs['request_spec']
             if self.manager._get_parent_cells():
                 LOG.exception(_("Error scheduling"))
                 for instance_uuid in request_spec['instance_uuids']:
