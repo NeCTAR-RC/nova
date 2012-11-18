@@ -2009,10 +2009,21 @@ def get_instance_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_instance_uuid_by_ec2_id(context, ec2_id)
 
 
-def ec2_instance_create(context, instance_ec2_id):
+def ec2_instance_create(context, instance_uuid, id=None, update_cells=True):
     """Create the ec2 id to instance uuid mapping on demand"""
-    return IMPL.ec2_instance_create(context, instance_ec2_id)
+    rv = IMPL.ec2_instance_create(context, instance_uuid, id)
 
+    LOG.debug("uuid=%s, id=%s" % (instance_uuid, rv.id))
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'ec2_instance_create',
+                                                            instance_uuid,
+                                                            rv.id
+                                                        )
+        except Exception:
+            LOG.exception(_("Failed to notify cells of e2c_instance_create"))
+    return rv
 
 ####################
 

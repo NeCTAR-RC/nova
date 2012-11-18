@@ -1471,7 +1471,7 @@ def instance_create(context, values):
         instance_ref.instance_type
 
     # create the instance uuid to ec2_id mapping entry for instance
-    ec2_instance_create(context, instance_ref['uuid'])
+    db.ec2_instance_create(context, instance_ref['uuid'])
 
     return instance_ref
 
@@ -5211,16 +5211,21 @@ def instance_fault_get_by_instance_uuids(context, instance_uuids):
 
 ##################
 
-
 @require_context
 def ec2_instance_create(context, instance_uuid, id=None):
     """Create ec2 compatable instance by provided uuid"""
-    ec2_instance_ref = models.InstanceIdMapping()
-    ec2_instance_ref.update({'uuid': instance_uuid})
+    session = get_session()
+    ec2_instance_ref = _ec2_instance_get_query(context, session=session).\
+                       filter_by(uuid=instance_uuid).\
+                       first()
+    if not ec2_instance_ref:
+        ec2_instance_ref = models.InstanceIdMapping()
+        ec2_instance_ref.update({'uuid': instance_uuid})
+
     if id is not None:
         ec2_instance_ref.update({'id': id})
 
-    ec2_instance_ref.save()
+    ec2_instance_ref.save(session=session)
 
     return ec2_instance_ref
 
