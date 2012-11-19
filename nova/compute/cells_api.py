@@ -24,6 +24,7 @@ from nova.compute import task_states
 from nova.compute import vm_states
 from nova import exception
 from nova import flags
+from nova import block_device
 from nova.openstack.common import cfg
 from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
@@ -35,7 +36,8 @@ LOG = logging.getLogger(__name__)
 
 check_instance_state = compute_api.check_instance_state
 wrap_check_policy = compute_api.wrap_check_policy
-
+check_policy = compute_api.check_policy
+check_instance_lock = compute_api.check_instance_lock
 
 def validate_cell(fn):
     def _wrapped(self, context, instance, *args, **kwargs):
@@ -497,21 +499,29 @@ class ComputeCellsAPI(compute_api.API):
     @validate_cell
     def attach_volume(self, context, instance, volume_id, device=None):
         """Attach an existing volume to an existing instance."""
-        if device and not re.match("^/dev/x{0,1}[a-z]d[a-z]+$", device):
+        if device and not block_device.match_device(device):
             raise exception.InvalidDevicePath(path=device)
-        super(ComputeCellsAPI, self).attach_volume(context, instance,
-                volume_id, device)
+        device = self.compute_rpcapi.reserve_block_device_name(
+            context, device=device, instance=instance, volume_id=volume_id)
+        try:
+            volume = self.volume_api.get(context, volume_id)
+            self.volume_api.check_attach(context, volume)
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                self.db.block_device_mapping_destroy_by_instance_and_device(
+                        context, instance['uuid'], device)
         self._cast_to_cells(context, instance, 'attach_volume',
                 volume_id, device)
 
-    @wrap_check_policy
+    @check_instance_lock
     @validate_cell
-    def detach_volume(self, context, instance, volume):
+    def _detach_volume(self, context, instance, volume_id):
         """Detach a volume from an instance."""
-        # FIXME(comstud): this call should be in volume i think?
-        super(ComputeCellsAPI, self).detach_volume(context, instance, volume)
+        check_policy(context, 'detach_volume', instance)
+        volume = self.volume_api.get(context, volume_id)
+        self.volume_api.check_detach(context, volume)
         self._cast_to_cells(context, instance, 'detach_volume',
-                dict(volume.iteritems()))
+                volume_id)
 
     @wrap_check_policy
     @validate_cell
