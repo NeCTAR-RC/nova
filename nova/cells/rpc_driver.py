@@ -42,6 +42,14 @@ class CellsRPCDriver(driver.BaseCellsDriver):
                      'rpc_port': 'port',
                      'rpc_virtual_host': 'virtual_host'}
         server_params = {}
+        rpc_host = next_hop.db_info['rpc_host']
+
+        if rpc_host:
+            rpc_hosts = rpc_host.split(',')
+            if len(rpc_hosts) > 1:
+                server_params['hosts'] = rpc_hosts
+                param_map.pop('rpc_host')
+
         for source, target in param_map.items():
             if next_hop.db_info[source]:
                 server_params[target] = next_hop.db_info[source]
