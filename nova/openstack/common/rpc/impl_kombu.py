@@ -402,9 +402,11 @@ class Connection(object):
         # Keys to translate from server_params to kombu params
         server_params_to_kombu_params = {'username': 'userid'}
 
+        rabbit_hosts = server_params.pop('hosts', self.conf.rabbit_hosts)
+
         ssl_params = self._fetch_ssl_params()
         params_list = []
-        for adr in self.conf.rabbit_hosts:
+        for adr in rabbit_hosts:
             hostname, port = network_utils.parse_host_port(
                 adr, default_port=self.conf.rabbit_port)
 
