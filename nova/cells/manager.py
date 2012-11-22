@@ -789,6 +789,9 @@ class CellsManager(manager.Manager):
                     return
             args[0] = security_group
 
+        if method == 'detach_volume':
+            args[0] = args[1]
+            args.pop()
         return fn(context, *args, **method_info['method_kwargs'])
 
     def _get_instances_to_sync(self, context, updated_since=None,

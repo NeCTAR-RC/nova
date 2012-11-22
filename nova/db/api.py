@@ -1255,22 +1255,44 @@ def snapshot_update(context, snapshot_id, values):
 
 ####################
 
-
-def block_device_mapping_create(context, values):
+def block_device_mapping_create(context, values, update_cells=True):
     """Create an entry of block device mapping"""
-    return IMPL.block_device_mapping_create(context, values)
+    rv = IMPL.block_device_mapping_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                                                'block_device_mapping_create',
+                                                values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_create"))
+    return rv
 
 
-def block_device_mapping_update(context, bdm_id, values):
+def block_device_mapping_update(context, bdm_id, values, update_cells=True):
     """Update an entry of block device mapping"""
-    return IMPL.block_device_mapping_update(context, bdm_id, values)
+    rv = IMPL.block_device_mapping_update(context, bdm_id, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                                                'block_device_mapping_update',
+                                                bdm_id, values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_update"))
+    return rv
 
 
-def block_device_mapping_update_or_create(context, values):
+def block_device_mapping_update_or_create(context, values, update_cells=True):
     """Update an entry of block device mapping.
     If not existed, create a new entry"""
-    return IMPL.block_device_mapping_update_or_create(context, values)
-
+    rv = IMPL.block_device_mapping_update_or_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                                'block_device_mapping_update_or_create',
+                                values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_update_or_create"))
+    return rv
 
 def block_device_mapping_get_all_by_instance(context, instance_uuid):
     """Get all block device mapping belonging to an instance"""
@@ -1278,23 +1300,49 @@ def block_device_mapping_get_all_by_instance(context, instance_uuid):
                                                          instance_uuid)
 
 
-def block_device_mapping_destroy(context, bdm_id):
+def block_device_mapping_destroy(context, bdm_id, update_cells=True):
     """Destroy the block device mapping."""
-    return IMPL.block_device_mapping_destroy(context, bdm_id)
+    rv = IMPL.block_device_mapping_destroy(context, bdm_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                                            'block_device_mapping_destroy',
+                                            bdm_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_destroy"))
+    return rv
 
 
 def block_device_mapping_destroy_by_instance_and_device(context, instance_uuid,
-                                                        device_name):
+                                                        device_name, update_cells=True):
     """Destroy the block device mapping."""
-    return IMPL.block_device_mapping_destroy_by_instance_and_device(
+    rv = IMPL.block_device_mapping_destroy_by_instance_and_device(
         context, instance_uuid, device_name)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                            'block_device_mapping_destroy_by_instance_and_device',
+                            instance_uuid,
+                            device_name)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_destroy_by_instance_and_device"))
+    return rv
 
 
 def block_device_mapping_destroy_by_instance_and_volume(context, instance_uuid,
-                                                        volume_id):
+                                                        volume_id, update_cells=True):
     """Destroy the block device mapping."""
-    return IMPL.block_device_mapping_destroy_by_instance_and_volume(
+    rv = IMPL.block_device_mapping_destroy_by_instance_and_volume(
         context, instance_uuid, volume_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
+                                'block_device_mapping_destroy_by_instance_and_volume',
+                                instance_uuid,
+                                volume_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of block_device_mapping_destroy_by_instance_and_volume"))
+    return rv
 
 
 ####################

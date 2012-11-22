@@ -277,6 +277,13 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
         self.call_dbapi_method(context, dbmethod, args,
                                kwargs=kwargs, direction='down')
 
+    def broadcast_dbmethod_up(self, context, dbmethod, *args, **kwargs):
+        """Broadcast db method upwards"""
+        if not FLAGS.cells.enable:
+            return
+        self.call_dbapi_method(context, dbmethod, args,
+                               kwargs=kwargs, direction='up')
+
     def security_group_rule_create(self, context, security_group_rule, group):
         """Broadcast security group rule create request downward"""
         if not FLAGS.cells.enable:
