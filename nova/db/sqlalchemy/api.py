@@ -4690,11 +4690,16 @@ def volume_type_extra_specs_update_or_create(context, volume_type_id,
 ####################
 
 
+def _s3_image_get_query(context, session=None):
+    return model_query(context,
+                       models.S3Image,
+                       session=session,
+                       read_deleted='yes')
+
+
 def s3_image_get(context, image_id):
     """Find local s3 image represented by the provided id"""
-    result = model_query(context, models.S3Image, read_deleted="yes").\
-                 filter_by(id=image_id).\
-                 first()
+    result = _s3_image_get_query(context).filter_by(id=image_id).first()
 
     if not result:
         raise exception.ImageNotFound(image_id=image_id)
@@ -4704,9 +4709,7 @@ def s3_image_get(context, image_id):
 
 def s3_image_get_by_uuid(context, image_uuid):
     """Find local s3 image represented by the provided uuid"""
-    result = model_query(context, models.S3Image, read_deleted="yes").\
-                 filter_by(uuid=image_uuid).\
-                 first()
+    result = _s3_image_get_query(context).filter_by(uuid=image_uuid).first()
 
     if not result:
         raise exception.ImageNotFound(image_id=image_uuid)
@@ -4714,12 +4717,21 @@ def s3_image_get_by_uuid(context, image_uuid):
     return result
 
 
-def s3_image_create(context, image_uuid):
+def s3_image_create(context, image_uuid, id=None):
     """Create local s3 image represented by provided uuid"""
-    try:
+    session = get_session()
+    s3_image_ref = _s3_image_get_query(context, session=session).\
+                       filter_by(uuid=image_uuid).\
+                       first()
+    if not s3_image_ref:
         s3_image_ref = models.S3Image()
         s3_image_ref.update({'uuid': image_uuid})
-        s3_image_ref.save()
+
+    if id is not None:
+        s3_image_ref.update({'id': id})
+
+    try:
+        s3_image_ref.save(session=session)
     except Exception, e:
         raise exception.DBError(e)
 

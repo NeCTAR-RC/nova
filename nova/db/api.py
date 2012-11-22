@@ -1805,9 +1805,19 @@ def s3_image_get_by_uuid(context, image_uuid):
     return IMPL.s3_image_get_by_uuid(context, image_uuid)
 
 
-def s3_image_create(context, image_uuid):
+def s3_image_create(context, image_uuid, id=None, update_cells=True):
     """Create local s3 image represented by provided uuid"""
-    return IMPL.s3_image_create(context, image_uuid)
+    s3_image_ref = IMPL.s3_image_create(context, image_uuid, id=id)
+    LOG.debug("uuid=%s, id=%s" % (image_uuid, s3_image_ref.id))
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            's3_image_create',
+                                                            image_uuid,
+                                                            id=s3_image_ref.id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of s3_image_create"))
+    return s3_image_ref
 
 
 ####################
