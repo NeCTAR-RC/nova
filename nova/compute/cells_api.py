@@ -600,3 +600,26 @@ class SecurityGroupCellsAPI(compute_api.SecurityGroupAPI):
             LOG.debug(msg, instance, cell_name, context=context)
             self._cast_to_cells(context, cell_name, security_group,
                     'refresh_security_group_rules', instance['host'])
+    
+    def add_to_instance(self, context, instance, security_group_name):
+        super(SecurityGroupCellsAPI, self).add_to_instance(context, instance, security_group_name)
+        security_group = self.db.security_group_get_by_name(context,
+                context.project_id,
+                security_group_name)
+
+        instance_uuid = instance['uuid']
+        cell_name = instance['cell_name']
+        self._cast_to_cells(context, cell_name, security_group,
+                'refresh_security_group_rules', instance['host'])
+
+    def remove_from_instance(self, context, instance, security_group_name):
+        """Remove the security group associated with the instance"""
+        super(SecurityGroupCellsAPI, self).remove_from_instance(context, instance, security_group_name)
+        security_group = self.db.security_group_get_by_name(context,
+                context.project_id,
+                security_group_name)
+
+        instance_uuid = instance['uuid']
+        cell_name = instance['cell_name']
+        self._cast_to_cells(context, cell_name, security_group,
+                'refresh_security_group_rules', instance['host'])

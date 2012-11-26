@@ -713,17 +713,33 @@ def instance_update_and_get_original(context, instance_uuid, values):
     return rv
 
 
-def instance_add_security_group(context, instance_id, security_group_id):
+def instance_add_security_group(context, instance_id, security_group_id, update_cells=True):
     """Associate the given security group with the given instance."""
-    return IMPL.instance_add_security_group(context, instance_id,
+    rv =  IMPL.instance_add_security_group(context, instance_id,
                                             security_group_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                'instance_add_security_group',
+                instance_id,
+                security_group_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance add security group"))
+    return rv
 
-
-def instance_remove_security_group(context, instance_id, security_group_id):
+def instance_remove_security_group(context, instance_id, security_group_id, update_cells=True):
     """Disassociate the given security group from the given instance."""
-    return IMPL.instance_remove_security_group(context, instance_id,
+    rv =  IMPL.instance_remove_security_group(context, instance_id,
                                             security_group_id)
-
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                'instance_remove_security_group',
+                instance_id,
+                security_group_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance remove security group"))
+    return rv
 
 ###################
 
