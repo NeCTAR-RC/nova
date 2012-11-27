@@ -205,3 +205,22 @@ def form_security_group_rule_create_broadcast_message(security_group_rule, group
     return form_broadcast_message('down', 'security_group_rule_create',
             {'security_group_rule': security_group_rule_dict},
             routing_path=routing_path, hopcount=hopcount)
+
+def form_security_group_rule_destroy_broadcast_message(security_group_rule, group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for adding security group rules which
+    sends unique information about a parent group rather than the id,
+    which can get out of sync between child/parent cells"""
+    security_group_rule_dict = dict(security_group_rule.iteritems())
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at', 'group_id', 'parent_group_id']
+    for item in remove:
+        security_group_rule_dict.pop(item)
+    security_group_dict = dict(group.iteritems())
+    parent_group_id = security_group_rule_dict.pop('parent_group_id', None)
+    security_group_rule_dict['parent_group_name'] = security_group_dict['name']
+    security_group_rule_dict['parent_group_pid'] = security_group_dict['project_id']
+
+    return form_broadcast_message('down', 'security_group_rule_destroy',
+            {'security_group_rule': security_group_rule_dict},
+            routing_path=routing_path, hopcount=hopcount)

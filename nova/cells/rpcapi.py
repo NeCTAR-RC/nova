@@ -292,3 +292,12 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
                 security_group_rule, group)
         topic = FLAGS.cells.topic
         self.cast(context, bcast_message, topic)
+
+    def security_group_rule_destroy(self, context, security_group_rule, group):
+        """Broadcast security group rule create request downward"""
+        if not FLAGS.cells.enable:
+            return
+        bcast_message = cells_utils.form_security_group_rule_destroy_broadcast_message(
+                security_group_rule, group)
+        topic = FLAGS.cells.topic
+        self.cast(context, bcast_message, topic)

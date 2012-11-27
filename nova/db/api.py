@@ -715,11 +715,11 @@ def instance_update_and_get_original(context, instance_uuid, values):
 
 def instance_add_security_group(context, instance_id, security_group_id, update_cells=True):
     """Associate the given security group with the given instance."""
-    rv =  IMPL.instance_add_security_group(context, instance_id,
+    rv = IMPL.instance_add_security_group(context, instance_id,
                                             security_group_id)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
                 'instance_add_security_group',
                 instance_id,
                 security_group_id)
@@ -729,11 +729,11 @@ def instance_add_security_group(context, instance_id, security_group_id, update_
 
 def instance_remove_security_group(context, instance_id, security_group_id, update_cells=True):
     """Disassociate the given security group from the given instance."""
-    rv =  IMPL.instance_remove_security_group(context, instance_id,
+    rv = IMPL.instance_remove_security_group(context, instance_id,
                                             security_group_id)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
                 'instance_remove_security_group',
                 instance_id,
                 security_group_id)
@@ -1458,7 +1458,7 @@ def security_group_rule_create(context, values, update_cells=True):
             # Rather than directly calling a db method, use custom
             # sync that maintains integrity of references between
             # security groups and their rules on syncing
-            group = IMPL.security_group_get(context, values['parent_group_id'])
+            group = security_group_get(context, values['parent_group_id'])
             cells_rpcapi.CellsAPI().security_group_rule_create(context, values, group)
 
         except Exception:
@@ -1481,12 +1481,13 @@ def security_group_rule_get_by_security_group_grantee(context,
 
 def security_group_rule_destroy(context, security_group_rule_id, update_cells=True):
     """Deletes a security group rule."""
+    values = security_group_rule_get(context, security_group_rule_id)
     rv = IMPL.security_group_rule_destroy(context, security_group_rule_id)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
-                                                            'security_group_rule_destroy',
-                                                            security_group_rule_id)
+            group = security_group_get(context, values['parent_group_id'])
+            cells_rpcapi.CellsAPI().security_group_rule_destroy(context,
+                                                                values, group)
         except Exception:
             LOG.exception(_("Failed to notify cells of security_group_rule_destroy"))
     return rv

@@ -174,6 +174,7 @@ class CellsManager(manager.Manager):
         self.api_map = {'compute': compute.API(),
                         'network': network.API(),
                         'volume': volume.API(),
+                        'securitygroup': compute.SecurityGroupAPI(),
                         'securitygroup_rpc': compute.rpcapi.SecurityGroupAPI(),
                         'consoleauth_rpc': consoleauth_rpcapi.ConsoleAuthAPI()}
 
@@ -761,7 +762,7 @@ class CellsManager(manager.Manager):
             self.broadcast_message(context, **bcast_msg['args'])
 
         # FIXME(comstud): Make more generic later.  Finish 'volume' code
-        if service_name == 'compute':
+        if service_name == 'compute' or service_name == 'securitygroup':
             # 1st arg is instance_uuid that we need to turn into the
             # instance object.
             instance_uuid = args[0]
@@ -1054,33 +1055,70 @@ class CellsManager(manager.Manager):
         security_group_name = security_group_rule.pop('parent_group_name', None)
         security_group_pid = security_group_rule.pop('parent_group_pid', None)
 
-        if security_group_name and security_group_pid:
+        if not security_group_name or not security_group_pid:
+            LOG.error(_( "Could not remove rule %(security_group_rule)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
 
-            # Security group name and project id were included correctly
-            try:
-                group = self.db.security_group_get_by_name(
-                        context,
-                        security_group_pid,
-                        security_group_name
-                        )
-            except exception.SecurityGroupNotFound:
-                LOG.error(_( "Could not add rule %(security_group_rule)s "
-                        "to group '%(security_group_name)s' (group missing from db)"),
-                        locals())
-                return
+        # Security group name and project id were included correctly
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                security_group_pid,
+                security_group_name
+            )
+        except exception.SecurityGroupNotFound:
+            LOG.error(_( "Could not add rule %(security_group_rule)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
 
-            security_group_rule['parent_group_id'] = group.id
-
-        else:
-            # No security group name and project id. See if the parent_group_id
-            # was explicitly included
-            if security_group_rule.get('parent_group_id', None):
-                # No group name or project id was specified, but a parent_group_id
-                # was passed to us. This isn't the way things are meant to be done
-                # but will work 9 times out of 10.
-                sgr = security_group_rule
-                LOG.warning(_( "Forcing parent group id to %s for rule %s as no "
-                                "groupname/project id pair was specified." %
-                                (sgr['parent_group_id'], sgr)))
-
+        security_group_rule['parent_group_id'] = group.id
         self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
+
+
+    def security_group_rule_destroy(self, context, security_group_rule, routing_path,
+                                    **kwargs):
+        # Don't remove the rule if the message was sent from this cell
+        if self._path_is_us(routing_path):
+            return
+
+        security_group_name = security_group_rule.pop('parent_group_name', None)
+        security_group_pid = security_group_rule.pop('parent_group_pid', None)
+
+        if not security_group_name or not security_group_pid:
+            LOG.error(_( "Could not remove rule %(security_group_rule)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
+        # Security group name and project id were included correctly
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                security_group_pid,
+                security_group_name
+            )
+        except exception.SecurityGroupNotFound:
+            LOG.error(_( "Could not add rule %(security_group_rule)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
+
+        security_group_rule['parent_group_id'] = group.id
+        rules = self.db.security_group_rule_get_by_security_group(context, group.id)
+        LOG.debug("Rules for group %s are %s" % (group.id, rules))
+        found_rule = None
+        for rule in rules:
+            rule_dict = dict(rule.iteritems())
+            for key, value in security_group_rule.items():
+                if rule_dict[key] != value:
+                    LOG.debug("%s != %s" % (rule_dict[key], value))
+                    break
+            else:
+                found_rule = rule
+        if found_rule:
+            self.db.security_group_rule_destroy(context, found_rule.id)
+        else:
+            LOG.error(_( "Coudn't find security group rule %s for delete'." %
+                           (security_group_rule)))
