@@ -206,6 +206,7 @@ def form_security_group_rule_create_broadcast_message(security_group_rule, group
             {'security_group_rule': security_group_rule_dict},
             routing_path=routing_path, hopcount=hopcount)
 
+
 def form_security_group_rule_destroy_broadcast_message(security_group_rule, group, routing_path=None,
         hopcount=0):
 
@@ -224,3 +225,16 @@ def form_security_group_rule_destroy_broadcast_message(security_group_rule, grou
     return form_broadcast_message('down', 'security_group_rule_destroy',
             {'security_group_rule': security_group_rule_dict},
             routing_path=routing_path, hopcount=hopcount)
+
+
+def cell_display_name_from_instance(instance):
+    """Get the name of the cell from the instance, formatted suitably
+    for display to a user.
+
+    Removes the top (API) cell from cell_name since it will never
+    change."""
+    cell_name = instance.get('cell_name', "")
+    if cell_name:
+        index = cell.find('!')
+        cell_name = cell_name[index + 1:].replace('!', '-')
+    return cell_name

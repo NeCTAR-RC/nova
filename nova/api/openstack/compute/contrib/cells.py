@@ -26,6 +26,7 @@ from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
 from nova.cells import rpcapi as cells_rpcapi
+from nova.cells import utils as cells_utils
 from nova.compute import api as compute
 from nova import db
 from nova import exception
@@ -320,10 +321,9 @@ class ServerCellsController(wsgi.Controller):
         self.compute_api = compute.API()
 
     def _extend_server(self, server, instance):
-        for attr in ['cell_name', ]:
-            if attr in instance:
-                key = "%s:%s" % (Cells.alias, attr)
-                server[key] = instance[attr]
+        if 'cell_name' in instance:
+            key = "%s:%s" % (Cells.alias, 'cell_name')
+            server[key] = cells_utils.cell_display_name_from_instance(instance)
 
     @wsgi.extends
     def show(self, req, resp_obj, id):

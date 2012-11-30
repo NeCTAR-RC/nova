@@ -30,6 +30,7 @@ from nova.api.ec2 import inst_state
 from nova.api import validator
 from nova import block_device
 from nova.cells import rpcapi as cells_rpcapi
+from nova.cells import utils as cells_utils
 from nova import compute
 from nova.compute import instance_types
 from nova.compute import vm_states
@@ -1108,10 +1109,7 @@ class CloudController(object):
             services = db.service_get_all_by_host(context.elevated(), host)
 
             if FLAGS.cells.enable:
-                zone = instance.get('cell_name', "")
-                if zone:
-                    index = zone.find('!')
-                    zone = zone[index+1:].replace('!', '-')
+                zone = cells_utils.cell_display_name_from_instance(instance)
             else:
                 zone = ec2utils.get_availability_zone_by_host(services, host)
 
