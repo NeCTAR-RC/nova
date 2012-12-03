@@ -1912,6 +1912,51 @@ def instance_remove_security_group(context, instance_uuid, security_group_id):
                         'deleted_at': timeutils.utcnow(),
                         'updated_at': literal_column('updated_at')})
 
+@require_context
+def security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+
+    sort_fn = {'desc': desc, 'asc': asc}
+    session = get_session()
+    query_prefix = session.query(models.SecurityGroupInstanceAssociation).\
+            order_by(sort_fn[sort_dir](getattr(models.SecurityGroupInstanceAssociation, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.SecurityGroupInstanceAssociation.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.SecurityGroupInstanceAssociation.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = ['id', 'uuid']
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.SecurityGroupInstanceAssociation,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.SecurityGroupInstanceAssociation, filters)
+
+    instance_associations = query_prefix.all()
+    return instance_associations
 
 ###################
 
@@ -3112,12 +3157,18 @@ def volume_update(context, volume_id, values):
 @require_context
 def ec2_volume_create(context, volume_uuid, id=None):
     """Create ec2 compatable volume by provided uuid"""
-    ec2_volume_ref = models.VolumeIdMapping()
-    ec2_volume_ref.update({'uuid': volume_uuid})
+    session = get_session()
+    ec2_volume_ref = _ec2_volume_get_query(context, session=session).\
+                       filter_by(uuid=volume_uuid).\
+                       first()
+    if not ec2_volume_ref:
+        ec2_volume_ref = models.VolumeIdMapping()
+        ec2_volume_ref.update({'uuid': volume_uuid})
+
     if id is not None:
         ec2_volume_ref.update({'id': id})
 
-    ec2_volume_ref.save()
+    ec2_volume_ref.save(session=session)
 
     return ec2_volume_ref
 
@@ -3133,6 +3184,50 @@ def get_ec2_volume_id_by_uuid(context, volume_id, session=None):
 
     return result['id']
 
+def ec2_volume_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+
+    sort_fn = {'desc': desc, 'asc': asc}
+    session = get_session()
+    query_prefix = session.query(models.VolumeIdMapping).\
+            order_by(sort_fn[sort_dir](getattr(models.VolumeIdMapping, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.VolumeIdMapping.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.VolumeIdMapping.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = ['id', 'uuid']
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.VolumeIdMapping,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.VolumeIdMapping, filters)
+
+    volume_mappings = query_prefix.all()
+    return volume_mappings
 
 @require_context
 def get_volume_uuid_by_ec2_id(context, ec2_id, session=None):
@@ -3466,6 +3561,51 @@ def _security_group_get_by_names(context, session, project_id, group_names):
 def security_group_get_all(context):
     return _security_group_get_query(context).all()
 
+@require_context
+def security_group_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+    sort_fn = {'desc': desc, 'asc': asc}
+
+    session = get_session()
+    query_prefix = session.query(models.SecurityGroup).\
+            order_by(sort_fn[sort_dir](getattr(models.SecurityGroup, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.SecurityGroup.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.SecurityGroup.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = []
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.SecurityGroup,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.SecurityGroup, filters)
+
+    rules = query_prefix.all()
+    return rules
 
 @require_context
 def security_group_get(context, security_group_id, session=None):
@@ -3554,6 +3694,16 @@ def security_group_in_use(context, group_id):
 
 @require_context
 def security_group_create(context, values, session=None):
+
+    try:
+        name = values.get('name', None)
+        project_id = values.get('project_id', None)
+        security_group_ref = security_group_get_by_name(context,
+                project_id, name,
+                columns_to_join=[], session=session)
+        return security_group_ref
+    except exception.NotFound:
+        pass
     security_group_ref = models.SecurityGroup()
     # FIXME(devcamcar): Unless I do this, rules fails with lazy load exception
     # once save() is called.  This will get cleaned up in next orm pass.
@@ -3651,6 +3801,52 @@ def security_group_rule_get_by_security_group(context, security_group_id,
             options(joinedload_all('grantee_group.instances.instance_type')).\
             all()
 
+@require_context
+def security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+
+    sort_fn = {'desc': desc, 'asc': asc}
+
+    session = get_session()
+    query_prefix = session.query(models.SecurityGroupIngressRule).\
+            order_by(sort_fn[sort_dir](getattr(models.SecurityGroupIngressRule, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.SecurityGroupIngressRule.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.SecurityGroupIngressRule.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = []
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.SecurityGroupIngressRule,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.SecurityGroupIngressRule, filters)
+
+    rules = query_prefix.all()
+    return rules
 
 @require_context
 def security_group_rule_get_by_security_group_grantee(context,
@@ -3664,6 +3860,13 @@ def security_group_rule_get_by_security_group_grantee(context,
 
 @require_context
 def security_group_rule_create(context, values):
+
+    # Add this to stop us checking for deleted rules
+    values['deleted'] = False
+    rule = security_group_rule_get_all_by_filters(context, values, 'deleted', 'asc')
+    if rule:
+        return rule[0]
+
     security_group_rule_ref = models.SecurityGroupIngressRule()
     security_group_rule_ref.update(values)
     security_group_rule_ref.save()
@@ -4716,6 +4919,52 @@ def s3_image_get_by_uuid(context, image_uuid):
 
     return result
 
+@require_context
+def s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+
+    sort_fn = {'desc': desc, 'asc': asc}
+
+    session = get_session()
+    query_prefix = session.query(models.S3Image).\
+            order_by(sort_fn[sort_dir](getattr(models.S3Image, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.S3Image.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.S3Image.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = ['uuid', 'id']
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.S3Image,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.S3Image, filters)
+
+    s3_image = query_prefix.all()
+    return s3_image
 
 def s3_image_create(context, image_uuid, id=None):
     """Create local s3 image represented by provided uuid"""
@@ -4723,9 +4972,16 @@ def s3_image_create(context, image_uuid, id=None):
     s3_image_ref = _s3_image_get_query(context, session=session).\
                        filter_by(uuid=image_uuid).\
                        first()
+
+    if not s3_image_ref and id:
+        s3_image_ref = _s3_image_get_query(context, session=session).\
+                           filter_by(id=id).\
+                           first()
+
     if not s3_image_ref:
         s3_image_ref = models.S3Image()
-        s3_image_ref.update({'uuid': image_uuid})
+
+    s3_image_ref.update({'uuid': image_uuid})
 
     if id is not None:
         s3_image_ref.update({'id': id})
@@ -5230,10 +5486,16 @@ def ec2_instance_create(context, instance_uuid, id=None):
     ec2_instance_ref = _ec2_instance_get_query(context, session=session).\
                        filter_by(uuid=instance_uuid).\
                        first()
+
+    if not ec2_instance_ref and id:
+        ec2_instance_ref = _ec2_instance_get_query(context, session=session).\
+                           filter_by(id=id).\
+                           first()
+        
     if not ec2_instance_ref:
         ec2_instance_ref = models.InstanceIdMapping()
-        ec2_instance_ref.update({'uuid': instance_uuid})
 
+    ec2_instance_ref.update({'uuid': instance_uuid})
     if id is not None:
         ec2_instance_ref.update({'id': id})
 
@@ -5275,6 +5537,51 @@ def _ec2_instance_get_query(context, session=None):
                        session=session,
                        read_deleted='yes')
 
+
+def ec2_instance_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+
+    sort_fn = {'desc': desc, 'asc': asc}
+    session = get_session()
+    query_prefix = session.query(models.InstanceIdMapping).\
+            order_by(sort_fn[sort_dir](getattr(models.InstanceIdMapping, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.InstanceIdMapping.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        if filters.pop('deleted'):
+            deleted = or_(models.InstanceIdMapping.deleted == True)
+            query_prefix = query_prefix.filter(deleted)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=False)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = ['id', 'uuid']
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.InstanceIdMapping,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.InstanceIdMapping, filters)
+
+    instance_associations = query_prefix.all()
+    return instance_associations
 
 @require_admin_context
 def task_log_get(context, task_name, period_beginning,

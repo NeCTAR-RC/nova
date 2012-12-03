@@ -189,6 +189,12 @@ def update_routing_path(fn):
     wrapper.__name__ = fn.__name__
     return wrapper
 
+def replace_security_group(object_dict, security_group_id_arg_name, group):
+    security_group_dict = dict(group.iteritems())
+    parent_group_id = object_dict.pop(security_group_id_arg_name, None)
+
+    object_dict['parent_group_name'] = security_group_dict['name']
+    object_dict['parent_group_pid'] = security_group_dict['project_id']
 
 def form_security_group_rule_create_broadcast_message(security_group_rule, group, routing_path=None,
         hopcount=0):
@@ -197,10 +203,18 @@ def form_security_group_rule_create_broadcast_message(security_group_rule, group
     sends unique information about a parent group rather than the id,
     which can get out of sync between child/parent cells"""
     security_group_rule_dict = dict(security_group_rule.iteritems())
-    security_group_dict = dict(group.iteritems())
-    parent_group_id = security_group_rule_dict.pop('parent_group_id', None)
-    security_group_rule_dict['parent_group_name'] = security_group_dict['name']
-    security_group_rule_dict['parent_group_pid'] = security_group_dict['project_id']
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at', 'group_id', 'parent_group_id']
+    for item in remove:
+        if item in security_group_rule_dict:
+            security_group_rule_dict.pop(item)
+
+    #security_group_dict = dict(group.iteritems())
+
+    replace_security_group(security_group_rule_dict, 'parent_group_id', group)
+    #parent_group_id = security_group_rule_dict.pop('parent_group_id', None)
+
+    #security_group_rule_dict['parent_group_name'] = security_group_dict['name']
+    #security_group_rule_dict['parent_group_pid'] = security_group_dict['project_id']
 
     return form_broadcast_message('down', 'security_group_rule_create',
             {'security_group_rule': security_group_rule_dict},
@@ -216,11 +230,14 @@ def form_security_group_rule_destroy_broadcast_message(security_group_rule, grou
     security_group_rule_dict = dict(security_group_rule.iteritems())
     remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at', 'group_id', 'parent_group_id']
     for item in remove:
-        security_group_rule_dict.pop(item)
-    security_group_dict = dict(group.iteritems())
-    parent_group_id = security_group_rule_dict.pop('parent_group_id', None)
-    security_group_rule_dict['parent_group_name'] = security_group_dict['name']
-    security_group_rule_dict['parent_group_pid'] = security_group_dict['project_id']
+        if item in security_group_rule_dict:
+            security_group_rule_dict.pop(item)
+    replace_security_group(security_group_rule_dict, 'parent_group_id', group)
+    #security_group_dict = dict(group.iteritems())
+    #replace_security_group(security_group_rule_dict, 'parent_group_id')
+    #parent_group_id = security_group_rule_dict.pop('parent_group_id', None)
+    #security_group_rule_dict['parent_group_name'] = security_group_dict['name']
+    #security_group_rule_dict['parent_group_pid'] = security_group_dict['project_id']
 
     return form_broadcast_message('down', 'security_group_rule_destroy',
             {'security_group_rule': security_group_rule_dict},
@@ -238,3 +255,44 @@ def cell_display_name_from_instance(instance):
         index = cell_name.find('!')
         cell_name = cell_name[index + 1:].replace('!', '-')
     return cell_name
+
+
+def form_instance_association_create_broadcast_message(instance_association, group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for adding instance associations which
+    sends unique information about a parent group rather than the id,
+    which can get out of sync between child/parent cells"""
+    instance_association_dict = dict(instance_association.iteritems())
+
+    # TODO (shauno) anything else to delete here?
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
+    for item in remove:
+        if item in instance_association_dict:
+            instance_association_dict.pop(item)
+
+    replace_security_group(instance_association_dict, 'security_group_id', group)
+
+    return form_broadcast_message('up', 'instance_association_create',
+            {'instance_association': instance_association_dict},
+            routing_path=routing_path, hopcount=hopcount)
+
+
+def form_instance_association_destroy_broadcast_message(instance_association, group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for adding instance associations which
+    sends unique information about a parent group rather than the id,
+    which can get out of sync between child/parent cells"""
+    instance_association_dict = dict(instance_association.iteritems())
+    # TODO (shauno) anything else to delete here?
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
+    for item in remove:
+        if item in instance_association_dict:
+            instance_association_dict.pop(item)
+
+    replace_security_group(instance_association_dict, 'security_group_id', group)
+
+    return form_broadcast_message('up', 'instance_association_destroy',
+            {'instance_association': instance_association_dict},
+            routing_path=routing_path, hopcount=hopcount)

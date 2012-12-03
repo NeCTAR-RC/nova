@@ -30,6 +30,7 @@ from eventlet import queue
 
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
+from nova.cells import consistency
 from nova import compute
 from nova.consoleauth import rpcapi as consoleauth_rpcapi
 from nova import context
@@ -70,7 +71,17 @@ flag_opts = [
                         "or deleted to continue to update cells"),
         cfg.IntOpt("instance_update_num_instances",
                 default=1,
-                help="Number of instances to update per periodic task run")
+                help="Number of instances to update per periodic task run"),
+        cfg.IntOpt("heal_update_interval",
+                default=0,
+                help="Number of seconds between cell healing updates"),
+        cfg.IntOpt("heal_updated_at_threshold",
+                default=0,
+                help="Number of seconds after a a healable was updated "
+                        "or deleted to continue to update cells"),
+        cfg.IntOpt("heal_update_num",
+                default=10,
+                help="Number of healables to update per periodic task run")
 ]
 
 
@@ -212,6 +223,67 @@ class CellsManager(manager.Manager):
         self._update_our_capacity(ctxt)
         self.last_instance_heal_time = 0
         self.instances_to_heal = iter([])
+
+        self.rules_consistency_handler = \
+            consistency.RuleConsistencyHandler(
+                    FLAGS.cells.heal_update_interval,
+                    FLAGS.cells.heal_updated_at_threshold,
+                    FLAGS.cells.heal_update_num,
+                    self.our_path,
+                    self.cells_rpcapi,
+                    self._get_child_cells
+                    )
+
+        # TODO (shauno) settings for each of these /
+        # combine them
+        self.groups_consistency_handler = \
+            consistency.GroupConsistencyHandler(
+                    FLAGS.cells.heal_update_interval,
+                    FLAGS.cells.heal_updated_at_threshold,
+                    FLAGS.cells.heal_update_num,
+                    self.our_path,
+                    self.cells_rpcapi,
+                    self._get_child_cells
+                    )
+
+        self.s3_images_consistency_handler = \
+            consistency.S3ImageConsistencyHandler(
+                    FLAGS.cells.heal_update_interval,
+                    FLAGS.cells.heal_updated_at_threshold,
+                    FLAGS.cells.heal_update_num,
+                    self.our_path,
+                    self.cells_rpcapi,
+                    self._get_child_cells
+                    )
+
+        self.instance_association_consistency_handler = \
+        consistency.InstanceAssociationConsistencyHandler(
+                FLAGS.cells.heal_update_interval,
+                FLAGS.cells.heal_updated_at_threshold,
+                FLAGS.cells.heal_update_num,
+                self.our_path,
+                self.cells_rpcapi,
+                self._get_child_cells
+                )
+        self.instance_id_mapping_consistency_handler = \
+        consistency.InstanceIDMappingConsistencyHandler(
+                FLAGS.cells.heal_update_interval,
+                FLAGS.cells.heal_updated_at_threshold,
+                FLAGS.cells.heal_update_num,
+                self.our_path,
+                self.cells_rpcapi,
+                self._get_child_cells
+                )
+
+        self.volume_id_mapping_consistency_handler = \
+        consistency.VolumeIDMappingConsistencyHandler(
+                FLAGS.cells.heal_update_interval,
+                FLAGS.cells.heal_updated_at_threshold,
+                FLAGS.cells.heal_update_num,
+                self.our_path,
+                self.cells_rpcapi,
+                self._get_child_cells
+                )
 
         def _cells_manager_startup():
             # FIXME(comstud): When we start, we want to send out some
@@ -786,8 +858,10 @@ class CellsManager(manager.Manager):
             try:
                 security_group = db.security_group_get_by_name(context, security_group_pid,
                         security_group_name)
-            except exception.InstanceNotFound:
-                    return
+            except exception.SecurityGroupNotFoundForProject:
+                LOG.warning(_("Ignoring unknown security group (%s, %s) in broadcast "),
+                        security_group_pid, security_group_name)
+                return
             args[0] = security_group
 
         if method == 'detach_volume':
@@ -1043,6 +1117,8 @@ class CellsManager(manager.Manager):
     def security_group_rule_create(self, context, security_group_rule, routing_path,
             **kwargs):
 
+        LOG.info(_("Reeiived message to create rule %s" % ((dict(security_group_rule.iteritems())))))
+
         # Don't add the rule if the message was sent from this cell
         if self._path_is_us(routing_path):
             return
@@ -1057,7 +1133,7 @@ class CellsManager(manager.Manager):
 
         if not security_group_name or not security_group_pid:
             LOG.error(_( "Could not remove rule %(security_group_rule)s "
-                         "to group '%(security_group_name)s' (group missing from db)"),
+                         "from group '%(security_group_name)s' (group missing from db)"),
                       locals())
             return
 
@@ -1080,6 +1156,7 @@ class CellsManager(manager.Manager):
 
     def security_group_rule_destroy(self, context, security_group_rule, routing_path,
                                     **kwargs):
+        LOG.info(_("Recieved message to delete rule %s" % (security_group_rule)))
         # Don't remove the rule if the message was sent from this cell
         if self._path_is_us(routing_path):
             return
@@ -1118,7 +1195,221 @@ class CellsManager(manager.Manager):
             else:
                 found_rule = rule
         if found_rule:
+            LOG.info(_( "Found security group rule %s'. Deleting." %
+                           (security_group_rule)))
             self.db.security_group_rule_destroy(context, found_rule.id)
         else:
-            LOG.error(_( "Coudn't find security group rule %s for delete'." %
+            LOG.warning(_( "Couldn't find security group rule %s for delete'." %
                            (security_group_rule)))
+
+
+    def unpack_group(self, context, obj, db_func, prepare_db_args):
+
+        # NOTE (shauno): The parent group id was (hopefully)replaced with the
+        # group name  and project id  when this message was created so we could
+        # link this back to the correct parent group even if ids get out of
+        # sync between parent and child cells. Use them to find the correct parent
+        # group and replace them with the id
+        security_group_name = obj.pop('parent_group_name', None)
+        security_group_pid = obj.pop('parent_group_pid', None)
+
+        if not security_group_name or not security_group_pid:
+            LOG.error(_( "Could not add %(obj)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
+
+        # Security group name and project id were included correctly
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                security_group_pid,
+                security_group_name
+            )
+        except exception.SecurityGroupNotFound:
+            LOG.error(_( "Could not add %(obj)s "
+                         "to group '%(security_group_name)s' (group missing from db)"),
+                      locals())
+            return
+
+        # TODO get below args right
+        args, kwargs = prepare_db_args(obj, group)
+        db_func(context, *args, **kwargs)
+
+    def instance_association_create(self, context, instance_association, routing_path,
+            **kwargs):
+
+        LOG.info(_("Recieved message to create instance_association %s" % ((dict(instance_association.iteritems())))))
+        def prepare_args(obj, group):
+            args = (obj['uuid'], group.id)
+            kwargs = {'update_cells':False}
+            return args, kwargs
+
+        if self._path_is_us(routing_path):
+            return
+
+        self.unpack_group(
+                context,
+                instance_association,
+                self.db.instance_add_security_group,
+                prepare_args
+                )
+
+    def instance_association_destroy(self, context, instance_association, routing_path,
+                                    **kwargs):
+        LOG.info(_("Recieved message to delete %s" % (instance_association)))
+
+        def prepare_args(obj, group):
+            args = (obj['uuid'], group.id)
+            kwargs = {'update_cells':False}
+            return args, kwargs
+
+        if self._path_is_us(routing_path):
+            return
+
+        self.unpack_group(
+                context,
+                instance_association,
+                self.db.instance_remove_security_group,
+                prepare_args
+                )
+
+    def _get_rules_to_sync(self, context, updated_since=None,
+            project_id=None, deleted=True, shuffle=False):
+
+        filters = {}
+        if updated_since is not None:
+            filters['changes-since'] = updated_since
+        if project_id is not None:
+            filters['project_id'] = project_id
+        if not deleted:
+            filters['deleted'] = false
+        rules = self.db.security_group_rule_get_all_by_filters(
+                context, filters, 'deleted', 'asc')
+        if shuffle:
+            random.shuffle(rules)
+        for rule in rules:
+            yield rule
+
+
+    def _sync_rule(self, context, rule):
+        """broadcast an instance_update or instance_destroy message up to
+        parent cells.
+        """
+        if rule['deleted']:
+            group = db.security_group_get(context, rule['parent_group_id'])
+            msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
+                rule, group, routing_path=self.our_path, hopcount=1)
+            log.info(_("sending message %s to delete rule" % (msg)))
+        else:
+            group = db.security_group_get(context, rule['parent_group_id'])
+            msg = cells_utils.form_security_group_rule_create_broadcast_message(
+                rule, group, routing_path=self.our_path, hopcount=1)
+            log.info(_("sending message %s to add rule" % (msg)))
+
+        self.cells_rpcapi.send_message_to_cells(context,
+                self._get_child_cells(), msg)
+
+
+    @manager.periodic_task
+    def _heal_security_groups(self, context):
+        # Only sync rules from top cells
+        if self._get_parent_cells():
+            return
+
+        LOG.info(_("Checking if it's time to sync security groups"))
+        curr_time = time.time()
+        if not self.groups_consistency_handler.is_time_to_heal(curr_time):
+            return
+
+        LOG.info(_("Syncing security groups"))
+        self.groups_consistency_handler.set_last_heal_time(curr_time)
+        self.groups_consistency_handler.reset()
+        self.groups_consistency_handler.heal_entries(context)
+
+    @manager.periodic_task
+    def _heal_security_group_rules(self, context):
+        # Only sync rules from top cells
+        if self._get_parent_cells():
+            return
+
+        LOG.info(_("Checking if it's time to sync rules"))
+        curr_time = time.time()
+        if not self.rules_consistency_handler.is_time_to_heal(curr_time):
+            return
+
+        LOG.info(_("Syncing rules"))
+        self.rules_consistency_handler.set_last_heal_time(curr_time)
+        self.rules_consistency_handler.reset()
+        self.rules_consistency_handler.heal_entries(context)
+
+    @manager.periodic_task
+    def _heal_instance_associations(self, context):
+        # Only sync images from bottom level cells
+        if self._get_child_cells():
+            return
+
+        handler = self.instance_association_consistency_handler
+        LOG.info(_("Checking if it's time to sync instance associations"))
+
+        curr_time = time.time()
+
+        if not handler.is_time_to_heal(curr_time):
+            return
+        LOG.info(_("Syncing instance associations"))
+        handler.set_last_heal_time(curr_time)
+        handler.reset()
+        handler.heal_entries(context)
+
+    @manager.periodic_task
+    def _heal_s3_images(self, context):
+        # Only sync images from top cells
+        if self._get_parent_cells():
+            return
+
+        LOG.info(_("Checking if it's time to sync s3 images"))
+
+        curr_time = time.time()
+
+        if not self.s3_images_consistency_handler.is_time_to_heal(curr_time):
+            return
+        LOG.info(_("Syncing s3 images"))
+        self.s3_images_consistency_handler.set_last_heal_time(curr_time)
+        self.s3_images_consistency_handler.reset()
+        self.s3_images_consistency_handler.heal_entries(context)
+
+    @manager.periodic_task
+    def _heal_instance_id_mappings(self, context):
+        # Only sync images from top cells
+        if self._get_parent_cells():
+            return
+
+        handler = self.instance_id_mapping_consistency_handler
+        LOG.info(_("Checking if it's time to sync instance id mappings"))
+
+        curr_time = time.time()
+
+        if not handler.is_time_to_heal(curr_time):
+            return
+        LOG.info(_("Syncing instance id mappings"))
+        handler.set_last_heal_time(curr_time)
+        handler.reset()
+        handler.heal_entries(context)
+
+    @manager.periodic_task
+    def _heal_volume_id_mappings(self, context):
+        # Only sync from top level cells
+        if self._get_parent_cells():
+            return
+
+        handler = self.volume_id_mapping_consistency_handler
+        LOG.info(_("Checking if it's time to sync volume id mappings"))
+
+        curr_time = time.time()
+
+        if not handler.is_time_to_heal(curr_time):
+            return
+        LOG.info(_("Syncing volume id mappings"))
+        handler.set_last_heal_time(curr_time)
+        handler.reset()
+        handler.heal_entries(context)

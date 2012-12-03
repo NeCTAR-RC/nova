@@ -741,6 +741,12 @@ def instance_remove_security_group(context, instance_id, security_group_id, upda
             LOG.exception(_("Failed to notify cells of instance remove security group"))
     return rv
 
+
+def security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+    return IMPL.security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None)
+
 ###################
 
 
@@ -1211,9 +1217,13 @@ def get_volume_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_volume_uuid_by_ec2_id(context, ec2_id)
 
 
-def ec2_volume_create(context, volume_id, forced_id=None):
+def ec2_volume_create(context, volume_id, forced_id=None, update_cells=False):
     return IMPL.ec2_volume_create(context, volume_id, forced_id)
 
+def ec2_volume_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+    return IMPL.ec2_volume_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None)
 
 def get_snapshot_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_snapshot_uuid_by_ec2_id(context, ec2_id)
@@ -1374,6 +1384,11 @@ def security_group_get(context, security_group_id):
     return IMPL.security_group_get(context, security_group_id)
 
 
+def security_group_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+    return IMPL.security_group_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None)
+
 def security_group_get_by_name(context, project_id, group_name):
     """Returns a security group with the specified name from a project."""
     return IMPL.security_group_get_by_name(context, project_id, group_name)
@@ -1433,6 +1448,8 @@ def security_group_destroy(context, security_group_id, update_cells=True):
     rv = IMPL.security_group_destroy(context, security_group_id)
     if update_cells:
         try:
+            # TODO (shauno): use consistent reference for group across
+            # cells (like with rules)
             cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
                                                             'security_group_destroy',
                                                             security_group_id)
@@ -1471,6 +1488,11 @@ def security_group_rule_get_by_security_group(context, security_group_id):
     return IMPL.security_group_rule_get_by_security_group(context,
                                                           security_group_id)
 
+
+def security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+    return IMPL.security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None)
 
 def security_group_rule_get_by_security_group_grantee(context,
                                                       security_group_id):
@@ -1864,6 +1886,10 @@ def s3_image_get(context, image_id):
     """Find local s3 image represented by the provided id"""
     return IMPL.s3_image_get(context, image_id)
 
+def s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+    return IMPL.s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None)
 
 def s3_image_get_by_uuid(context, image_uuid):
     """Find local s3 image represented by the provided uuid"""
@@ -2083,6 +2109,10 @@ def get_instance_uuid_by_ec2_id(context, ec2_id):
     """Get uuid through ec2 id from instance_id_mappings table"""
     return IMPL.get_instance_uuid_by_ec2_id(context, ec2_id)
 
+def ec2_instance_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+    return IMPL.ec2_instance_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None)
 
 def ec2_instance_create(context, instance_uuid, id=None, update_cells=True):
     """Create the ec2 id to instance uuid mapping on demand"""

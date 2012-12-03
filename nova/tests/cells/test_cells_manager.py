@@ -18,9 +18,12 @@ Tests For CellsManager
 import datetime
 import inspect
 import random
+import time
+import copy
 
 from nova.cells import manager as cells_manager
 from nova.cells import utils as cells_utils
+from nova.cells import consistency
 from nova import context
 from nova import db
 from nova import exception
@@ -861,3 +864,524 @@ class CellsManagerClassTestCase(test.TestCase):
         self.assertEqual(call_info['create'], 0)
         self.assertEqual(call_info['get'], 1)
 
+    def test_instance_association_create(self):
+
+        call_info = {
+                'create': 0,
+                'get': 0,
+                }
+
+        fake_context = 'fake_context'
+        fake_routing_path = 'fake_routing_path'
+        fake_group_pid = 'fake_pid'
+        fake_group_name = 'fake_name'
+        fake_uuid = 'uuid'
+        fake_group_id = 1
+        # TODO (shauno) use a proper fake for this
+        class group(object):
+            def __getattribute__(self, attr):
+                if attr == 'id':
+                    return fake_group_id
+                else:
+                    return 'attribute'
+        fake_security_group = group()
+        fake_instance_association = {
+            'parent_group_name': fake_group_name,
+            'parent_group_pid': fake_group_pid,
+            'uuid': fake_uuid,
+            }
+
+        def path_is_us_false(path):
+            self.assertEqual(path, fake_routing_path)
+            return False
+
+        def security_group_get_by_name_success(context, pid, name):
+            call_info['get'] += 1
+            self.assertEqual(pid, fake_group_pid)
+            self.assertEqual(name, fake_group_name)
+            return fake_security_group
+
+        def instance_add_security_group(context, uuid, group_id, update_cells=False):
+            call_info['create'] += 1
+            self.assertEqual(uuid, fake_uuid)
+            self.assertEqual(group_id, fake_group_id)
+            self.assertEqual(update_cells, False)
+            return
+
+        self.stubs.Set(self.cells_manager,
+                '_path_is_us', path_is_us_false)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_get_by_name', security_group_get_by_name_success)
+        self.stubs.Set(self.cells_manager.db,
+                'instance_add_security_group', instance_add_security_group)
+
+        self.cells_manager.instance_association_create(fake_context,
+                fake_instance_association, fake_routing_path)
+
+        self.assertEqual(call_info['create'], 1)
+        self.assertEqual(call_info['get'], 1)
+
+    def test_instance_association_destroy(self):
+
+        call_info = {
+                'destroy': 0,
+                'get': 0,
+                }
+
+        fake_context = 'fake_context'
+        fake_routing_path = 'fake_routing_path'
+        fake_group_pid = 'fake_pid'
+        fake_group_name = 'fake_name'
+        fake_uuid = 'uuid'
+        fake_group_id = 1
+        # TODO (shauno) use a proper fake for this
+        class group(object):
+            def __getattribute__(self, attr):
+                if attr == 'id':
+                    return fake_group_id
+                else:
+                    return 'attribute'
+        fake_security_group = group()
+        fake_instance_association = {
+            'parent_group_name': fake_group_name,
+            'parent_group_pid': fake_group_pid,
+            'uuid': fake_uuid,
+            }
+
+        def path_is_us_false(path):
+            self.assertEqual(path, fake_routing_path)
+            return False
+
+        def security_group_get_by_name_success(context, pid, name):
+            call_info['get'] += 1
+            self.assertEqual(pid, fake_group_pid)
+            self.assertEqual(name, fake_group_name)
+            return fake_security_group
+
+        def instance_remove_security_group(context, uuid, group_id, update_cells=False):
+            call_info['destroy'] += 1
+            self.assertEqual(uuid, fake_uuid)
+            self.assertEqual(group_id, fake_group_id)
+            self.assertEqual(update_cells, False)
+            return
+
+        self.stubs.Set(self.cells_manager,
+                '_path_is_us', path_is_us_false)
+        self.stubs.Set(self.cells_manager.db,
+                'security_group_get_by_name', security_group_get_by_name_success)
+        self.stubs.Set(self.cells_manager.db,
+                'instance_remove_security_group', instance_remove_security_group)
+
+        self.cells_manager.instance_association_destroy(fake_context,
+                fake_instance_association, fake_routing_path)
+
+        self.assertEqual(call_info['destroy'], 1)
+        self.assertEqual(call_info['get'], 1)
+
+    def test_heal_rules(self):
+
+        fake_context = context.RequestContext('fake', 'fake')
+        stalled_time = time.time()
+
+        call_info = {'heal_entries': 0}
+
+
+        def fake_time():
+            return stalled_time
+
+        def get_parent_cells():
+            return None
+
+        def is_time_to_heal_true(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+            return True
+
+        def set_last_heal_time(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+
+        def heal_entries(context):
+            self.assertEqual(context, fake_context)
+            call_info['heal_entries']+=1
+
+        def instance_get_by_uuid(context, uuid):
+            return instances[int(uuid[-1]) - 1]
+
+        self.stubs.Set(self.cells_manager, '_get_parent_cells',
+                get_parent_cells)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'is_time_to_heal',
+                is_time_to_heal_true)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'set_last_heal_time',
+                set_last_heal_time)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'heal_entries',
+                heal_entries)
+        self.stubs.Set(time, 'time', fake_time)
+
+        self.cells_manager._heal_security_group_rules(fake_context)
+        self.assertEqual(call_info['heal_entries'], 1)
+
+    def test_heal_rules_skip(self):
+
+        fake_context = context.RequestContext('fake', 'fake')
+        stalled_time = time.time()
+
+        call_info = {'heal_entries': 0}
+
+
+        def fake_time():
+            return stalled_time
+
+        def get_parent_cells():
+            return None
+
+        def is_time_to_heal_false(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+            return False
+
+        def set_last_heal_time(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+
+        def heal_entries(context):
+            self.assertEqual(context, fake_context)
+            call_info['heal_entries']+=1
+
+        def instance_get_by_uuid(context, uuid):
+            return instances[int(uuid[-1]) - 1]
+
+        self.stubs.Set(self.cells_manager, '_get_parent_cells',
+                get_parent_cells)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'is_time_to_heal',
+                is_time_to_heal_false)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'set_last_heal_time',
+                set_last_heal_time)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'heal_entries',
+                heal_entries)
+        self.stubs.Set(time, 'time', fake_time)
+
+        self.cells_manager._heal_security_group_rules(fake_context)
+        self.assertEqual(call_info['heal_entries'], 0)
+
+    def test_heal_rules_child(self):
+
+        fake_context = context.RequestContext('fake', 'fake')
+        stalled_time = time.time()
+
+        call_info = {'heal_entries': 0}
+
+        def fake_time():
+            return stalled_time
+
+        def get_parent_cells_has_parents():
+            return ['parent1']
+
+        def is_time_to_heal_true(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+            return True
+
+        def set_last_heal_time(curr_time):
+            self.assertEqual(curr_time, stalled_time)
+
+        def heal_entries(context):
+            self.assertEqual(context, fake_context)
+            call_info['heal_entries']+=1
+
+        def instance_get_by_uuid(context, uuid):
+            return instances[int(uuid[-1]) - 1]
+
+        self.stubs.Set(self.cells_manager, '_get_parent_cells',
+                get_parent_cells_has_parents)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'is_time_to_heal',
+                is_time_to_heal_true)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'set_last_heal_time',
+                set_last_heal_time)
+        self.stubs.Set(self.cells_manager.rules_consistency_handler, 'heal_entries',
+                heal_entries)
+        self.stubs.Set(time, 'time', fake_time)
+
+        self.cells_manager._heal_security_group_rules(fake_context)
+        self.assertEqual(call_info['heal_entries'], 0)
+
+class CellsConsistencyManagerClassTestCase(test.TestCase):
+    """Test case for CellsConsistencyManager class"""
+
+    def setUp(self):
+        super(CellsConsistencyManagerClassTestCase, self).setUp()
+        self.interval = 1000
+        self.update_threshold = 2000
+        self.update_number = 5
+        self.path = 'fake_path'
+        self.rpc_api = 'fake_rpc'
+        self.get_child_cells = 'fake_child_cells'
+
+        self.consistency_handler = \
+            consistency.ConsistencyHandler(
+                    self.interval,
+                    self.update_threshold,
+                    self.update_number,
+                    self.path,
+                    self.rpc_api,
+                    self.get_child_cells)
+
+    def test_time(self):
+        last_heal_time = time.time()
+        after_heal_time = last_heal_time + self.interval + 1
+        before_heal_time = last_heal_time + self.interval - 1
+
+        self.consistency_handler.set_last_heal_time(last_heal_time)
+        self.assertEqual(self.consistency_handler.is_time_to_heal(after_heal_time), True)
+        self.assertEqual(self.consistency_handler.is_time_to_heal(before_heal_time), False)
+
+        self.consistency_handler.set_last_heal_time(last_heal_time + 5)
+        self.assertEqual(self.consistency_handler.is_time_to_heal(after_heal_time), False)
+
+    def test_reset(self):
+
+        fake_context = context.RequestContext('fake', 'fake')
+
+        fake_entries = [
+                    {'deleted':False, 'name':'first'},
+                    {'deleted':False, 'name':'second'},
+                    {'deleted':False, 'name':'third'},
+                    {'deleted':False, 'name':'fourth'},
+                    {'deleted':False, 'name':'fifth'},
+                    {'deleted':False, 'name':'sixth'}
+                ]
+
+
+        call_info = {
+                'filter_called': 0,
+                'send_create_called':0,
+                'send_delete_called':0,
+                'entries':[],
+                }
+
+        def reset_call_info():
+            call_info['filter_called'] =  0
+            call_info['send_create_called'] = 0
+            call_info['send_delete_called'] = 0
+            call_info['entries']= []
+
+        def check_call_info(*args, **kwargs):
+            for key, value in kwargs.items():
+                self.assertEqual(call_info[key], value)
+
+
+        def filter_fake_3(context, filters, deleted, direction):
+            self.assertEqual(context, fake_context)
+            call_info['filter_called']+=1
+            return fake_entries[0:3]
+
+        def filter_fake_6(context, filters, deleted, direction):
+            self.assertEqual(context, fake_context)
+            call_info['filter_called']+=1
+            return fake_entries
+
+        def send_create(context, entry):
+            self.assertEqual(context, fake_context)
+            call_info['send_create_called']+=1
+            call_info['entries'].append(entry)
+
+        def send_delete(context, entry):
+            self.assertEqual(context, fake_context)
+            call_info['send_delete_called']+=1
+
+        # Test that the consistency handler only sends 3 entries
+        # when the db returns 3 entries, but the max number of
+        # entries for the update is 5
+
+        self.stubs.Set(self.consistency_handler, 'get_entries_filtered',
+                filter_fake_3)
+        self.stubs.Set(self.consistency_handler, '_send_create',
+                send_create)
+        self.stubs.Set(self.consistency_handler, '_send_destroy',
+                send_delete)
+
+        current_time = time.time()
+        last_heal_time = current_time - self.interval
+        self.consistency_handler.set_last_heal_time(last_heal_time)
+        self.consistency_handler.heal_entries(fake_context)
+
+        check_call_info(filter_called=1, send_create_called=3, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 3)
+        for entry in fake_entries[0:3]:
+            self.assertEqual(entry in call_info['entries'], True)
+
+        # Check that no more entries are sent after the first iteration
+        # unless reset is called
+        self.consistency_handler.heal_entries(fake_context)
+
+        check_call_info(filter_called=1, send_create_called=3, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 3)
+        for entry in fake_entries[0:3]:
+            self.assertEqual(entry in  call_info['entries'], True)
+
+        # Confirm that the 3 entries are resent if reset is called
+        self.consistency_handler.reset()
+        reset_call_info()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(filter_called=1, send_create_called=3, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 3)
+        for entry in fake_entries[0:3]:
+            self.assertEqual(entry in  call_info['entries'], True)
+
+        # Check that no more than the maximum number (5) of entries are sent
+        self.stubs.Set(self.consistency_handler, 'get_entries_filtered',
+                filter_fake_6)
+        reset_call_info()
+
+        self.consistency_handler.reset()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(filter_called=1, send_create_called=5, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 5)
+        create_count = 0
+        for entry in fake_entries:
+            if entry in call_info['entries']:
+                create_count+=1
+        self.assertEqual(len(call_info['entries']), 5)
+
+        call_entries = copy.deepcopy(call_info['entries'])
+
+        # check that the last remaining entry, and a subsequent
+        # 4 newly generated entries are sent
+        reset_call_info()
+        self.consistency_handler.reset()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(filter_called=1, send_create_called=5, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 5)
+
+    def test_heal_entries(self):
+        fake_context = context.RequestContext('fake', 'fake')
+
+        fake_entries = [
+                    {'deleted':False, 'name':'first'},
+                    {'deleted':False, 'name':'second'},
+                    {'deleted':False, 'name':'third'},
+                    {'deleted':False, 'name':'fourth'},
+                    {'deleted':False, 'name':'fifth'},
+                    {'deleted':False, 'name':'sixth'},
+                ]
+        fake_entries_delete = [
+                    {'deleted':True, 'name':'seventh'},
+                    {'deleted':True, 'name':'eigth'},
+                ]
+        call_info = {
+                'filter_called': 0,
+                'send_create_called':0,
+                'send_delete_called':0,
+                'entries':[],
+                'deleted':[],
+                }
+
+        def reset_call_info():
+            call_info['filter_called'] =  0
+            call_info['send_create_called'] = 0
+            call_info['send_delete_called'] = 0
+            call_info['entries']= []
+            call_info['deleted']= []
+
+        def check_call_info(*args, **kwargs):
+            # Special case for created/deleted entry lists
+            in_created = kwargs.pop('in_created', None)
+            in_deleted = kwargs.pop('in_deleted', None)
+
+            if in_created:
+                created_set = set([e['name'] for e in in_created])
+                call_created_set = set([e['name'] for e in call_info['entries']])
+                self.assertEqual(created_set, call_created_set)
+                self.assertEqual(len(call_info['entries']), len(call_created_set))
+
+            if in_deleted:
+                deleted_set = set([e['name'] for e in in_deleted])
+                call_deleted_set = set([e['name'] for e in call_info['deleted']])
+                self.assertEqual(deleted_set, call_deleted_set)
+                self.assertEqual(len(call_info['deleted']), len(call_deleted_set))
+
+            # All other key valie pairs for regular comparison
+            for key, value in kwargs.items():
+                self.assertEqual(call_info[key], value)
+
+
+        def filter_fake_3(context, filters, deleted, direction):
+            # Return a list of entries shorter than the max num entries
+            self.assertEqual(context, fake_context)
+            call_info['filter_called']+=1
+            return fake_entries[0:3]
+
+        def filter_fake_6(context, filters, deleted, direction):
+            # Return a list of entries longer than the max num entries
+            self.assertEqual(context, fake_context)
+            call_info['filter_called']+=1
+            return fake_entries
+
+        def filter_fake_delete(context, filters, deleted, direction):
+            # Return a list of entries that are to be created and deleted
+            self.assertEqual(context, fake_context)
+            call_info['filter_called']+=1
+            return fake_entries[0:2] + fake_entries_delete[0:2]
+
+        def send_create(context, entry):
+            self.assertEqual(context, fake_context)
+            call_info['send_create_called']+=1
+            call_info['entries'].append(entry)
+
+        def send_delete(context, entry):
+            self.assertEqual(context, fake_context)
+            call_info['send_delete_called']+=1
+            call_info['deleted'].append(entry)
+
+        # Test that the consistency handler only sends 3 entries
+        # when the db returns 3 entries, but the max number of
+        # entries for the update is 5
+
+        self.stubs.Set(self.consistency_handler, 'get_entries_filtered',
+                filter_fake_3)
+        self.stubs.Set(self.consistency_handler, '_send_create',
+                send_create)
+        self.stubs.Set(self.consistency_handler, '_send_destroy',
+                send_delete)
+
+        current_time = time.time()
+        last_heal_time = current_time - self.interval
+        self.consistency_handler.set_last_heal_time(last_heal_time)
+        self.consistency_handler.heal_entries(fake_context)
+
+        check_call_info(filter_called=1, send_create_called=3, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 3)
+        for entry in fake_entries[0:3]:
+            self.assertEqual(entry in call_info['entries'], True)
+
+        # Check that no more than the maximum number (5) of entries are sent
+        self.stubs.Set(self.consistency_handler, 'get_entries_filtered',
+                filter_fake_6)
+        reset_call_info()
+
+        self.consistency_handler.reset()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(filter_called=1, send_create_called=5, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 5)
+        create_count = 0
+        for entry in fake_entries:
+            if entry in call_info['entries']:
+                create_count+=1
+        self.assertEqual(len(call_info['entries']), 5)
+
+        # Check that remaining entries (>5) are sent on the second
+        # call to heal instances
+        reset_call_info()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(filter_called=0, send_create_called=1, send_delete_called=0)
+        self.assertEqual(len(call_info['entries']), 1)
+
+        # Delete for delete, create for create
+        self.stubs.Set(self.consistency_handler, 'get_entries_filtered',
+                filter_fake_delete)
+        reset_call_info()
+
+        self.consistency_handler.reset()
+        self.consistency_handler.heal_entries(fake_context)
+        check_call_info(
+                filter_called=1,
+                send_create_called=2,
+                send_delete_called=2,
+                in_created=fake_entries[0:2],
+                in_deleted=fake_entries_delete
+                )

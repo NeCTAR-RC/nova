@@ -189,7 +189,7 @@ class CellsUtilsTestCase(test.TestCase):
             self.assertEqual(path, found_routing_paths[i])
 
     def test_security_group_rule_create_broadcast_message(self):
-        fake_rule = {'id': 'fake_uuid',
+        fake_rule = {
                          'parent_group': 'fake_parent',
                          'protocol': 'fake_protocol',
                          'to_port': 'fake_to',
@@ -210,6 +210,63 @@ class CellsUtilsTestCase(test.TestCase):
                    'args': {'security_group_rule': rule_info}}
         expected = {'method': 'broadcast_message',
                     'args': {'direction': 'down',
+                             'message': message,
+                             'routing_path': None,
+                             'hopcount': 0,
+                             'fanout': False}}
+        self.assertEqual(bcast_message, expected)
+
+    def test_instance_association_create_broadcast_message(self):
+        fake_instance_association = {
+                         'security_group_id': 'fake_parent',
+                         'uuid': 'fake_uuid'}
+
+        fake_group = {'id': 'fake_group_id',
+            'name':'fake_group_name',
+            'project_id':'fake_project_id',
+            'description':'fake_description',
+                }
+        bcast_message = cells_utils.form_instance_association_create_broadcast_message(
+                fake_instance_association, fake_group)
+
+        ia_info = fake_instance_association.copy()
+        ia_info.pop('security_group_id')
+        ia_info['parent_group_name'] = fake_group['name']
+        ia_info['parent_group_pid'] = fake_group['project_id']
+
+        message = {'method': 'instance_association_create',
+                   'args': {'instance_association': ia_info}}
+        expected = {'method': 'broadcast_message',
+                    'args': {'direction': 'up',
+                             'message': message,
+                             'routing_path': None,
+                             'hopcount': 0,
+                             'fanout': False}}
+
+        self.assertEqual(bcast_message, expected)
+
+    def test_instance_association_destroy_broadcast_message(self):
+        fake_instance_association = {
+                         'security_group_id': 'fake_parent',
+                         'uuid': 'fake_uuid'}
+
+        fake_group = {'id': 'fake_group_id',
+            'name':'fake_group_name',
+            'project_id':'fake_project_id',
+            'description':'fake_description',
+                }
+        bcast_message = cells_utils.form_instance_association_destroy_broadcast_message(
+                fake_instance_association, fake_group)
+
+        ia_info = fake_instance_association.copy()
+        ia_info.pop('security_group_id')
+        ia_info['parent_group_name'] = fake_group['name']
+        ia_info['parent_group_pid'] = fake_group['project_id']
+
+        message = {'method': 'instance_association_destroy',
+                   'args': {'instance_association': ia_info}}
+        expected = {'method': 'broadcast_message',
+                    'args': {'direction': 'up',
                              'message': message,
                              'routing_path': None,
                              'hopcount': 0,
