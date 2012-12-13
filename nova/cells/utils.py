@@ -235,6 +235,6 @@ def cell_display_name_from_instance(instance):
     change."""
     cell_name = instance.get('cell_name', "")
     if cell_name:
-        index = cell.find('!')
+        index = cell_name.find('!')
         cell_name = cell_name[index + 1:].replace('!', '-')
     return cell_name
