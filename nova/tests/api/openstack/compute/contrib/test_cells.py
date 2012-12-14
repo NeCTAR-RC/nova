@@ -473,7 +473,7 @@ class CellsServerTest(test.TestCase):
 
         self.assertEqual(res.status_int, 200)
         self.assertServerStates(self._get_server(res.body),
-                                cell_name='top!child3!gchild1')
+                                cell_name='child3-gchild1')
 
     def test_detail(self):
         url = '/v2/fake/servers/detail'
@@ -482,7 +482,7 @@ class CellsServerTest(test.TestCase):
         self.assertEqual(res.status_int, 200)
         for i, server in enumerate(self._get_servers(res.body)):
             self.assertServerStates(server,
-                                    cell_name='top!child%s!gchild1' % (i+1))
+                                    cell_name='child%s-gchild1' % (i+1))
 
     def test_no_instance_passthrough_404(self):
 
