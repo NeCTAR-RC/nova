@@ -219,7 +219,7 @@ class InstanceMetadata():
 
         if self._check_version('2008-02-01', version):
             meta_data['placement'] = {'availability-zone':
-                                      self.availability_zone}
+                                      FLAGS.cells.full_name}
 
         if self._check_version('2008-09-01', version):
             meta_data['instance-action'] = 'none'
