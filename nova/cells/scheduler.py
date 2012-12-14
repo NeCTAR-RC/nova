@@ -189,9 +189,11 @@ class CellsScheduler(base.Base):
                     # Need to create instance DB entry as scheduler
                     # thinks it's already created... At least how things
                     # currently work.
+                    display_name = request_spec['instance_properties']['display_name']
                     for instance_uuid in request_spec['instance_uuids']:
                         request_spec['instance_properties']['uuid'] = instance_uuid
                         self._create_instance_here(context, **kwargs)
+                        request_spec['instance_properties']['display_name'] = display_name
                     fwd_msg['method'] = 'run_instance'
 
                     self._cast_to_scheduler(context, fwd_msg)
