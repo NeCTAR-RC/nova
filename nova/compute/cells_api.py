@@ -18,6 +18,7 @@
 import re
 
 from nova.cells import rpcapi as cells_rpcapi
+from nova.cells.utils import cell_display_name_from_instance
 from nova.compute import api as compute_api
 from nova.compute import instance_types
 from nova.compute import task_states
@@ -507,13 +508,18 @@ class ComputeCellsAPI(compute_api.API):
             context, device=device, instance=instance, volume_id=volume_id)
         try:
             volume = self.volume_api.get(context, volume_id)
+            instance_az = cell_display_name_from_instance(instance)
+            volume_az = volume['availability_zone']
+            if volume_az != instance_az:
+                msg = "Volume not in same cell (%s != %s)" % (instance_az, volume_az)
+                raise exception.InvalidVolume(reason=msg)
             self.volume_api.check_attach(context, volume)
+            self._cast_to_cells(context, instance, 'attach_volume',
+                volume_id, device)
         except Exception:
             with excutils.save_and_reraise_exception():
                 self.db.block_device_mapping_destroy_by_instance_and_device(
                         context, instance['uuid'], device)
-        self._cast_to_cells(context, instance, 'attach_volume',
-                volume_id, device)
 
     @check_instance_lock
     @validate_cell
