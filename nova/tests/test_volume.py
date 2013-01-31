@@ -104,7 +104,7 @@ class VolumeTestCase(test.TestCase):
                 db.get_volume_uuid_by_ec2_id(context.get_admin_context(), 5))
 
         ec2_vol = db.ec2_volume_create(context.get_admin_context(),
-                'aaaaaaaa-bbbb-bbbb-bbbb-aaaaaaaaaaaa', 1)
+                'aaaaaaaa-bbbb-bbbb-bbbb-aaaaaaaaaxxx', 1)
         self.assertEqual(1, ec2_vol['id'])
 
         ec2_vol = db.ec2_volume_create(context.get_admin_context(),
