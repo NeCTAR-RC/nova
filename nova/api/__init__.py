@@ -15,3 +15,12 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+from nova import flags
+from nova.openstack.common import cfg
+
+stub_floating_ips_api = cfg.BoolOpt('stub_floating_ips_api',
+        default=False,
+        help='Stub out the floating IPs API.')
+FLAGS = flags.FLAGS
+FLAGS.register_opt(stub_floating_ips_api)

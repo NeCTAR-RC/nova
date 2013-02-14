@@ -25,12 +25,14 @@ from nova.api.openstack import xmlutil
 from nova import compute
 from nova.compute import utils as compute_utils
 from nova import exception
+from nova import flags
 from nova import network
 from nova.openstack.common import log as logging
 from nova import utils
 
-
 LOG = logging.getLogger(__name__)
+FLAGS = flags.FLAGS
+
 authorize = extensions.extension_authorizer('compute', 'floating_ips')
 
 
@@ -160,7 +162,10 @@ class FloatingIPController(object):
         context = req.environ['nova.context']
         authorize(context)
 
-        floating_ips = self.network_api.get_floating_ips_by_project(context)
+        if FLAGS.stub_floating_ips_api:
+            floating_ips = []
+        else:
+            floating_ips = self.network_api.get_floating_ips_by_project(context)
 
         for floating_ip in floating_ips:
             self._set_metadata(context, floating_ip)

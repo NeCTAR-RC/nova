@@ -17,11 +17,13 @@
 from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
+from nova import flags
 from nova import network
 from nova.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)
+FLAGS = flags.FLAGS
 authorize = extensions.extension_authorizer('compute', 'floating_ip_pools')
 
 
@@ -71,7 +73,11 @@ class FloatingIPPoolsController(object):
         """Return a list of pools."""
         context = req.environ['nova.context']
         authorize(context)
-        pools = self.network_api.get_floating_ip_pools(context)
+
+        if FLAGS.stub_floating_ips_api:
+            pools = []
+        else:
+            pools = self.network_api.get_floating_ip_pools(context)
         return _translate_floating_ip_pools_view(pools)
 
 

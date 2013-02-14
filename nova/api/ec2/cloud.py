@@ -1128,7 +1128,7 @@ class CloudController(object):
 
         return list(reservations.values())
 
-    def describe_addresses(self, context, public_ip=None, **kwargs):
+    def _get_floating_ips(self, context, public_ip):
         if public_ip:
             floatings = []
             for address in public_ip:
@@ -1137,6 +1137,13 @@ class CloudController(object):
                 floatings.append(floating)
         else:
             floatings = self.network_api.get_floating_ips_by_project(context)
+        return floatings
+
+    def describe_addresses(self, context, public_ip=None, **kwargs):
+        if FLAGS.stub_floating_ips_api:
+            floatings = []
+        else:
+            floatings = self._get_floating_ips(context, public_ip)
         addresses = [self._format_address(context, f) for f in floatings]
         return {'addressesSet': addresses}
 
