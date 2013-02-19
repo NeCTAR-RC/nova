@@ -1608,9 +1608,18 @@ def console_get(context, console_id, instance_uuid=None):
     ##################
 
 
-def instance_type_create(context, values):
+def instance_type_create(context, values, update_cells=True):
     """Create a new instance type."""
-    return IMPL.instance_type_create(context, values)
+
+    rv = IMPL.instance_type_create(context, values)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_create',
+                                                            values)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_create"))
+    return rv
 
 
 def instance_type_get_all(context, inactive=False, filters=None):
@@ -1634,9 +1643,17 @@ def instance_type_get_by_flavor_id(context, id):
     return IMPL.instance_type_get_by_flavor_id(context, id)
 
 
-def instance_type_destroy(context, name):
+def instance_type_destroy(context, name, update_cells=True):
     """Delete an instance type."""
-    return IMPL.instance_type_destroy(context, name)
+    rv = IMPL.instance_type_destroy(context, name)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_destroy',
+                                                            name)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_destroy"))
+    return rv
 
 
 def instance_type_access_get_by_flavor_id(context, flavor_id):
@@ -1644,14 +1661,32 @@ def instance_type_access_get_by_flavor_id(context, flavor_id):
     return IMPL.instance_type_access_get_by_flavor_id(context, flavor_id)
 
 
-def instance_type_access_add(context, flavor_id, project_id):
+def instance_type_access_add(context, flavor_id, project_id, update_cells=True):
     """Add flavor access for project."""
-    return IMPL.instance_type_access_add(context, flavor_id, project_id)
+    rv = IMPL.instance_type_access_add(context, flavor_id, project_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_access_add',
+                                                            flavor_id,
+                                                            project_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_access_add"))
+    return rv
 
 
-def instance_type_access_remove(context, flavor_id, project_id):
+def instance_type_access_remove(context, flavor_id, project_id, update_cells=True):
     """Remove flavor access for project."""
-    return IMPL.instance_type_access_remove(context, flavor_id, project_id)
+    rv = IMPL.instance_type_access_remove(context, flavor_id, project_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_access_remove',
+                                                            flavor_id,
+                                                            project_id)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_access_remove"))
+    return rv
 
 
 ####################
@@ -1792,17 +1827,33 @@ def instance_type_extra_specs_get(context, flavor_id):
     return IMPL.instance_type_extra_specs_get(context, flavor_id)
 
 
-def instance_type_extra_specs_delete(context, flavor_id, key):
+def instance_type_extra_specs_delete(context, flavor_id, key, update_cells=True):
     """Delete the given extra specs item."""
     IMPL.instance_type_extra_specs_delete(context, flavor_id, key)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_extra_specs_delete',
+                                                            flavor_id,
+                                                            key)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_extra_specs_delete"))
 
 
 def instance_type_extra_specs_update_or_create(context, flavor_id,
-                                               extra_specs):
+                                               extra_specs, update_cells=True):
     """Create or update instance type extra specs. This adds or modifies the
     key/value pairs specified in the extra specs dict argument"""
     IMPL.instance_type_extra_specs_update_or_create(context, flavor_id,
                                                     extra_specs)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
+                                                            'instance_type_extra_specs_update_or_create',
+                                                            flavor_id,
+                                                            extra_specs)
+        except Exception:
+            LOG.exception(_("Failed to notify cells of instance_type_extra_specs_update_or_create"))
 
 
 ##################
@@ -1899,7 +1950,6 @@ def s3_image_get_by_uuid(context, image_uuid):
 def s3_image_create(context, image_uuid, id=None, update_cells=True):
     """Create local s3 image represented by provided uuid"""
     s3_image_ref = IMPL.s3_image_create(context, image_uuid, id=id)
-    LOG.debug("uuid=%s, id=%s" % (image_uuid, s3_image_ref.id))
     if update_cells:
         try:
             cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
