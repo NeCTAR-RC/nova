@@ -49,6 +49,11 @@ def fake_cn_get(context, host):
     return {"hypervisor_hostname": host}
 
 
+def fake_sys_md_get(context, instance_uuid):
+    ids = {UUID1: 1, UUID2: 2, UUID3: 1}
+    return {'instance_name': 'instance-%d' % ids[instance_uuid]}
+
+
 class ExtendedServerAttributesTest(test.TestCase):
     content_type = 'application/json'
     prefix = 'OS-EXT-SRV-ATTR:'
@@ -59,6 +64,7 @@ class ExtendedServerAttributesTest(test.TestCase):
         self.stubs.Set(compute.api.API, 'get', fake_compute_get)
         self.stubs.Set(compute.api.API, 'get_all', fake_compute_get_all)
         self.stubs.Set(db, 'compute_node_get_by_host', fake_cn_get)
+        self.stubs.Set(db, 'instance_system_metadata_get', fake_sys_md_get)
 
     def _make_request(self, url):
         req = webob.Request.blank(url)

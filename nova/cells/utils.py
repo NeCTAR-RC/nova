@@ -69,6 +69,7 @@ def form_broadcast_message(direction, method, method_kwargs,
 def form_instance_update_broadcast_message(instance, routing_path=None,
         hopcount=0):
     instance = dict(instance.iteritems())
+    instance_id = instance.get('id', None)
     # Remove things that we can't update in the parent.  'cell_name'
     # is included in this list.. because it'll always be empty in
     # a child zone... and we don't want it to overwrite the column
@@ -89,6 +90,9 @@ def form_instance_update_broadcast_message(instance, routing_path=None,
             isinstance(instance['system_metadata'], list)):
         sys_metadata = dict([(md['key'], md['value'])
                 for md in instance['system_metadata']])
+        if 'instance_name' not in sys_metadata and instance_id:
+            sys_metadata['instance_name'] = (FLAGS.instance_name_template %
+                                                instance_id)
         instance['system_metadata'] = sys_metadata
 
     return form_broadcast_message('up', 'instance_update',

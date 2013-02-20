@@ -1010,6 +1010,12 @@ class CellsManager(manager.Manager):
         if info_cache:
             self.db.instance_info_cache_update(context, instance_uuid,
                     info_cache)
+        sys_metadata = instance_info.get('system_metadata', None)
+        if sys_metadata:
+            if 'instance_name' in sys_metadata:
+                metadata = {'instance_name': sys_metadata['instance_name']}
+                self.db.instance_system_metadata_update(context, instance_uuid,
+                    metadata, delete=False)
 
     def instance_destroy(self, context, instance_info, routing_path=None,
             **kwargs):

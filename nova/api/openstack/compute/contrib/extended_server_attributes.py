@@ -19,6 +19,7 @@ from nova.api.openstack import wsgi
 from nova.api.openstack import xmlutil
 from nova import compute
 from nova import db
+from nova import exception
 from nova import flags
 from nova.openstack.common import log as logging
 
@@ -43,6 +44,16 @@ class ExtendedServerAttributesController(wsgi.Controller):
         except TypeError:
             return
 
+    def _get_hypervisor_instance_name(self, context, instance):
+        if not FLAGS.cells.enable:
+            return instance['name']
+        try:
+            sys_metadata = db.instance_system_metadata_get(context,
+                                                           instance['uuid'])
+        except exception.NotFound:
+            sys_metadata = {}
+        return sys_metadata.get('instance_name', '')
+
     def _extend_server(self, context, server, instance):
         key = "%s:hypervisor_hostname" % Extended_server_attributes.alias
         server[key] = self._get_hypervisor_hostname(context, instance)
@@ -51,9 +62,11 @@ class ExtendedServerAttributesController(wsgi.Controller):
             if attr == 'name':
                 key = "%s:instance_%s" % (Extended_server_attributes.alias,
                                           attr)
+                server[key] = self._get_hypervisor_instance_name(context,
+                                                                 instance)
             else:
                 key = "%s:%s" % (Extended_server_attributes.alias, attr)
-            server[key] = instance[attr]
+                server[key] = instance[attr]
 
     @wsgi.extends
     def show(self, req, resp_obj, id):
