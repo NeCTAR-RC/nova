@@ -31,7 +31,7 @@ cells_opts = [
                 default='nova',
                 help='Fully qualified name of this cell'),
     cfg.ListOpt('capabilities',
-                default=['hypervisor=xenserver;kvm', 'os=linux;windows', 'restrictions=unrestricted'],
+                default=['hypervisor=xenserver;kvm', 'os=linux;windows', 'required_roles=unrestricted'],
                 help='Key/Multi-value list with the capabilities of the cell'),
     cfg.StrOpt('topic',
                 default='cells',
