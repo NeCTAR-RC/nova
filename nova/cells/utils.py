@@ -261,6 +261,13 @@ def cell_display_name_from_instance(instance):
     return cell_name
 
 
+def top_cell(cell_name):
+    if cell_name:
+        cells = cell_name.split('!')
+        cell_name = cells.pop(0)
+    return cell_name
+
+
 def form_instance_association_create_broadcast_message(instance_association, group, routing_path=None,
         hopcount=0):
 

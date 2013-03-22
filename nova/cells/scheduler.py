@@ -112,14 +112,14 @@ class CellsScheduler(base.Base):
             filter_response = fn(cells, filter_properties)
             if not filter_response:
                 continue
-            if 'action' in filter_response:
-                return filter_response
-            if 'drop' in filter_response:
-                for cell in filter_response.get('drop', []):
-                    try:
-                        cells.remove(cell)
-                    except KeyError:
-                        pass
+            if filter_response.get('action') == 'direct_route':
+                target = filter_response['target']
+                cell_names = map(lambda c: c.name, cells)
+                if cells_utils.top_cell(target) in cell_names:
+                    return target
+            for cell in filter_response.get('drop', []):
+                if cell in cells:
+                    cells.remove(cell)
         return None
 
     def _route_to_cell(self, context, cell_name, method, method_kwargs,
@@ -160,19 +160,18 @@ class CellsScheduler(base.Base):
                    'args': kwargs}
 
         cells = self._get_possible_cells()
-        filter_resp = self._filter_cells(cells, fw_properties)
-        if filter_resp and 'action' in filter_resp:
-            if filter_resp['action'] == 'direct_route':
-                target = '!'.join((self.manager.my_cell_info.name,
-                                  filter_resp['target']))
-                if target == cells_utils.path_without_hosts(routing_path):
-                    # Ah, it's for me.
-                    cells = [self.manager.my_cell_info]
-                else:
-                    self._route_to_cell(context, target,
-                            'schedule_run_instance_direct', kwargs,
-                            routing_path=routing_path)
-                    return
+        direct_route = self._filter_cells(cells, fw_properties)
+        if direct_route:
+            target = '!'.join((self.manager.my_cell_info.name,
+                              direct_route))
+            if target == cells_utils.path_without_hosts(routing_path):
+                # Ah, it's for me.
+                cells = [self.manager.my_cell_info]
+            else:
+                self._route_to_cell(context, target,
+                        'schedule_run_instance_direct', kwargs,
+                        routing_path=routing_path)
+                return
 
         if not cells:
             raise exception.NoCellsAvailable()

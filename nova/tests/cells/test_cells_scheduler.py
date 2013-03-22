@@ -18,6 +18,7 @@ Tests For CellsScheduler
 
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import scheduler as cells_scheduler
+from nova.cells.optional_filters import restrict_filter
 from nova import context
 from nova import exception
 from nova import flags
@@ -36,6 +37,13 @@ class CellsSchedulerTestCase(test.TestCase):
         super(CellsSchedulerTestCase, self).setUp()
         self.flags(name='me', group='cells')
         self.flags(host='host0')
+        self.flags(scheduler_retries=0, group='cells')
+        self.flags(scheduler_filters=[
+            'nova.cells.optional_filters.restrict_filter.'
+                'RestrictCellFilter',
+            'nova.cells.filters.standard_filters',
+            'nova.cells.optional_filters.restrict_filter.'
+                'DirectOnlyCellFilter'], group='cells')
         fakes.init()
 
         rpcapi_obj = cells_rpcapi.CellsAPI(
@@ -59,14 +67,14 @@ class CellsSchedulerTestCase(test.TestCase):
             'grandchild@host2!cell2@host1!me@host0')
 
     def test_schedule_run_instance_hint_bottom_cell(self):
-        expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
+        expected_routing_path = 'grandchild2@host5!cell4@host1!me@host0'
         call_info = self._call_schedule_run_instance(expected_routing_path,
                                          scheduler_hints={
-                                             'cell': 'cell2!grandchild'})
+                                             'cell': 'cell4!grandchild2'})
         self.assertEqual(call_info['create_called'], 1)
         self.assertEqual(call_info['cast_called'], 1)
         self.assertEqual(call_info['update_called'], 1)
-    
+
     def test_schedule_run_instance_hint_middle_cell(self):
         expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
         call_info = self._call_schedule_run_instance(expected_routing_path,
@@ -82,13 +90,72 @@ class CellsSchedulerTestCase(test.TestCase):
                           expected_routing_path=None,
                           scheduler_hints={'cell': 'cell2!missing'})
 
+    def test_schedule_run_instance_direct_only_no_hint(self):
+        self.flags(scheduler_direct_only_cells=['cell2'], group='cells')
+        # Fudge our child cells so we only have 'cell2' as a child
+        for key in self.cells_manager.child_cells.keys():
+            if key != 'cell2':
+                del self.cells_manager.child_cells[key]
+        self.assertRaises(exception.NoCellsAvailable,
+                          self._call_schedule_run_instance,
+                          expected_routing_path=None)
+
+    def test_schedule_run_instance_direct_only_with_hint(self):
+        self.flags(scheduler_direct_only_cells=['cell2'], group='cells')
+        # Fudge our child cells so we only have 'cell2' as a child
+        expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
+        call_info = self._call_schedule_run_instance(expected_routing_path,
+                                         scheduler_hints={
+                                             'cell': 'cell2'})
+        self.assertEqual(call_info['create_called'], 1)
+        self.assertEqual(call_info['cast_called'], 1)
+        self.assertEqual(call_info['update_called'], 1)
+
+    def test_schedule_run_instance_wrong_role(self):
+        # Fudge our child cells so we only have 'cell2' as a child
+        for key in self.cells_manager.child_cells.keys():
+            if key != 'cell2':
+                del self.cells_manager.child_cells[key]
+        cell2 = self.cells_manager.child_cells['cell2']
+        cell2.capabilities['required_roles'] = ['nonexistentrole']
+        self.assertRaises(exception.NoCellsAvailable,
+                          self._call_schedule_run_instance,
+                          expected_routing_path=None)
+
+    def test_schedule_run_instance_direct_wrong_role(self):
+        # Fudge our child cells so we only have 'cell2' as a child
+        for key in self.cells_manager.child_cells.keys():
+            if key != 'cell2':
+                del self.cells_manager.child_cells[key]
+        # Fudge our child cells so we only have 'cell2' as a child
+        cell2 = self.cells_manager.child_cells['cell2']
+        cell2.capabilities['required_roles'] = ['nonexistentrole']
+        self.assertRaises(exception.NoCellsAvailable,
+                          self._call_schedule_run_instance,
+                          expected_routing_path=None,
+                          scheduler_hints={'cell': 'cell2'})
+
+    def test_schedule_run_instance_correct_role(self):
+        # Fudge our child cells so we only have 'cell2' as a child
+        for key in self.cells_manager.child_cells.keys():
+            if key != 'cell2':
+                del self.cells_manager.child_cells[key]
+        cell2 = self.cells_manager.child_cells['cell2']
+        cell2.capabilities['required_roles'] = ['fakerole']
+        expected_routing_path = 'grandchild@host2!cell2@host1!me@host0'
+        call_info = self._call_schedule_run_instance(expected_routing_path,
+                                         scheduler_hints={'cell': 'cell2'})
+        self.assertEqual(call_info['create_called'], 1)
+        self.assertEqual(call_info['cast_called'], 1)
+        self.assertEqual(call_info['update_called'], 1)
+
     def _call_schedule_run_instance(self, expected_routing_path, scheduler_hints=None, error=False):
         # Nuke our parents so we can see the instance_update
         self.cells_manager.parent_cells = {}
 
         # Tests that requests make it to child cell, instance is created,
         # and an update is returned back upstream
-        fake_context = context.RequestContext('fake', 'fake')
+        fake_context = context.RequestContext('fake', 'fake', roles=['fakerole'])
         fake_topic = 'compute'
         fake_instance_props = {'vm_state': 'fake_vm_state',
                                'security_groups': 'meow'}
@@ -104,7 +171,11 @@ class CellsSchedulerTestCase(test.TestCase):
             fake_filter_properties['scheduler_hints'] = scheduler_hints
 
         # The grandchild cell is where this should get scheduled
-        gc_mgr = fakes.FAKE_CELL_MANAGERS['grandchild']
+        if expected_routing_path:
+            target_cell = expected_routing_path.split('@', 1)[0]
+        else:
+            target_cell = 'grandchild'
+        gc_mgr = fakes.FAKE_CELL_MANAGERS[target_cell]
 
         call_info = {'create_called': 0, 'cast_called': 0,
                      'update_called': 0}

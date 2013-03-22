@@ -13,13 +13,25 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from nova import flags
+from nova.openstack.common import cfg
 from nova.cells.filters import BaseCellFilter
 import logging
 
 LOG = logging.getLogger(__name__)
 
-class RestrictCellFilter(BaseCellFilter):
 
+direct_only_cells = cfg.ListOpt(
+    'scheduler_direct_only_cells',
+    default=[],
+    help='Cells that can only be scheduled to directly. '
+         'I.e., with the "cell" scheduler hint.')
+
+FLAGS = flags.FLAGS
+FLAGS.register_opt(direct_only_cells, group='cells')
+
+
+class RestrictCellFilter(BaseCellFilter):
     def filter_cells(self, cells, filter_properties):
         roles = filter_properties['context'].roles
         drop = []
@@ -34,3 +46,13 @@ class RestrictCellFilter(BaseCellFilter):
         if not drop:
             return None
         return {'drop' : drop}
+
+
+class DirectOnlyCellFilter(BaseCellFilter):
+    def filter_cells(self, cells, filter_properties):
+        # Just always drop the direct only cells. The pick cell filter
+        # should be before this filter in the filter list.
+        direct_cell_names = FLAGS.cells.scheduler_direct_only_cells
+        cell_names = [cell for cell in cells
+                        if cell.name in direct_cell_names]
+        return {'drop': cell_names}

@@ -79,7 +79,10 @@ def init():
                            dict(id=5, name='cell5', is_parent=False)],
             'cell2': [dict(id=1, name=MY_CELL_NAME, is_parent=True),
                       dict(id=2, name='grandchild', is_parent=False)],
-            'grandchild': [dict(id=1, name='cell2', is_parent=True)]}
+            'cell4': [dict(id=1, name=MY_CELL_NAME, is_parent=True),
+                      dict(id=2, name='grandchild2', is_parent=False)],
+            'grandchild': [dict(id=1, name='cell2', is_parent=True)],
+            'grandchild2': [dict(id=1, name='cell4', is_parent=True)]}
     FAKE_CELL_MANAGERS = {}
 
 
