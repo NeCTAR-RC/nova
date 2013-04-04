@@ -464,7 +464,8 @@ class ComputeCellsAPI(compute_api.API):
         self.cells_rpcapi.call_service_api_method(context, cell_name,
                 'consoleauth_rpc', 'authorize_console',
                 connect_info['token'], console_type, connect_info['host'],
-                connect_info['port'], connect_info['internal_access_path'])
+                connect_info['port'], connect_info['internal_access_path'],
+                instance['uuid'])
         return {'url': connect_info['access_url']}
 
     @validate_cell
