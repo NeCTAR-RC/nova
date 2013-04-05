@@ -1136,6 +1136,7 @@ class CellsManager(manager.Manager):
         # group and replace them with the id
         security_group_name = security_group_rule.pop('parent_group_name', None)
         security_group_pid = security_group_rule.pop('parent_group_pid', None)
+        linked_group_name = security_group_rule.pop('linked_group_name', None)
 
         if not security_group_name or not security_group_pid:
             LOG.error(_( "Could not remove rule %(security_group_rule)s "
@@ -1155,6 +1156,19 @@ class CellsManager(manager.Manager):
                          "to group '%(security_group_name)s' (group missing from db)"),
                       locals())
             return
+        if linked_group_name:
+            try:
+                linked_group = self.db.security_group_get_by_name(
+                    context,
+                    security_group_pid,
+                    linked_group_name,
+                )
+                security_group_rule['group_id'] = linked_group.id
+            except exception.SecurityGroupNotFound:
+                LOG.error(_( "Could not add rule %(security_group_rule)s "
+                             "to group '%(security_group_name)s' (linked group missing from db)"),
+                          locals())
+                return
 
         security_group_rule['parent_group_id'] = group.id
         self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
