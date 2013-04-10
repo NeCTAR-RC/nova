@@ -126,13 +126,17 @@ class GroupConsistencyHandler(ConsistencyHandler):
         self.model_name_plural= 'groups'
 
     def _send_create(self, context, group):
-        self.cells_rpcapi.broadcast_dbmethod_down(context,
-                                                        'security_group_create',
-                                                        group)
+        msg = cells_utils.form_security_group_create_broadcast_message(
+            group, routing_path=self.our_path, hopcount=1)
+
+        self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
+
     def _send_destroy(self, context, group):
-        self.cells_rpcapi.broadcast_dbmethod_down(context,
-                                                        'security_group_destroy',
-                                                        group['id'])
+        msg = cells_utils.form_security_group_destroy_broadcast_message(
+            group, routing_path=self.our_path, hopcount=1)
+
+        self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
+
 
 class RuleConsistencyHandler(ConsistencyHandler):
     def __init__(self, *args, **kwargs):
@@ -145,7 +149,6 @@ class RuleConsistencyHandler(ConsistencyHandler):
 
     def _send_create(self, context, rule):
         group = db.security_group_get(context, rule['parent_group_id'])
-
         msg = cells_utils.form_security_group_rule_create_broadcast_message(
             rule, group, routing_path=self.our_path, hopcount=1)
 
@@ -153,7 +156,6 @@ class RuleConsistencyHandler(ConsistencyHandler):
 
     def _send_destroy(self, context, rule):
         group = db.security_group_get(context, rule['parent_group_id'])
-
         msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
             rule, group, routing_path=self.our_path, hopcount=1)
 

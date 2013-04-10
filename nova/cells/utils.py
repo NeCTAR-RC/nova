@@ -202,6 +202,40 @@ def replace_security_group(object_dict, security_group_id_arg_name, group):
     object_dict['parent_group_pid'] = security_group_dict['project_id']
 
 
+def form_security_group_create_broadcast_message(group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for adding security groups which
+    sends by name and project_id which is unique,
+    id can get out of sync between child/parent cells"""
+    security_group_dict = dict(group.iteritems())
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
+    for item in remove:
+        if item in security_group_dict:
+            security_group_dict.pop(item)
+
+    return form_broadcast_message('down', 'security_group_create',
+            {'group': security_group_dict},
+            routing_path=routing_path, hopcount=hopcount)
+
+
+def form_security_group_destroy_broadcast_message(group, routing_path=None,
+        hopcount=0):
+
+    """Create a special message for destroying security groups which
+    sends by name and project_id which is unique,
+    id can get out of sync between child/parent cells"""
+    security_group_dict = dict(group.iteritems())
+    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
+    for item in remove:
+        if item in security_group_dict:
+            security_group_dict.pop(item)
+
+    return form_broadcast_message('down', 'security_group_destroy',
+            {'group': security_group_dict},
+            routing_path=routing_path, hopcount=hopcount)
+
+
 def form_security_group_rule_create_broadcast_message(security_group_rule, group, routing_path=None,
         hopcount=0):
 

@@ -3837,11 +3837,8 @@ def security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
 
     # Filters for exact matches that we can do along with the SQL query...
     # For other filters that don't match this, we will do regexp matching
-    exact_match_filter_names = []
-
-    for f in ['cidr', 'to_port', 'from_port', 'protocol', 'group_id', 'parent_group_id']:
-        if f not in filters:
-            filters[f] = None
+    # Need to match on these as they can be None
+    exact_match_filter_names = ['cidr', 'group_id']
 
     # Filter the query
     query_prefix = exact_filter(query_prefix, models.SecurityGroupIngressRule,

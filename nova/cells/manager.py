@@ -1120,10 +1120,54 @@ class CellsManager(manager.Manager):
     def compute_node_stats(self, context, routing_path):
         return [db.compute_node_statistics(context)]
 
+    def security_group_create(self, context, group, routing_path):
+
+        LOG.debug(_("Received message to create group %s" % ((dict(group.iteritems())))))
+
+        # Don't add the group if the message was sent from this cell
+        if self._path_is_us(routing_path):
+            return
+
+        # See if this already exists
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                group['project_id'],
+                group['name']
+            )
+        except exception.SecurityGroupNotFound:
+            #Doesn't exist so we'll create it
+            LOG.info(_("Adding missing security group %s" % ((dict(group.iteritems())))))
+            self.db.security_group_create(context, group, update_cells=False)
+
+
+    def security_group_destroy(self, context, group, routing_path):
+
+        LOG.debug(_("Received message to destroy group %s" % ((dict(group.iteritems())))))
+
+        # Don't remove the group if the message was sent from this cell
+        if self._path_is_us(routing_path):
+            return
+
+        # See if this group exists and remove it
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                group['project_id'],
+                group['name']
+            )
+            # Exists so destroy
+            LOG.info(_("Deleting out of sync security group %s" % ((dict(group.iteritems())))))
+            db.security_group_destroy(group.id, update_cells=False)
+        except exception.SecurityGroupNotFound:
+            # Doesn't exist so do nothing
+            pass
+
+
     def security_group_rule_create(self, context, security_group_rule, routing_path,
             **kwargs):
 
-        LOG.info(_("Reeiived message to create rule %s" % ((dict(security_group_rule.iteritems())))))
+        LOG.debug(_("Received message to create rule %s" % ((dict(security_group_rule.iteritems())))))
 
         # Don't add the rule if the message was sent from this cell
         if self._path_is_us(routing_path):
@@ -1171,12 +1215,13 @@ class CellsManager(manager.Manager):
                 return
 
         security_group_rule['parent_group_id'] = group.id
+
         self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
 
 
     def security_group_rule_destroy(self, context, security_group_rule, routing_path,
                                     **kwargs):
-        LOG.info(_("Recieved message to delete rule %s" % (security_group_rule)))
+        LOG.debug(_("Recieved message to delete rule %s" % (security_group_rule)))
         # Don't remove the rule if the message was sent from this cell
         if self._path_is_us(routing_path):
             return
@@ -1259,7 +1304,7 @@ class CellsManager(manager.Manager):
     def instance_association_create(self, context, instance_association, routing_path,
             **kwargs):
 
-        LOG.info(_("Recieved message to create instance_association %s" % ((dict(instance_association.iteritems())))))
+        LOG.debug(_("Recieved message to create instance_association %s" % ((dict(instance_association.iteritems())))))
         def prepare_args(obj, group):
             args = (obj['uuid'], group.id)
             kwargs = {'update_cells':False}
@@ -1277,7 +1322,7 @@ class CellsManager(manager.Manager):
 
     def instance_association_destroy(self, context, instance_association, routing_path,
                                     **kwargs):
-        LOG.info(_("Recieved message to delete %s" % (instance_association)))
+        LOG.debug(_("Recieved message to delete %s" % (instance_association)))
 
         def prepare_args(obj, group):
             args = (obj['uuid'], group.id)
@@ -1293,42 +1338,6 @@ class CellsManager(manager.Manager):
                 self.db.instance_remove_security_group,
                 prepare_args
                 )
-
-    def _get_rules_to_sync(self, context, updated_since=None,
-            project_id=None, deleted=True, shuffle=False):
-
-        filters = {}
-        if updated_since is not None:
-            filters['changes-since'] = updated_since
-        if project_id is not None:
-            filters['project_id'] = project_id
-        if not deleted:
-            filters['deleted'] = false
-        rules = self.db.security_group_rule_get_all_by_filters(
-                context, filters, 'deleted', 'asc')
-        if shuffle:
-            random.shuffle(rules)
-        for rule in rules:
-            yield rule
-
-
-    def _sync_rule(self, context, rule):
-        """broadcast an instance_update or instance_destroy message up to
-        parent cells.
-        """
-        if rule['deleted']:
-            group = db.security_group_get(context, rule['parent_group_id'])
-            msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
-                rule, group, routing_path=self.our_path, hopcount=1)
-            log.info(_("sending message %s to delete rule" % (msg)))
-        else:
-            group = db.security_group_get(context, rule['parent_group_id'])
-            msg = cells_utils.form_security_group_rule_create_broadcast_message(
-                rule, group, routing_path=self.our_path, hopcount=1)
-            log.info(_("sending message %s to add rule" % (msg)))
-
-        self.cells_rpcapi.send_message_to_cells(context,
-                self._get_child_cells(), msg)
 
 
     @manager.periodic_task
