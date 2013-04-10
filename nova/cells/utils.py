@@ -269,11 +269,18 @@ def form_security_group_rule_destroy_broadcast_message(security_group_rule, grou
     sends unique information about a parent group rather than the id,
     which can get out of sync between child/parent cells"""
     security_group_rule_dict = dict(security_group_rule.iteritems())
+    linked_id = security_group_rule_dict.pop('group_id', None)
     remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at', 'group_id', 'parent_group_id']
     for item in remove:
         if item in security_group_rule_dict:
             security_group_rule_dict.pop(item)
     replace_security_group(security_group_rule_dict, 'parent_group_id', group)
+    if linked_id:
+        from nova import db
+        from nova import context
+        ctx = context.get_admin_context()
+        linked_group = db.security_group_get(ctx, linked_id)
+        security_group_rule_dict['linked_group_name'] = linked_group.name
 
     return form_broadcast_message('down', 'security_group_rule_destroy',
             {'security_group_rule': security_group_rule_dict},

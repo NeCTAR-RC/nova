@@ -1215,8 +1215,13 @@ class CellsManager(manager.Manager):
                 return
 
         security_group_rule['parent_group_id'] = group.id
-
-        self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
+        # Check to see if rule exists already
+        rule = self.db.security_group_rule_get_all_by_filters(
+            context, security_group_rule, 'deleted', 'asc')
+        if not rule:
+            #Doesn't so let's create it
+            LOG.info(_("Adding missing security group rule %s" % ((dict(security_group_rule.iteritems())))))
+            self.db.security_group_rule_create(context, security_group_rule, update_cells=False)
 
 
     def security_group_rule_destroy(self, context, security_group_rule, routing_path,
@@ -1228,6 +1233,7 @@ class CellsManager(manager.Manager):
 
         security_group_name = security_group_rule.pop('parent_group_name', None)
         security_group_pid = security_group_rule.pop('parent_group_pid', None)
+        linked_group_name = security_group_rule.pop('linked_group_name', None)
 
         if not security_group_name or not security_group_pid:
             LOG.error(_( "Could not remove rule %(security_group_rule)s "
@@ -1247,25 +1253,29 @@ class CellsManager(manager.Manager):
                       locals())
             return
 
+        if linked_group_name:
+            try:
+                linked_group = self.db.security_group_get_by_name(
+                    context,
+                    security_group_pid,
+                    linked_group_name,
+                )
+                security_group_rule['group_id'] = linked_group.id
+            except exception.SecurityGroupNotFound:
+                LOG.error(_( "Could not add rule %(security_group_rule)s "
+                             "to group '%(security_group_name)s' (linked group missing from db)"),
+                          locals())
+                return
+
         security_group_rule['parent_group_id'] = group.id
-        rules = self.db.security_group_rule_get_by_security_group(context, group.id)
-        LOG.debug("Rules for group %s are %s" % (group.id, rules))
-        found_rule = None
-        for rule in rules:
-            rule_dict = dict(rule.iteritems())
-            for key, value in security_group_rule.items():
-                if rule_dict[key] != value:
-                    LOG.debug("%s != %s" % (rule_dict[key], value))
-                    break
-            else:
-                found_rule = rule
-        if found_rule:
-            LOG.info(_( "Found security group rule %s'. Deleting." %
-                           (security_group_rule)))
-            self.db.security_group_rule_destroy(context, found_rule.id)
-        else:
-            LOG.warning(_( "Couldn't find security group rule %s for delete'." %
-                           (security_group_rule)))
+
+        security_group_rule['deleted'] = False
+        rules = self.db.security_group_rule_get_all_by_filters(
+            context, security_group_rule, 'deleted', 'asc')
+        if rules:
+            rule = rules[0]
+            LOG.info(_("Deleting out of sync security group rule %s" % ((dict(rule.iteritems())))))
+            self.db.security_group_rule_destroy(context, rule.id)
 
 
     def unpack_group(self, context, obj, db_func, prepare_db_args):

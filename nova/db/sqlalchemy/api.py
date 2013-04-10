@@ -3695,15 +3695,6 @@ def security_group_in_use(context, group_id):
 @require_context
 def security_group_create(context, values, session=None):
 
-    try:
-        name = values.get('name', None)
-        project_id = values.get('project_id', None)
-        security_group_ref = security_group_get_by_name(context,
-                project_id, name,
-                columns_to_join=[], session=session)
-        return security_group_ref
-    except exception.NotFound:
-        pass
     security_group_ref = models.SecurityGroup()
     # FIXME(devcamcar): Unless I do this, rules fails with lazy load exception
     # once save() is called.  This will get cleaned up in next orm pass.
@@ -3861,12 +3852,6 @@ def security_group_rule_get_by_security_group_grantee(context,
 
 @require_context
 def security_group_rule_create(context, values):
-
-    # Add this to stop us checking for deleted rules
-    values['deleted'] = False
-    rule = security_group_rule_get_all_by_filters(context, values, 'deleted', 'asc')
-    if rule:
-        return rule[0]
 
     security_group_rule_ref = models.SecurityGroupIngressRule()
     security_group_rule_ref.update(values)
