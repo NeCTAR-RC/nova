@@ -45,6 +45,7 @@ class ConsistencyHandler(object):
                 context, filters, 'deleted', 'asc')
         if shuffle:
             random.shuffle(entries)
+
         for entry in entries:
             yield entry
 
@@ -132,10 +133,18 @@ class GroupConsistencyHandler(ConsistencyHandler):
         self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
 
     def _send_destroy(self, context, group):
-        msg = cells_utils.form_security_group_destroy_broadcast_message(
-            group, routing_path=self.our_path, hopcount=1)
+        # Dirty hack
+        # need to work around a bug where a security group may have been deleted then
+        # created again with the same name/project id
+        # only want to delete it if it's the most recent occurance and it's marked deleted.
+        filters = {'project_id': group.project_id, 'name': group.name}
+        groups = db.security_group_get_all_by_filters(context, filters, 'created_at', 'desc')
+        most_recent_group = groups[0]
+        if group.id == most_recent_group.id:
 
-        self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
+            msg = cells_utils.form_security_group_destroy_broadcast_message(
+                group, routing_path=self.our_path, hopcount=1)
+            self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
 
 
 class RuleConsistencyHandler(ConsistencyHandler):
@@ -155,12 +164,26 @@ class RuleConsistencyHandler(ConsistencyHandler):
         self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
 
     def _send_destroy(self, context, rule):
-        group = db.security_group_get(context, rule['parent_group_id'])
-        msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
-            rule, group, routing_path=self.our_path, hopcount=1)
+        filters = {'to_port': rule.to_port,
+                   'from_port': rule.from_port,
+                   'parent_group_id': rule.parent_group_id,
+                   'protocol': rule.protocol,
+        }
+        if rule.cidr:
+            filters['cidr'] = rule.cidr
+        if rule.group_id:
+            filters['group_id'] = rule.group_id
 
-        self.cells_rpcapi.send_message_to_cells(context,
-                self._get_child_cells(), msg)
+        rules = db.security_group_rule_get_all_by_filters(context, filters, 'created_at', 'desc')
+        most_recent_rule = rules[0]
+        if rule.id == most_recent_rule.id:
+
+            group = db.security_group_get(context, rule['parent_group_id'])
+            msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
+                rule, group, routing_path=self.our_path, hopcount=1)
+
+            self.cells_rpcapi.send_message_to_cells(context,
+                    self._get_child_cells(), msg)
 
     #Disabling this for now
     def heal_entries_disabled(self, context):
