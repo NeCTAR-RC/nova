@@ -1158,7 +1158,7 @@ class CellsManager(manager.Manager):
             )
             # Exists so destroy
             LOG.info(_("Deleting out of sync security group %s" % ((dict(group.iteritems())))))
-            db.security_group_destroy(group.id, update_cells=False)
+            self.db.security_group_destroy(context, group.id, update_cells=False)
         except exception.SecurityGroupNotFound:
             # Doesn't exist so do nothing
             pass
