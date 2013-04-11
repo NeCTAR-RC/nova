@@ -20,6 +20,7 @@ import inspect
 import random
 import time
 import copy
+import mock
 
 from nova.cells import manager as cells_manager
 from nova.cells import utils as cells_utils
@@ -700,7 +701,9 @@ class CellsManagerClassTestCase(test.TestCase):
                 'get': 0,
                 }
 
-        fake_context = 'fake_context'
+        fake_context = mock.Mock()
+        fake_context.project_id = "fake_project"
+        fake_context.to_dict = lambda: {'is_admin': 'True'}
         fake_routing_path = 'fake_routing_path'
         fake_group_pid = 'fake_pid'
         fake_group_name = 'fake_pid'
