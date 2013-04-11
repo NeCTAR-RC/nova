@@ -3819,13 +3819,6 @@ def security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
             query_prefix = query_prefix.\
                     filter_by(deleted=False)
 
-    if not context.is_admin:
-        # If we're not admin context, add appropriate filter..
-        if context.project_id:
-            filters['project_id'] = context.project_id
-        else:
-            filters['user_id'] = context.user_id
-
     # Filters for exact matches that we can do along with the SQL query...
     # For other filters that don't match this, we will do regexp matching
     # Need to match on these as they can be None
