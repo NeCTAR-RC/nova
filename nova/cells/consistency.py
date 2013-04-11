@@ -162,7 +162,8 @@ class RuleConsistencyHandler(ConsistencyHandler):
         self.cells_rpcapi.send_message_to_cells(context,
                 self._get_child_cells(), msg)
 
-    def heal_entries(self, context):
+    #Disabling this for now
+    def heal_entries_disabled(self, context):
         num_entries = self.update_number
         LOG.info(_("Synching %s entries" % (num_entries)))
         groups = {}
