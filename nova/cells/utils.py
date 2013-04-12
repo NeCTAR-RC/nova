@@ -254,6 +254,7 @@ def form_security_group_rule_create_broadcast_message(security_group_rule, group
         from nova import db
         from nova import context
         ctx = context.get_admin_context()
+        ctx.read_deleted = 'yes'
         linked_group = db.security_group_get(ctx, linked_id)
         security_group_rule_dict['linked_group_name'] = linked_group.name
 
@@ -279,6 +280,7 @@ def form_security_group_rule_destroy_broadcast_message(security_group_rule, grou
         from nova import db
         from nova import context
         ctx = context.get_admin_context()
+        ctx.read_deleted = 'yes'
         linked_group = db.security_group_get(ctx, linked_id)
         security_group_rule_dict['linked_group_name'] = linked_group.name
 

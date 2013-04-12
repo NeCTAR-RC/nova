@@ -6,6 +6,7 @@ from nova import db
 from nova.cells import utils as cells_utils
 from nova.openstack.common import log as logging
 from nova.openstack.common import timeutils
+from nova import exception
 
 LOG = logging.getLogger('nova.cells.consistency')
 
@@ -137,14 +138,15 @@ class GroupConsistencyHandler(ConsistencyHandler):
         # need to work around a bug where a security group may have been deleted then
         # created again with the same name/project id
         # only want to delete it if it's the most recent occurance and it's marked deleted.
-        filters = {'project_id': group.project_id, 'name': group.name}
+        filters = {'project_id': group.project_id, 'name': group.name, 'deleted': False}
         groups = db.security_group_get_all_by_filters(context, filters, 'created_at', 'desc')
-        most_recent_group = groups[0]
-        if group.id == most_recent_group.id:
+        if groups:
+            #Bad do nothing
+            return
 
-            msg = cells_utils.form_security_group_destroy_broadcast_message(
-                group, routing_path=self.our_path, hopcount=1)
-            self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
+        msg = cells_utils.form_security_group_destroy_broadcast_message(
+            group, routing_path=self.our_path, hopcount=1)
+        self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
 
 
 class RuleConsistencyHandler(ConsistencyHandler):
@@ -157,7 +159,11 @@ class RuleConsistencyHandler(ConsistencyHandler):
         self.model_name_plural= 'rules'
 
     def _send_create(self, context, rule):
-        group = db.security_group_get(context, rule['parent_group_id'])
+        try:
+            group = db.security_group_get(context, rule['parent_group_id'])
+        except exception.SecurityGroupNotFound:
+            #Rule exists but group deleted, Do nothing
+            return
         msg = cells_utils.form_security_group_rule_create_broadcast_message(
             rule, group, routing_path=self.our_path, hopcount=1)
 
@@ -173,17 +179,21 @@ class RuleConsistencyHandler(ConsistencyHandler):
             filters['cidr'] = rule.cidr
         if rule.group_id:
             filters['group_id'] = rule.group_id
-
+        filters['deleted'] = False
         rules = db.security_group_rule_get_all_by_filters(context, filters, 'created_at', 'desc')
-        most_recent_rule = rules[0]
-        if rule.id == most_recent_rule.id:
-
+        if rules:
+            #Bad do nothing
+            return
+        try:
             group = db.security_group_get(context, rule['parent_group_id'])
-            msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
-                rule, group, routing_path=self.our_path, hopcount=1)
+        except exception.SecurityGroupNotFound:
+            # Group is deleted so don't care
+            return
+        msg = cells_utils.form_security_group_rule_destroy_broadcast_message(
+            rule, group, routing_path=self.our_path, hopcount=1)
 
-            self.cells_rpcapi.send_message_to_cells(context,
-                    self._get_child_cells(), msg)
+        self.cells_rpcapi.send_message_to_cells(context,
+            self._get_child_cells(), msg)
 
     #Disabling this for now
     def heal_entries_disabled(self, context):
