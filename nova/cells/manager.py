@@ -1215,7 +1215,8 @@ class CellsManager(manager.Manager):
                 return
 
         security_group_rule['parent_group_id'] = group.id
-        # Check to see if rule exists already
+        # Check to see if rule exists already (only check for active entries)
+        security_group_rule['deleted'] = False
         rule = self.db.security_group_rule_get_all_by_filters(
             context, security_group_rule, 'deleted', 'asc')
         if not rule:
