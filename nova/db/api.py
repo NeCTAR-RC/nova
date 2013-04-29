@@ -1424,14 +1424,11 @@ def security_group_ensure_default(context, update_cells=True):
 
 def security_group_destroy(context, security_group_id, update_cells=True):
     """Deletes a security group."""
+    group = security_group_get(context, security_group_id)
     rv = IMPL.security_group_destroy(context, security_group_id)
     if update_cells:
         try:
-            # TODO (shauno): use consistent reference for group across
-            # cells (like with rules)
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_down(context,
-                                                            'security_group_destroy',
-                                                            security_group_id)
+            cells_rpcapi.CellsAPI().security_group_destroy(context, group)
         except Exception:
             LOG.exception(_("Failed to notify cells of security_group_destroy"))
     return rv

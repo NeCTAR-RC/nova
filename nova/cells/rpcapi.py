@@ -284,6 +284,24 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
         self.call_dbapi_method(context, dbmethod, args,
                                kwargs=kwargs, direction='up')
 
+    def security_group_create(self, context, group):
+        """Broadcast security group create request downward"""
+        if not FLAGS.cells.enable:
+            return
+        bcast_message = cells_utils.form_security_group_create_broadcast_message(
+            group)
+        topic = FLAGS.cells.topic
+        self.cast(context, bcast_message, topic)
+
+    def security_group_destroy(self, context, group):
+        """Broadcast security group destroy request downward"""
+        if not FLAGS.cells.enable:
+            return
+        bcast_message = cells_utils.form_security_group_destroy_broadcast_message(
+            group)
+        topic = FLAGS.cells.topic
+        self.cast(context, bcast_message, topic)
+
     def security_group_rule_create(self, context, security_group_rule, group):
         """Broadcast security group rule create request downward"""
         if not FLAGS.cells.enable:
