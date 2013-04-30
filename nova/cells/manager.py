@@ -1249,9 +1249,10 @@ class CellsManager(manager.Manager):
                 security_group_name
             )
         except exception.SecurityGroupNotFound:
-            LOG.error(_( "Could not add rule %(security_group_rule)s "
+            LOG.warn(_( "Could not remove rule %(security_group_rule)s "
                          "to group '%(security_group_name)s' (group missing from db)"),
                       locals())
+            #May need to make this better
             return
 
         if linked_group_name:
@@ -1263,9 +1264,10 @@ class CellsManager(manager.Manager):
                 )
                 security_group_rule['group_id'] = linked_group.id
             except exception.SecurityGroupNotFound:
-                LOG.error(_( "Could not add rule %(security_group_rule)s "
+                LOG.warn(_( "Could not remove rule %(security_group_rule)s "
                              "to group '%(security_group_name)s' (linked group missing from db)"),
                           locals())
+                #TODO May need to make this better
                 return
 
         security_group_rule['parent_group_id'] = group.id
