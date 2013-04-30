@@ -490,7 +490,7 @@ class Connection(object):
             self.channel._new_queue('ae.undeliver')
         for consumer in self.consumers:
             consumer.reconnect(self.channel)
-        LOG.info(_('Connected to AMQP server on %(hostname)s:%(port)d') %
+        LOG.debug(_('Connected to AMQP server on %(hostname)s:%(port)d') %
                  params)
 
     def reconnect(self):
