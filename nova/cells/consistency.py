@@ -95,10 +95,10 @@ class ConsistencyHandler(object):
         parent cells.
         """
         if entry['deleted']:
-            LOG.debug(_("sending message to delete %s %s" % (self.model_name_plural, entry.id)))
+            LOG.debug(_("sending message to delete %s" % (self.model_name_plural)))
             self._send_destroy(context, entry)
         else:
-            LOG.debug(_("sending message to create %s %s" % (self.model_name_plural, entry.id)))
+            LOG.debug(_("sending message to create %s" % (self.model_name_plural)))
             self._send_create(context, entry)
 
     def heal_entries(self, context):

@@ -891,7 +891,7 @@ class CellsManagerClassTestCase(test.TestCase):
         fake_instance_association = {
             'parent_group_name': fake_group_name,
             'parent_group_pid': fake_group_pid,
-            'uuid': fake_uuid,
+            'instance_uuid': fake_uuid,
             }
 
         def path_is_us_false(path):
@@ -927,11 +927,16 @@ class CellsManagerClassTestCase(test.TestCase):
     def test_instance_association_destroy(self):
 
         call_info = {
-                'destroy': 0,
-                'get': 0,
-                }
+            'destroy': 0,
+            'get': 0,
+            'get_instance': 0,
+            'get_filters': 0,
+        }
 
-        fake_context = 'fake_context'
+        fake_context = mock.Mock()
+        fake_context.project_id = "fake_project"
+        fake_context.read_deleted = 'no'
+        fake_context.to_dict = lambda: {'is_admin': 'True'}
         fake_routing_path = 'fake_routing_path'
         fake_group_pid = 'fake_pid'
         fake_group_name = 'fake_name'
@@ -948,7 +953,7 @@ class CellsManagerClassTestCase(test.TestCase):
         fake_instance_association = {
             'parent_group_name': fake_group_name,
             'parent_group_pid': fake_group_pid,
-            'uuid': fake_uuid,
+            'instance_uuid': fake_uuid,
             }
 
         def path_is_us_false(path):
@@ -968,18 +973,35 @@ class CellsManagerClassTestCase(test.TestCase):
             self.assertEqual(update_cells, False)
             return
 
+        def instance_get_by_uuid(context, uuid):
+            call_info['get_instance'] += 1
+            self.assertEqual(uuid, fake_uuid)
+            return
+
+        def security_group_instance_association_get_all_by_filters(
+            context, instance_association, sort_key, sort_dir, limit=None, marker=None):
+            call_info['get_filters'] += 1
+            return True
+
         self.stubs.Set(self.cells_manager,
                 '_path_is_us', path_is_us_false)
         self.stubs.Set(self.cells_manager.db,
                 'security_group_get_by_name', security_group_get_by_name_success)
         self.stubs.Set(self.cells_manager.db,
                 'instance_remove_security_group', instance_remove_security_group)
+        self.stubs.Set(self.cells_manager.db,
+                'instance_get_by_uuid', instance_get_by_uuid)
+        self.stubs.Set(self.cells_manager.db,
+                       'security_group_instance_association_get_all_by_filters',
+                       security_group_instance_association_get_all_by_filters)
 
         self.cells_manager.instance_association_destroy(fake_context,
                 fake_instance_association, fake_routing_path)
 
         self.assertEqual(call_info['destroy'], 1)
         self.assertEqual(call_info['get'], 1)
+        self.assertEqual(call_info['get_instance'], 1)
+        self.assertEqual(call_info['get_filters'], 1)
 
     def test_heal_rules(self):
 
@@ -1149,7 +1171,6 @@ class CellsConsistencyManagerClassTestCase(test.TestCase):
                     {'deleted':False, 'name':'sixth'}
                 ]
 
-
         call_info = {
                 'filter_called': 0,
                 'send_create_called':0,
@@ -1298,7 +1319,7 @@ class CellsConsistencyManagerClassTestCase(test.TestCase):
                 self.assertEqual(deleted_set, call_deleted_set)
                 self.assertEqual(len(call_info['deleted']), len(call_deleted_set))
 
-            # All other key valie pairs for regular comparison
+            # All other key value pairs for regular comparison
             for key, value in kwargs.items():
                 self.assertEqual(call_info[key], value)
 

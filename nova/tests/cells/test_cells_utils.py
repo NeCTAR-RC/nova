@@ -18,7 +18,7 @@ Tests For Cells Utils interfaces
 
 from nova.cells import utils as cells_utils
 from nova import test
-
+from nova import db
 
 class CellsUtilsTestCase(test.TestCase):
     """Test case for cells.common interfaces."""
@@ -219,15 +219,21 @@ class CellsUtilsTestCase(test.TestCase):
     def test_instance_association_create_broadcast_message(self):
         fake_instance_association = {
                          'security_group_id': 'fake_parent',
-                         'uuid': 'fake_uuid'}
+                         'instance_uuid': 'fake_uuid'}
 
         fake_group = {'id': 'fake_group_id',
             'name':'fake_group_name',
             'project_id':'fake_project_id',
             'description':'fake_description',
                 }
+
+        def security_group_get(context, group_id):
+            return fake_group
+
+        self.stubs.Set(db, 'security_group_get', security_group_get)
+
         bcast_message = cells_utils.form_instance_association_create_broadcast_message(
-                fake_instance_association, fake_group)
+                'fake_uuid', 'fake_group_id')
 
         ia_info = fake_instance_association.copy()
         ia_info.pop('security_group_id')
@@ -248,15 +254,21 @@ class CellsUtilsTestCase(test.TestCase):
     def test_instance_association_destroy_broadcast_message(self):
         fake_instance_association = {
                          'security_group_id': 'fake_parent',
-                         'uuid': 'fake_uuid'}
+                         'instance_uuid': 'fake_uuid'}
 
         fake_group = {'id': 'fake_group_id',
             'name':'fake_group_name',
             'project_id':'fake_project_id',
             'description':'fake_description',
                 }
+
+        def security_group_get(context, group_id):
+            return fake_group
+
+        self.stubs.Set(db, 'security_group_get', security_group_get)
+
         bcast_message = cells_utils.form_instance_association_destroy_broadcast_message(
-                fake_instance_association, fake_group)
+                'fake_uuid', 'fake_group_id')
 
         ia_info = fake_instance_association.copy()
         ia_info.pop('security_group_id')
