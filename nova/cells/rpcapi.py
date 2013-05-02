@@ -319,3 +319,21 @@ class CellsAPI(nova.openstack.common.rpc.proxy.RpcProxy):
                 security_group_rule, group)
         topic = FLAGS.cells.topic
         self.cast(context, bcast_message, topic)
+
+    def instance_add_security_group(self, context, instance_uuid, security_group_id):
+        """Broadcast security group instance association add upward"""
+        if not FLAGS.cells.enable:
+            return
+        bcast_message = cells_utils.form_instance_association_create_broadcast_message(
+                instance_uuid, security_group_id)
+
+        self.cast(context, bcast_message)
+
+    def instance_remove_security_group(self, context, instance_uuid, security_group_id):
+        """Broadcast security group instance association remove upward"""
+        if not FLAGS.cells.enable:
+            return
+        bcast_message = cells_utils.form_instance_association_destroy_broadcast_message(
+                instance_uuid, security_group_id)
+
+        self.cast(context, bcast_message)

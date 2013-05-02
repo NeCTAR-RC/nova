@@ -1319,7 +1319,7 @@ class CellsManager(manager.Manager):
 
         LOG.debug(_("Recieved message to create instance_association %s" % ((dict(instance_association.iteritems())))))
         def prepare_args(obj, group):
-            args = (obj['uuid'], group.id)
+            args = (obj['instance_uuid'], group.id)
             kwargs = {'update_cells':False}
             return args, kwargs
 
@@ -1335,22 +1335,44 @@ class CellsManager(manager.Manager):
 
     def instance_association_destroy(self, context, instance_association, routing_path,
                                     **kwargs):
-        LOG.debug(_("Recieved message to delete %s" % (instance_association)))
-
-        def prepare_args(obj, group):
-            args = (obj['uuid'], group.id)
-            kwargs = {'update_cells':False}
-            return args, kwargs
 
         if self._path_is_us(routing_path):
             return
+        LOG.debug(_("Recieved message to delete %s" % (instance_association)))
 
-        self.unpack_group(
+        try:
+            instance = self.db.instance_get_by_uuid(
                 context,
-                instance_association,
-                self.db.instance_remove_security_group,
-                prepare_args
-                )
+                instance_association['instance_uuid']
+            )
+        except exception.InstanceNotFound:
+            #Ignore if instance no longer exists
+            return
+
+        security_group_name = instance_association.pop('parent_group_name', None)
+        security_group_pid = instance_association.pop('parent_group_pid', None)
+
+        try:
+            group = self.db.security_group_get_by_name(
+                context,
+                security_group_pid,
+                security_group_name
+            )
+        except exception.SecurityGroupNotFound:
+            #Ignore if secgroup no longer exists
+            return
+
+        instance_association['security_group_id'] = group.id
+        instance_association['deleted'] = False
+        associations = self.db.security_group_instance_association_get_all_by_filters(
+            context, instance_association, 'deleted', 'asc')
+
+        if associations:
+            self.db.instance_remove_security_group(
+                context,
+                instance_association['instance_uuid'],
+                group.id,
+            )
 
 
     @manager.periodic_task

@@ -719,8 +719,7 @@ def instance_add_security_group(context, instance_id, security_group_id, update_
                                             security_group_id)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
-                'instance_add_security_group',
+            cells_rpcapi.CellsAPI().instance_add_security_group(context,
                 instance_id,
                 security_group_id)
         except Exception:
@@ -733,8 +732,7 @@ def instance_remove_security_group(context, instance_id, security_group_id, upda
                                             security_group_id)
     if update_cells:
         try:
-            cells_rpcapi.CellsAPI().broadcast_dbmethod_up(context,
-                'instance_remove_security_group',
+            cells_rpcapi.CellsAPI().instance_remove_security_group(context,
                 instance_id,
                 security_group_id)
         except Exception:

@@ -299,18 +299,17 @@ class InstanceAssociationConsistencyHandler(ConsistencyHandler):
         self.model_name_plural= 'instance associations'
 
     def _send_create(self, context, instance_association):
-        group = db.security_group_get(context, instance_association['security_group_id'])
-
-        msg = cells_utils.form_instance_association_create_broadcast_message(
-            instance_association, group, routing_path=self.our_path, hopcount=1)
-
-        self.cells_rpcapi.send_message_to_cells(context, self._get_child_cells(), msg)
+        LOG.info("Sending create to %s" % instance_association.iteritems())
+        self.cells_rpcapi.instance_add_security_group(
+            context,
+            instance_association['instance_uuid'],
+            instance_association['security_group_id'],
+        )
 
     def _send_destroy(self, context, instance_association):
-        group = db.security_group_get(context, instance_association['security_group_id'])
-
-        msg = cells_utils.form_instance_association_destroy_broadcast_message(
-            instance_association, group, routing_path=self.our_path, hopcount=1)
-
-        self.cells_rpcapi.send_message_to_cells(context,
-                self._get_child_cells(), msg)
+        LOG.info("Sending remove to %s" % instance_association.security_group_id)
+        self.cells_rpcapi.instance_remove_security_group(
+            context,
+            instance_association['instance_uuid'],
+            instance_association['security_group_id'],
+        )

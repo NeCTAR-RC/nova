@@ -309,20 +309,21 @@ def top_cell(cell_name):
     return cell_name
 
 
-def form_instance_association_create_broadcast_message(instance_association, group, routing_path=None,
+def form_instance_association_create_broadcast_message(instance_uuid, security_group_id, routing_path=None,
         hopcount=0):
 
     """Create a special message for adding instance associations which
     sends unique information about a parent group rather than the id,
     which can get out of sync between child/parent cells"""
-    instance_association_dict = dict(instance_association.iteritems())
 
-    # TODO (shauno) anything else to delete here?
-    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
-    for item in remove:
-        if item in instance_association_dict:
-            instance_association_dict.pop(item)
-
+    from nova import db
+    from nova import context
+    ctx = context.get_admin_context()
+    group = db.security_group_get(ctx, security_group_id)
+    instance_association_dict = {
+        'instance_uuid': instance_uuid,
+        'security_group_id': security_group_id,
+    }
     replace_security_group(instance_association_dict, 'security_group_id', group)
 
     return form_broadcast_message('up', 'instance_association_create',
@@ -330,19 +331,21 @@ def form_instance_association_create_broadcast_message(instance_association, gro
             routing_path=routing_path, hopcount=hopcount)
 
 
-def form_instance_association_destroy_broadcast_message(instance_association, group, routing_path=None,
+def form_instance_association_destroy_broadcast_message(instance_uuid, security_group_id, routing_path=None,
         hopcount=0):
 
     """Create a special message for adding instance associations which
     sends unique information about a parent group rather than the id,
     which can get out of sync between child/parent cells"""
-    instance_association_dict = dict(instance_association.iteritems())
-    # TODO (shauno) anything else to delete here?
-    remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
-    for item in remove:
-        if item in instance_association_dict:
-            instance_association_dict.pop(item)
 
+    from nova import db
+    from nova import context
+    ctx = context.get_admin_context()
+    group = db.security_group_get(ctx, security_group_id)
+    instance_association_dict = {
+        'instance_uuid': instance_uuid,
+        'security_group_id': security_group_id,
+    }
     replace_security_group(instance_association_dict, 'security_group_id', group)
 
     return form_broadcast_message('up', 'instance_association_destroy',
