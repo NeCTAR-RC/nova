@@ -95,10 +95,10 @@ class ConsistencyHandler(object):
         parent cells.
         """
         if entry['deleted']:
-            LOG.info(_("sending message to delete %s" % (self.model_name_plural)))
+            LOG.debug(_("sending message to delete %s %s" % (self.model_name_plural, entry.id)))
             self._send_destroy(context, entry)
         else:
-            LOG.info(_("sending message to create %s" % (self.model_name_plural)))
+            LOG.debug(_("sending message to create %s %s" % (self.model_name_plural, entry.id)))
             self._send_create(context, entry)
 
     def heal_entries(self, context):
@@ -236,13 +236,13 @@ class MappingConsistencyHandler(ConsistencyHandler):
         uuid = entry['uuid']
         id = entry['id']
         self.cells_rpcapi.broadcast_dbmethod_down(context, self.create_function, uuid, id=id)
-        LOG.info(_('Sent broadcast message down to create %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
+        LOG.debug(_('Sent broadcast message down to create %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
 
     def _send_destroy(self, context, entry):
         uuid =entry['uuid']
         id = entry['id']
         self.cells_rpcapi.broadcast_dbmethod_down(context, self.create_function, uuid, id=id)
-        LOG.info(_('Sent broadcast message down to destroy %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
+        LOG.debug(_('Sent broadcast message down to destroy %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
 
 class S3ImageConsistencyHandler(MappingConsistencyHandler):
 
@@ -283,7 +283,7 @@ class VolumeIDMappingConsistencyHandler(MappingConsistencyHandler):
         uuid = entry['uuid']
         id = entry['id']
         self.cells_rpcapi.broadcast_dbmethod_down(context, self.create_function, uuid, forced_id=id)
-        LOG.info(_('Sent broadcast message down to create %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
+        LOG.debug(_('Sent broadcast message down to create %s with id=%s and uuid=%s') % (self.model_name, id, uuid))
 
     def _send_destroy(self, context, instance_id_mapping):
         msg = _('Healing process attempted to delete an volume id mapping , which is not supported')
