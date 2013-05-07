@@ -1381,7 +1381,7 @@ class CellsManager(manager.Manager):
         if self._get_parent_cells():
             return
 
-        LOG.info(_("Checking if it's time to sync security groups"))
+        LOG.debug(_("Checking if it's time to sync security groups"))
         curr_time = time.time()
         if not self.groups_consistency_handler.is_time_to_heal(curr_time):
             return
@@ -1397,7 +1397,7 @@ class CellsManager(manager.Manager):
         if self._get_parent_cells():
             return
 
-        LOG.info(_("Checking if it's time to sync rules"))
+        LOG.debug(_("Checking if it's time to sync rules"))
         curr_time = time.time()
         if not self.rules_consistency_handler.is_time_to_heal(curr_time):
             return
@@ -1414,7 +1414,7 @@ class CellsManager(manager.Manager):
             return
 
         handler = self.instance_association_consistency_handler
-        LOG.info(_("Checking if it's time to sync instance associations"))
+        LOG.debug(_("Checking if it's time to sync instance associations"))
 
         curr_time = time.time()
 
@@ -1431,7 +1431,7 @@ class CellsManager(manager.Manager):
         if self._get_parent_cells():
             return
 
-        LOG.info(_("Checking if it's time to sync s3 images"))
+        LOG.debug(_("Checking if it's time to sync s3 images"))
 
         curr_time = time.time()
 
@@ -1449,7 +1449,7 @@ class CellsManager(manager.Manager):
             return
 
         handler = self.instance_id_mapping_consistency_handler
-        LOG.info(_("Checking if it's time to sync instance id mappings"))
+        LOG.debug(_("Checking if it's time to sync instance id mappings"))
 
         curr_time = time.time()
 
@@ -1467,7 +1467,7 @@ class CellsManager(manager.Manager):
             return
 
         handler = self.volume_id_mapping_consistency_handler
-        LOG.info(_("Checking if it's time to sync volume id mappings"))
+        LOG.debug(_("Checking if it's time to sync volume id mappings"))
 
         curr_time = time.time()
 
