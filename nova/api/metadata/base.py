@@ -222,9 +222,6 @@ class InstanceMetadata(object):
 
         hostname = self._get_hostname()
 
-        floating_ips = self.ip_info['floating_ips']
-        floating_ip = floating_ips and floating_ips[0] or ''
-
         fixed_ips = self.ip_info['fixed_ips']
         fixed_ip = fixed_ips and fixed_ips[0] or ''
 
@@ -257,7 +254,7 @@ class InstanceMetadata(object):
         if self._check_version('2007-01-19', version):
             meta_data['local-hostname'] = hostname
             meta_data['public-hostname'] = hostname
-            meta_data['public-ipv4'] = floating_ip
+            meta_data['public-ipv4'] = self.address
 
         if False and self._check_version('2007-03-01', version):
             # TODO(vish): store product codes
