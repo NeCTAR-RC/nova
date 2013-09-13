@@ -97,6 +97,15 @@ def add_cell_to_service(service, cell_name):
         add_cell_to_compute_node(compute_node[0], cell_name)
 
 
+def add_cell_to_aggregate(aggregate, cell_name):
+    """Fix aggregate attributes that should be unique.
+    Changes the aggregate's name and ID to include the cell_name,
+    making them unique in the context of the api cell
+    """
+    aggregate['id'] = cell_with_item(cell_name, aggregate['id'])
+    aggregate['name'] = cell_with_item(cell_name, aggregate['name'])
+
+
 def add_cell_to_task_log(task_log, cell_name):
     """Fix task_log attributes that should be unique.  In particular,
     the 'id' and 'host' fields should be prepended with cell name.
