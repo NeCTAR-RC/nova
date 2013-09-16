@@ -149,6 +149,19 @@ class ComputeCellsAPI(compute_api.API):
         """
         return
 
+    def _get_instances_by_filters(self, context, filters,
+                                  sort_key, sort_dir,
+                                  limit=None,
+                                  marker=None):
+        if 'ip' in filters:
+            filters['access_ip_v4'] = filters['ip']
+        if 'ip6' in filters:
+            filters['access_ip_v6'] = filters['ip6']
+
+        return self.db.instance_get_all_by_filters(context, filters,
+                                                   sort_key, sort_dir,
+                                                   limit=limit, marker=marker)
+
     def backup(self, context, instance, name, backup_type, rotation,
                extra_properties=None, image_id=None):
         """Backup the given instance."""
