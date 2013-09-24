@@ -517,6 +517,17 @@ this optional configuration:
 """)
 ]
 
+nectar_filter_opts = [
+    cfg.ListOpt('scheduler_direct_only_cells',
+                default=[],
+                help='Cells that can only be scheduled to directly. '
+                'I.e., with the "cell" scheduler hint.'),
+    cfg.IntOpt('free_disk_units_needed',
+               default=1,
+               help='Number of free disk units required to be accepted. '
+               'by the cell scheduler.')
+]
+
 ALL_CELLS_OPTS = (cells_opts +
                   mute_weigher_opts +
                   ram_weigher_opts +
@@ -525,7 +536,8 @@ ALL_CELLS_OPTS = (cells_opts +
                   cell_messaging_opts +
                   cell_rpc_driver_opts +
                   cell_scheduler_opts +
-                  cell_state_manager_opts)
+                  cell_state_manager_opts +
+                  nectar_filter_opts)
 
 
 def register_opts(conf):
