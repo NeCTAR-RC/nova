@@ -544,3 +544,9 @@ class CellsManager(manager.Manager):
         response = self.msg_runner.get_host_availability_zone(ctxt,
                 cell_name, host)
         return response.value_or_raise()
+
+    def instance_type_create(self, ctxt, cell_name, values):
+
+        response = self.msg_runner.instance_type_create(ctxt,
+                cell_name, values)
+        return response.value_or_raise()

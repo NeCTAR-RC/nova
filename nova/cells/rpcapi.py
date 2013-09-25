@@ -470,3 +470,10 @@ class CellsAPI(rpc_proxy.RpcProxy):
                 self.make_msg('get_host_availability_zone',
                               cell_name=cell_name, host=host),
                 version='1.6.1')
+
+    def instance_type_create(self, ctxt, cell_name, values):
+
+        return self.call(ctxt,
+                self.make_msg('instance_type_create',
+                              cell_name=cell_name, values=values),
+                version='1.6.1')

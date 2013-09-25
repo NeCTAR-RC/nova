@@ -28,6 +28,7 @@ from oslo.config import cfg
 from nova import context
 from nova import db
 from nova import exception
+from nova.cells import rpcapi as cell_rpcapi
 from nova.openstack.common.db import exception as db_exc
 from nova.openstack.common import log as logging
 from nova import utils
@@ -68,7 +69,7 @@ system_metadata_instance_type_props = {
 def create(name, memory, vcpus, root_gb, ephemeral_gb=None, flavorid=None,
            swap=None, rxtx_factor=None, is_public=True):
     """Creates instance types."""
-
+    cell, name = name.split('@')
     if flavorid is None or flavorid == '':
         flavorid = uuid.uuid4()
     if swap is None:
@@ -133,7 +134,12 @@ def create(name, memory, vcpus, root_gb, ephemeral_gb=None, flavorid=None,
     kwargs['is_public'] = utils.bool_from_str(is_public)
 
     try:
-        return db.instance_type_create(context.get_admin_context(), kwargs)
+        ctxt = context.get_admin_context()
+        if CONF.cells.enable:
+            cells_rpcapi = cell_rpcapi.CellsAPI()
+            return cells_rpcapi.instance_type_create(ctxt, cell, kwargs)
+        else:
+            return db.instance_type_create(ctxt, kwargs)
     except db_exc.DBError, e:
         LOG.exception(_('DB error: %s') % e)
         raise exception.InstanceTypeCreateFailed()
