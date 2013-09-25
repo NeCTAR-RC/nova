@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAATn///mE\u003d",
+        "filename": "nova/cells/filters/restrict.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2013-09-25T00:18:49Z",
+      "side": 1,
+      "message": "len is redundant here innit?",
+      "revId": "e363a81fee9c5218b1d731133f7989d2ccf337f4",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
