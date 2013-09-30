@@ -15,12 +15,15 @@
 Tests For Cells Messaging module
 """
 
+import mox
+
 from oslo.config import cfg
 
 from nova.cells import messaging
 from nova.cells import utils as cells_utils
 from nova import context
 from nova import exception
+from nova import db
 from nova.openstack.common import rpc
 from nova.openstack.common import timeutils
 from nova import test
@@ -1628,7 +1631,7 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
         self.mox.StubOutWithMock(self.src_db_inst,
                                  'security_group_create')
 
-        # Both mid and bottom cell should create the rule.
+        # Both mid and bottom cell should create the group.
         self.mox.StubOutWithMock(self.mid_db_inst,
                                  'security_group_get_by_name')
         self.mox.StubOutWithMock(self.mid_db_inst,
@@ -1656,26 +1659,23 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
     def test_security_group_rule_create(self):
         self._setup_attrs(up=False)
 
-        fake_group_pid = 'fake_pid'
-        fake_group_name = 'fake_name'
-        fake_group_id = 1
-        original_group_id = 2
+        fake_group = {
+            'id': 1,
+            'name': 'fake_name',
+            'description': 'fake_description',
+            'project_id': 'fake_pid',
+            'user_id': 'fake_uid',
+        }
+
         fake_rule = {
             'to_port': 'fake_to_port',
             'from_port': 'fake_from_port',
             'cidr': 'fake_cidr',
-            'parent_group_name': fake_group_name,
-            'parent_group_id': original_group_id,
+            'parent_group_id': fake_group['id'],
         }
         rule_out = fake_rule.copy()
-        rule_out['parent_group_id'] = fake_group_id
-        rule_out.pop('parent_group_name')
         rule_filter = rule_out.copy()
         rule_filter['deleted'] = False
-
-        group = {'id': fake_group_id,
-                 'name': fake_group_name,
-                 'project_id': fake_group_pid}
 
         # Top cell methods should not be called.
         self.mox.StubOutWithMock(self.src_db_inst,
@@ -1698,14 +1698,88 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
                                  'security_group_rule_create')
 
         self.mid_db_inst.security_group_get_by_name(self.ctxt,
-                fake_group_pid, fake_group_name).AndReturn(group)
+                fake_group['project_id'], fake_group['name']).AndReturn(fake_group)
         self.mid_db_inst.security_group_rule_get_all_by_filters(self.ctxt,
                 rule_filter, 'deleted', 'asc').AndReturn([])
         self.mid_db_inst.security_group_rule_create(self.ctxt,
                 rule_out, update_cells=False)
 
         self.tgt_db_inst.security_group_get_by_name(self.ctxt,
-                fake_group_pid, fake_group_name).AndReturn(group)
+                fake_group['project_id'], fake_group['name']).AndReturn(fake_group)
+        self.tgt_db_inst.security_group_rule_get_all_by_filters(self.ctxt,
+                rule_filter, 'deleted', 'asc').AndReturn([])
+        self.tgt_db_inst.security_group_rule_create(self.ctxt,
+                rule_out, update_cells=False)
+        self.mox.ReplayAll()
+
+        self.src_msg_runner.security_group_rule_create(self.ctxt, fake_group, fake_rule)
+
+    def test_security_group_rule_create_linked(self):
+        self._setup_attrs(up=False)
+
+        fake_group = {
+            'id': 1,
+            'name': 'fake_name',
+            'description': 'fake_description',
+            'project_id': 'fake_pid',
+            'user_id': 'fake_uid',
+        }
+        linked_group = {
+            'id': 2,
+            'name': 'linked_name',
+            'description': 'fake_description',
+            'project_id': 'fake_pid',
+            'user_id': 'fake_uid',
+        }
+
+        fake_rule = {
+            'to_port': 'fake_to_port',
+            'from_port': 'fake_from_port',
+            'parent_group_id': fake_group['id'],
+            'group_id': 2,
+        }
+        rule_out = fake_rule.copy()
+        rule_filter = rule_out.copy()
+        rule_filter['deleted'] = False
+
+        # Top cell methods should not be called.
+        self.mox.StubOutWithMock(db,
+                                 'security_group_get')
+        self.mox.StubOutWithMock(self.src_db_inst,
+                                 'security_group_get_by_name')
+        self.mox.StubOutWithMock(self.src_db_inst,
+                                 'security_group_rule_create')
+
+        # Both mid and bottom cell should create the rule.
+        self.mox.StubOutWithMock(self.mid_db_inst,
+                                 'security_group_get_by_name')
+        self.mox.StubOutWithMock(self.mid_db_inst,
+                                 'security_group_rule_get_all_by_filters')
+        self.mox.StubOutWithMock(self.mid_db_inst,
+                                 'security_group_rule_create')
+        self.mox.StubOutWithMock(self.tgt_db_inst,
+                                 'security_group_get_by_name')
+        self.mox.StubOutWithMock(self.tgt_db_inst,
+                                 'security_group_rule_get_all_by_filters')
+        self.mox.StubOutWithMock(self.tgt_db_inst,
+                                 'security_group_rule_create')
+
+        db.security_group_get(mox.IsA(context.RequestContext),
+                linked_group['id']).AndReturn(linked_group)
+
+        self.mid_db_inst.security_group_get_by_name(self.ctxt,
+                fake_group['project_id'], fake_group['name']).AndReturn(fake_group)
+        self.mid_db_inst.security_group_get_by_name(self.ctxt,
+                linked_group['project_id'], linked_group['name']).AndReturn(linked_group)
+        self.mid_db_inst.security_group_rule_get_all_by_filters(self.ctxt,
+                rule_filter, 'deleted', 'asc').AndReturn([])
+        self.mid_db_inst.security_group_rule_create(self.ctxt,
+                rule_out, update_cells=False)
+
+        self.tgt_db_inst.security_group_get_by_name(self.ctxt,
+                fake_group['project_id'], fake_group['name']).AndReturn(fake_group)
+        self.tgt_db_inst.security_group_get_by_name(self.ctxt,
+                linked_group['project_id'], linked_group['name']).AndReturn(linked_group)
         self.tgt_db_inst.security_group_rule_get_all_by_filters(self.ctxt,
                 rule_filter, 'deleted', 'asc').AndReturn([])
         self.tgt_db_inst.security_group_rule_create(self.ctxt,
@@ -1713,24 +1787,25 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
 
         self.mox.ReplayAll()
 
-        self.src_msg_runner.security_group_rule_create(self.ctxt, group, fake_rule)
+        self.src_msg_runner.security_group_rule_create(self.ctxt, fake_group, fake_rule)
 
     def test_security_group_rule_create_current_cell(self):
         self._setup_attrs(up=False)
 
-        fake_group_id = 1
-        fake_group_pid = 'fake_pid'
-        fake_group_name = 'fake_name'
+        fake_group = {
+            'id': 1,
+            'name': 'fake_name',
+            'description': 'fake_description',
+            'project_id': 'fake_pid',
+            'user_id': 'fake_uid',
+        }
+
         fake_rule = {
             'to_port':'fake_to_port',
             'from_port':'fake_from_port',
             'cidr': 'fake_cidr',
-            'parent_group_name': fake_group_name,
-            'parent_group_id': fake_group_id,
-            }
-        group = {'id': fake_group_id,
-                 'name': fake_group_name,
-                 'project_id': fake_group_pid}
+            'parent_group_id': fake_group['id'],
+        }
 
         # Should not be called.
         self.mox.StubOutWithMock(self.tgt_db_inst,
@@ -1740,38 +1815,46 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
         self.mox.ReplayAll()
 
         self.tgt_msg_runner.security_group_rule_create(self.ctxt,
-                group,
+                fake_group,
                 fake_rule)
 
     def test_security_group_rule_missing_parent_group(self):
         self._setup_attrs(up=False)
-
-        fake_group_id = 1
-        fake_group_pid = 'fake_pid'
-        fake_group_name = 'fake_name'
+        fake_group = {
+            'id': 1,
+            'name': 'fake_name',
+            'description': 'fake_description',
+            'project_id': 'fake_pid',
+            'user_id': 'fake_uid',
+        }
         fake_rule = {
             'to_port':'fake_to_port',
             'from_port':'fake_from_port',
             'cidr': 'fake_cidr',
-            'parent_group_name': fake_group_name,
-            'parent_group_id': fake_group_id,
+            'parent_group_id': fake_group['id'],
         }
-        group = {'id': fake_group_id,
-                 'name': fake_group_name,
-                 'project_id': fake_group_pid}
-
+        group_create = fake_group.copy()
+        group_create.pop('id')
 
         self.mox.StubOutWithMock(self.tgt_db_inst,
                                  'security_group_get_by_name')
         self.mox.StubOutWithMock(self.tgt_db_inst,
                                  'security_group_rule_create')
+        self.mox.StubOutWithMock(self.tgt_db_inst,
+                                 'security_group_create')
+
         self.tgt_db_inst.security_group_get_by_name(self.ctxt,
-                fake_group_pid, fake_group_name
+                fake_group['project_id'], fake_group['name']
                 ).AndRaise(exception.SecurityGroupNotFound(security_group_id=1))
+
+        self.tgt_db_inst.security_group_create(self.ctxt,
+                                        group_create,
+                                        ).AndReturn(fake_group)
+
         self.mox.ReplayAll()
 
         self.src_msg_runner.security_group_rule_create(self.ctxt,
-                group,
+                fake_group,
                 fake_rule)
 
     def test_instance_add_security_group(self):
