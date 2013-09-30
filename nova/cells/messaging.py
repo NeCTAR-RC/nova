@@ -1083,135 +1083,85 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
             pass
 
     def _refresh_group_security_rules(self, ctxt, group):
-        instances = group['instances']
+        instances = group.pop('instances', [])
         for instance in instances:
             self.securitygroup_rpcapi.refresh_instance_security_rules(ctxt,
                 instance['host'], instance)
 
-    def security_group_rule_create(self, message, rule):
+    def _security_group_rule_create_or_destroy(self, message, rule, create=True):
         ctxt = message.ctxt
-
         rule_dict = dict(rule.iteritems())
         LOG.debug(_("Received message to create rule %(rule_dict)s"), locals())
-
-        # NOTE(shauno): The parent group id was replaced with the
-        # group name and project id when this message was created
-        # so we could link this rule back to the correct parent group
-        # even if ids get out of sync between parent and child cells.
-        # Use them to find the correct parent group and replace them
-        # with the id.
         rule = rule.copy()
-        security_group_name = rule.pop('parent_group_name', None)
-        security_group_pid = rule.pop('parent_group_pid', None)
-        linked_group_name = rule.pop('linked_group_name', None)
+        group_dict = rule.pop('parent_group', None)
+        linked_group_dict = rule.pop('linked_group', None)
 
-        if not security_group_name or not security_group_pid:
+        if not group_dict:
             LOG.error(_("Could not add rule %(rule)s "
-                        "to group '%(security_group_name)s' "
-                        "(no parent name/project)"),
+                        "no embedded parent group"),
                       locals())
             return
-
-        # Security group name and project id were included correctly
-
         try:
             group = self.db.security_group_get_by_name(
                 ctxt,
-                security_group_pid,
-                security_group_name
+                group_dict['project_id'],
+                group_dict['name'],
             )
         except exception.SecurityGroupNotFound:
-            LOG.error(_("Could not add rule %(rule)s "
-                        "to group '%(security_group_name)s' "
-                        "(group missing from db)"),
-                      locals())
-            return
+            if create:
+                group = self.db.security_group_create(ctxt, group_dict)
+            else:
+                LOG.error(_("Couldn't delete rule %(rule)s, "
+                            "no parent group found"),
+                          locals())
+                return
+        rule['parent_group_id'] = group['id']
 
-        if linked_group_name:
+        if linked_group_dict:
             try:
                 linked_group = self.db.security_group_get_by_name(
                     ctxt,
-                    security_group_pid,
-                    linked_group_name,
+                    linked_group_dict['project_id'],
+                    linked_group_dict['name'],
                 )
                 rule['group_id'] = linked_group['id']
             except exception.SecurityGroupNotFound:
-                LOG.error(_("Could not add rule %(rule)s "
-                            "to group '%(security_group_name)s' "
-                            "(linked group missing from db)"),
-                          locals())
-                return
+                if create:
+                    linked_group = self.db.security_group_create(ctxt, linked_group_dict)
+                else:
+                    LOG.error(_("Couldn't delete rule %(rule)s, "
+                                "no linked group found"),
+                              locals())
+                    return
 
-        rule['parent_group_id'] = group['id']
+            rule['group_id'] = linked_group['id']
+
         # Check to see if rule exists already (only check for active entries)
         existing_rule = rule.copy()
         existing_rule['deleted'] = False
-        existing_rule = self.db.security_group_rule_get_all_by_filters(
+        existing_rules = self.db.security_group_rule_get_all_by_filters(
             ctxt, existing_rule, 'deleted', 'asc')
-        if not existing_rule:
+
+        if create and not existing_rules:
+            # if doesn't exist and we want to create
             LOG.info(_("Adding missing security group rule %s" % ((dict(rule.iteritems())))))
             self.db.security_group_rule_create(ctxt, rule, update_cells=False)
             self._refresh_group_security_rules(ctxt, group)
-
-    def security_group_rule_destroy(self, message, rule):
-        # TODO(kspear): Refactor this to share code from rule_create above.
-        LOG.debug(_("Received message to delete rule %s" % (rule)))
-
-        ctxt = message.ctxt
-
-        rule = rule.copy()
-        security_group_name = rule.pop('parent_group_name', None)
-        security_group_pid = rule.pop('parent_group_pid', None)
-        linked_group_name = rule.pop('linked_group_name', None)
-
-        if not security_group_name or not security_group_pid:
-            LOG.error(_( "Could not remove rule %(rule)s "
-                         "to group '%(security_group_name)s' (group missing from db)"),
-                      locals())
-            return
-
-        # Security group name and project id were included correctly
-
-        try:
-            group = self.db.security_group_get_by_name(
-                ctxt,
-                security_group_pid,
-                security_group_name
-            )
-        except exception.SecurityGroupNotFound:
-            LOG.warn(_("Could not remove rule %(rule)s "
-                       "from group '%(security_group_name)s' "
-                       "(group missing from db)"),
-                     locals())
-            #May need to make this better
-            return
-
-        if linked_group_name:
-            try:
-                linked_group = self.db.security_group_get_by_name(
-                    ctxt,
-                    security_group_pid,
-                    linked_group_name,
-                )
-                rule['group_id'] = linked_group['id']
-            except exception.SecurityGroupNotFound:
-                LOG.warn(_("Could not remove rule %(rule)s "
-                           "to group '%(security_group_name)s' "
-                           "(linked group missing from db)"),
-                         locals())
-                #TODO May need to make this better
-                return
-
-        rule['parent_group_id'] = group['id']
-        rule['deleted'] = False
-        rules = self.db.security_group_rule_get_all_by_filters(ctxt,
-                    rule, 'deleted', 'asc')
-        if rules:
-            rule_to_delete = rules[0]
+        elif not create and existing_rules:
+            # if exists and we want to remove
+            rule_to_delete = existing_rules[0]
             LOG.info(_("Deleting out of sync security group rule %s"),
                      dict(rule_to_delete.iteritems()))
             self.db.security_group_rule_destroy(ctxt, rule_to_delete['id'])
             self._refresh_group_security_rules(ctxt, group)
+
+    def security_group_rule_create(self, message, rule):
+        LOG.debug(_("Received message to create rule %s"), rule)
+        self._security_group_rule_create_or_destroy(message, rule, create=True)
+
+    def security_group_rule_destroy(self, message, rule):
+        LOG.debug(_("Received message to delete rule %s") % rule)
+        self._security_group_rule_create_or_destroy(message, rule, create=False)
 
     def _association_exists(self, ctxt, instance_uuid, group_id):
         filters = {'instance_uuid': instance_uuid,
@@ -1752,11 +1702,8 @@ class MessageRunner(object):
         """Create a special message for adding security groups which
         sends by name and project_id which is unique,
         id can get out of sync between child/parent cells"""
-        security_group_dict = dict(group.iteritems())
-        remove = ['id', 'deleted', 'created_at', 'updated_at', 'deleted_at']
-        for item in remove:
-            if item in security_group_dict:
-                security_group_dict.pop(item)
+        
+        security_group_dict = cells_utils.clean_security_group(group)
         if create:
             method = 'security_group_create'
         else:
@@ -1777,21 +1724,15 @@ class MessageRunner(object):
         """Create a special message for adding security group rules which
         sends unique information about a parent group rather than the id,
         which can get out of sync between child/parent cells"""
-        security_group_rule_dict = dict(rule.iteritems())
+        security_group_rule_dict = cells_utils.clean_security_group_rule(rule)
         linked_id = security_group_rule_dict.pop('group_id', None)
-        remove = ['id', 'deleted', 'created_at', 'updated_at',
-                  'deleted_at', 'group_id', 'parent_group_id']
-        for item in remove:
-            if item in security_group_rule_dict:
-                security_group_rule_dict.pop(item)
-
-        security_group_rule_dict['parent_group_name'] = group['name']
-        security_group_rule_dict['parent_group_pid'] = group['project_id']
-
+        
+        security_group_rule_dict['parent_group'] = cells_utils.clean_security_group(group)
+        
         if linked_id:
             rd_ctxt = ctxt.elevated(read_deleted='yes')
             linked_group = db.security_group_get(rd_ctxt, linked_id)
-            security_group_rule_dict['linked_group_name'] = linked_group.name
+            security_group_rule_dict['linked_group'] = cells_utils.clean_security_group(linked_group)
         if create:
             method = 'security_group_rule_create'
         else:
