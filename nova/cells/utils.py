@@ -112,3 +112,27 @@ def add_cell_to_task_log(task_log, cell_name):
     """
     task_log['id'] = cell_with_item(cell_name, task_log['id'])
     task_log['host'] = cell_with_item(cell_name, task_log['host'])
+
+
+def clean_security_group(group):
+    """Removes attributes that shouldn't be synced between cells
+    """
+    group_dict = dict(group.iteritems())
+    #group_dict = jsonutils.to_primitive(group_dict)
+    remove = ['id', 'created_at', 'updated_at', 'deleted_at',
+              'deleted', 'rules', 'instances']
+    for item in remove:
+        if item in group_dict:
+            group_dict.pop(item)
+    return group_dict
+
+def clean_security_group_rule(rule):
+    """Removes attributes that shouldn't be synced between cells
+    """
+    rule_dict = dict(rule.iteritems())
+    remove = ['id', 'deleted', 'created_at', 'updated_at',
+              'deleted_at', 'parent_group_id', 'grantee_group']
+    for item in remove:
+        if item in rule_dict:
+            rule_dict.pop(item)
+    return rule_dict
