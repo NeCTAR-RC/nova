@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAATn///b4\u003d",
+        "filename": "nova/cells/messaging.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1086,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2013-10-01T03:14:21Z",
+      "side": 1,
+      "message": "maybe .get() here so we\u0027re not changing the dict?",
+      "revId": "6e285aede0ef4fc131bc85c021bf5a983098dbb4",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAATn///b0\u003d",
+        "filename": "nova/cells/messaging.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1127,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2013-10-01T03:14:21Z",
+      "side": 1,
+      "message": "this line can be removed",
+      "revId": "6e285aede0ef4fc131bc85c021bf5a983098dbb4",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
