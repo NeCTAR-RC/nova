@@ -98,13 +98,6 @@ class ConsoleAuthManager(manager.Manager):
         if instance_uuid is None:
             return False
 
-        # NOTE(comstud): consoleauth was meant to run in API cells.  So,
-        # if cells is enabled, we must call down to the child cell for
-        # the instance.
-        if CONF.cells.enable:
-            return self.cells_rpcapi.validate_console_port(context,
-                    instance_uuid, token['port'], token['console_type'])
-
         instance = self.db.instance_get_by_uuid(context, instance_uuid)
 
         return self.compute_rpcapi.validate_console_port(context,

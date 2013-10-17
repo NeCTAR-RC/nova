@@ -798,6 +798,13 @@ class _TargetedMessageMethods(_BaseMessageMethods):
         return self.compute_rpcapi.validate_console_port(message.ctxt,
                 instance, console_port, console_type)
 
+    def authorize_console(self, message, token, console_type,
+                          host, port, internal_access_path,
+                          instance_uuid):
+        self.consoleauth_rpcapi.authorize_console(message.ctxt,
+                            token, console_type, host,
+                            port, internal_access_path, instance_uuid)
+
     def get_migrations(self, message, filters):
         return self.compute_api.get_migrations(message.ctxt, filters)
 
@@ -1570,6 +1577,20 @@ class MessageRunner(object):
                          'console_port': console_port,
                          'console_type': console_type}
         message = _TargetedMessage(self, ctxt, 'validate_console_port',
+                                   method_kwargs, 'down',
+                                   cell_name, need_response=True)
+        return message.process()
+
+    def authorize_console(self, ctxt, cell_name,
+                          token, console_type, host, port,
+                          internal_access_path, instance_uuid):
+        method_kwargs = {'token': token,
+                         'console_type': console_type,
+                         'host': host,
+                         'port': port,
+                         'internal_access_path': internal_access_path,
+                         'instance_uuid': instance_uuid}
+        message = _TargetedMessage(self, ctxt, 'authorize_console',
                                    method_kwargs, 'down',
                                    cell_name, need_response=True)
         return message.process()
