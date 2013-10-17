@@ -337,7 +337,8 @@ class ComputeCellsAPI(compute_api.API):
         connect_info = self._call_to_cells(context, instance,
                 'get_vnc_connect_info', console_type)
 
-        self.consoleauth_rpcapi.authorize_console(context,
+        cell_name = instance['cell_name']
+        self.cells_rpcapi.authorize_console(context, cell_name,
                 connect_info['token'], console_type, connect_info['host'],
                 connect_info['port'], connect_info['internal_access_path'],
                 instance_uuid=instance['uuid'])
@@ -353,7 +354,8 @@ class ComputeCellsAPI(compute_api.API):
         connect_info = self._call_to_cells(context, instance,
                 'get_spice_connect_info', console_type)
 
-        self.consoleauth_rpcapi.authorize_console(context,
+        cell_name = instance['cell_name']
+        self.cells_rpcapi.authorize_console(context, cell_name,
                 connect_info['token'], console_type, connect_info['host'],
                 connect_info['port'], connect_info['internal_access_path'],
                 instance_uuid=instance['uuid'])

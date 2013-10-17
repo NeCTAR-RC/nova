@@ -401,6 +401,14 @@ class CellsManager(manager.Manager):
                 console_type)
         return response.value_or_raise()
 
+    def authorize_console(self, ctxt, cell_name,
+                          token, console_type, host, port,
+                          internal_access_path, instance_uuid):
+
+        self.msg_runner.authorize_console(ctxt, cell_name,
+                                          token, console_type, host, port,
+                                          internal_access_path, instance_uuid)
+
     def get_capacities(self, ctxt, cell_name):
         return self.state_manager.get_capacities(cell_name)
 
