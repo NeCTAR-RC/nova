@@ -27,6 +27,7 @@ from oslo_utils import strutils
 import six
 
 from nova.api.validation import parameter_types
+from nova.cells import rpcapi as cells_rpcapi
 from nova import context
 from nova import db
 from nova import exception
@@ -93,6 +94,9 @@ system_metadata_flavor_extra_props = [
 def create(name, memory, vcpus, root_gb, ephemeral_gb=0, flavorid=None,
            swap=0, rxtx_factor=1.0, is_public=True):
     """Creates flavors."""
+    cell = None
+    if CONF.cells.enable and '@' in name:
+        cell, name = name.split('@')
     if not flavorid:
         flavorid = uuid.uuid4()
 
@@ -172,8 +176,12 @@ def create(name, memory, vcpus, root_gb, ephemeral_gb=0, flavorid=None,
     except ValueError:
         raise exception.InvalidInput(reason=_("is_public must be a boolean"))
 
-    flavor = objects.Flavor(context=context.get_admin_context(), **kwargs)
-    flavor.create()
+    if cell:
+        flavor = cells_rpcapi.CellsAPI().flavor_create(
+            context.get_admin_context(), cell, kwargs)
+    else:
+        flavor = objects.Flavor(context=context.get_admin_context(), **kwargs)
+        flavor.create()
     return flavor
 
 
