@@ -630,6 +630,12 @@ class CellsAPI(object):
                    backup_type=backup_type,
                    rotation=rotation)
 
+    def flavor_create(self, ctxt, cell_name, values):
+        cctxt = self.client.prepare(version='1.24')
+        return cctxt.call(ctxt, 'flavor_create',
+                          cell_name=cell_name,
+                          values=values)
+
     def rebuild_instance(self, ctxt, instance, new_pass, injected_files,
                          image_ref, orig_image_ref, orig_sys_metadata, bdms,
                          recreate=False, on_shared_storage=False, host=None,

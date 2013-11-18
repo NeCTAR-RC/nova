@@ -663,3 +663,8 @@ class CellsManager(manager.Manager):
         response = self.msg_runner.remove_host_from_aggregate(
             ctxt, cell_name, aggregate_id, host_name)
         return self._response_to_aggregate(response)
+
+    def flavor_create(self, ctxt, cell_name, values):
+        response = self.msg_runner.flavor_create(ctxt,
+                                            cell_name, values)
+        return response.value_or_raise()
