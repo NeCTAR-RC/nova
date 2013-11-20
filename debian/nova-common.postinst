@@ -15,7 +15,7 @@ if [ "$1" = "configure" ]; then
 
     if [ -z "$2" ]; then
       # New install - blanket permissions
-      chown -R nova:nova /var/lib/nova/
+      find /var/lib/nova/ -path /var/lib/nova/instances -prune -o -exec chown nova:nova {} \;
     elif dpkg --compare-versions "$2" lt "2011.3-0ubuntu4"; then
       # make sure that LXC rootfs mount points are excleuded
       # during upgrades from previous versions
@@ -41,7 +41,7 @@ if [ "$1" = "configure" ]; then
 
     if [ -z "$2" ]; then
         # New install - blanket permissions
-        chown -R nova:nova /var/lib/nova/
+        find /var/lib/nova/ -path /var/lib/nova/instances -prune -o -exec chown nova:nova {} \;
     elif dpkg --compare-versions "$2" lt "2011.3-0ubuntu4"; then
         # Make sure the LXC rootfs mount points are excluded
         # during upgrades from previous versions
@@ -60,11 +60,11 @@ if [ "$1" = "configure" ]; then
     chown root:root /etc/nova/rootwrap.d
     chmod 0755 /etc/nova/rootwrap.d
 
-    if ! grep -qE "^(sql_)?connection( )?=.*" /etc/nova/nova.conf || \
-         grep -qE "^(sql_)?connection.*sqlite.*" /etc/nova/nova.conf
-    then
-      su -s /bin/sh -c 'nova-manage db sync' nova
-    fi
+    #if ! grep -qE "^(sql_)?connection( )?=.*" /etc/nova/nova.conf || \
+    #     grep -qE "^(sql_)?connection.*sqlite.*" /etc/nova/nova.conf
+    #then
+    #  su -s /bin/sh -c 'nova-manage db sync' nova
+    #fi
 
     if [ -e /var/lib/nova/nova.sqlite ]
     then
