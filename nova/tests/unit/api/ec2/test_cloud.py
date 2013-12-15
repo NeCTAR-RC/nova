@@ -957,7 +957,7 @@ class CloudTestCase(test.TestCase):
         instance = result['instancesSet'][0]
         self.assertEqual(instance['instanceId'], instance_id)
         self.assertEqual(instance['placement']['availabilityZone'], 'zone2')
-        self.assertEqual(instance['ipAddress'], '1.2.3.4')
+        self.assertEqual(instance['ipAddress'], '192.168.0.3')
         self.assertEqual(instance['dnsName'], '1.2.3.4')
         self.assertEqual(instance['tagSet'], [])
         self.assertEqual(instance['privateDnsName'], 'server-4321')
@@ -1087,7 +1087,7 @@ class CloudTestCase(test.TestCase):
                               'instanceState': {'code': 16,
                                                 'name': 'running'},
                               'instanceType': flavor.name,
-                              'ipAddress': '1.2.3.4',
+                              'ipAddress': '192.168.0.3',
                               'keyName': 'None (None, host1)',
                               'launchTime':
                                   datetime.datetime(2012, 5, 1, 1, 1, 1,
@@ -1118,7 +1118,7 @@ class CloudTestCase(test.TestCase):
                                'instanceState': {'code': 16,
                                                  'name': 'running'},
                                'instanceType': flavor.name,
-                               'ipAddress': '1.2.3.4',
+                               'ipAddress': '192.168.0.3',
                                'keyName': u'None (None, host2)',
                                'launchTime':
                                    datetime.datetime(2012, 5, 1, 1, 1, 2,
@@ -1351,7 +1351,7 @@ class CloudTestCase(test.TestCase):
         instance = result['instancesSet'][0]
         instance_id = ec2utils.id_to_ec2_inst_id(inst.uuid)
         self.assertEqual(instance['instanceId'], instance_id)
-        self.assertEqual(instance['ipAddress'], '1.2.3.4')
+        self.assertEqual(instance['ipAddress'], '192.168.0.3')
         self.assertEqual(instance['dnsName'], '1.2.3.4')
         self.assertEqual(instance['privateDnsName'], 'server-1234')
         self.assertEqual(instance['privateIpAddress'], '192.168.0.3')

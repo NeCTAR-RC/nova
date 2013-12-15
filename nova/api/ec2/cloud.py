@@ -1232,8 +1232,7 @@ class CloudController(object):
             else:
                 i['privateDnsName'] = instance.hostname
             i['privateIpAddress'] = fixed_ip
-            if floating_ip is not None:
-                i['ipAddress'] = floating_ip
+            i['ipAddress'] = fixed_ip
             i['dnsName'] = floating_ip
             i['keyName'] = instance.key_name
             i['tagSet'] = []
