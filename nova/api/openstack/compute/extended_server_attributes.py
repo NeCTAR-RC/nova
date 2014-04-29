@@ -14,14 +14,19 @@
 
 """The Extended Server Attributes API extension."""
 
+from oslo_config import cfg
+
 from nova.api.openstack import api_version_request
 from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova import compute
+from nova import utils
+
 
 ALIAS = "os-extended-server-attributes"
 authorize = extensions.os_compute_soft_authorizer(ALIAS)
 soft_authorize = extensions.os_compute_soft_authorizer('servers')
+CONF = cfg.CONF
 
 
 class ExtendedServerAttributesController(wsgi.Controller):
@@ -29,6 +34,12 @@ class ExtendedServerAttributesController(wsgi.Controller):
         super(ExtendedServerAttributesController, self).__init__(*args,
                                                                  **kwargs)
         self.compute_api = compute.API(skip_policy_check=True)
+
+    def _get_hypervisor_instance_name(self, context, instance):
+        if not CONF.cells.enable:
+            return instance['name']
+        sys_metadata = utils.instance_sys_meta(instance)
+        return sys_metadata.get('instance_name', '')
 
     def _extend_server(self, context, server, instance, req):
         key = "OS-EXT-SRV-ATTR:hypervisor_hostname"
@@ -47,6 +58,9 @@ class ExtendedServerAttributesController(wsgi.Controller):
         for attr in properties:
             if attr == 'name':
                 key = "OS-EXT-SRV-ATTR:instance_%s" % attr
+                server[key] = self._get_hypervisor_instance_name(context,
+                                                                 instance)
+                continue
             else:
                 # NOTE(mriedem): Nothing after microversion 2.3 should use the
                 # OS-EXT-SRV-ATTR prefix for the attribute key name.
