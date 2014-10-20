@@ -1142,7 +1142,7 @@ class CellServiceAPIMethodNotFound(NotFound):
 
 
 class CellTimeout(NotFound):
-    msg_fmt = _("Timeout waiting for response from cell")
+    msg_fmt = _("Timeout waiting for response from cell %(cell_name)s")
 
 
 class CellMaxHopCountReached(NovaException):
