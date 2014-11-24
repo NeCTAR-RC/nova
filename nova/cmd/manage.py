@@ -70,6 +70,8 @@ import six
 
 from nova.api.ec2 import ec2utils
 from nova import availability_zones
+
+from nova.cmd import nectar
 from nova import config
 from nova import context
 from nova import db
@@ -1321,6 +1323,7 @@ CATEGORIES = {
     'shell': ShellCommands,
     'vm': VmCommands,
     'vpn': VpnCommands,
+    'nectar': nectar.NectarCommands,
 }
 
 
