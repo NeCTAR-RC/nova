@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1af78d9a_6e82ef01",
+        "filename": "nova/cmd/manage.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 1275,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2014-11-24T03:41:55Z",
+      "side": 1,
+      "message": "Why not call this \u0027volume\u0027 since it\u0027s not nectar specific? And possibly push it upstream?",
+      "revId": "e62e31e9f1c9c9ea698e7cc6aeb631cbb9730031",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
