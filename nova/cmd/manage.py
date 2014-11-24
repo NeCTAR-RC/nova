@@ -64,6 +64,7 @@ import six
 
 from nova.api.ec2 import ec2utils
 from nova import availability_zones
+from nova.cmd import nectar
 from nova.cells import rpcapi as cell_rpcapi
 from nova.compute import flavors
 from nova import config
@@ -1271,6 +1272,7 @@ CATEGORIES = {
     'shell': ShellCommands,
     'vm': VmCommands,
     'vpn': VpnCommands,
+    'nectar': nectar.NectarCommands,
 }
 
 
