@@ -16,6 +16,29 @@
       "revId": "dd0b7694443975390c56e79d8f905f5694ea2525",
       "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1af78d9a_2e12a7b4",
+        "filename": "nova/tests/cells/test_cells_state_manager.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 1000084
+      },
+      "writtenOn": "2014-11-25T03:03:49Z",
+      "side": 1,
+      "message": "what the fuck mutating a global?\n\nyou could patch this or just accept the fact there are 4 hosts.",
+      "range": {
+        "startLine": 126,
+        "startChar": 8,
+        "endLine": 126,
+        "endChar": 27
+      },
+      "revId": "dd0b7694443975390c56e79d8f905f5694ea2525",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
     }
   ]
 }
