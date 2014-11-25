@@ -33,7 +33,7 @@ CONF.import_opt('rpc_driver_queue_base', 'nova.cells.rpc_driver',
                 group='cells')
 
 
-class CellsRPCDriverTestCase(test.NoDBTestCase):
+class CellsRPCDriverTestCase(test.TestCase):
     """Test case for Cells communication via RPC."""
 
     def setUp(self):

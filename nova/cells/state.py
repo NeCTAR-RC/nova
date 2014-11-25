@@ -46,6 +46,9 @@ cell_state_manager_opts = [
                    help='Configuration file from which to read cells '
                    'configuration.  If given, overrides reading cells '
                    'from the database.'),
+        cfg.StrOpt('capacity_aggregate_key',
+                   help='Aggregate key to limit capacity reporting to '
+                   'certain hosts'),
 ]
 
 
@@ -261,12 +264,19 @@ class CellStateManager(base.Base):
         compute_hosts = {}
 
         def _get_compute_hosts():
+            aggr_nodes = None
+            if CONF.cells.capacity_aggregate_key:
+                aggr_nodes = self.db.aggregate_host_get_by_metadata_key(
+                    ctxt, key=CONF.cells.capacity_aggregate_key).keys()
+
             compute_nodes = self.db.compute_node_get_all(ctxt)
             for compute in compute_nodes:
                 service = compute['service']
                 if not service or service['disabled']:
                     continue
                 host = service['host']
+                if aggr_nodes is not None and host not in aggr_nodes:
+                    continue
                 compute_hosts[host] = {
                         'free_ram_mb': compute['free_ram_mb'],
                         'free_disk_mb': compute['free_disk_gb'] * 1024,
