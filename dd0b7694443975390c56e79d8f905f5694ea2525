@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1af78d9a_ee489fce",
+        "filename": "nova/cells/state.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 278,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2014-11-25T02:53:14Z",
+      "side": 1,
+      "message": "aggr_nodes isn\u0027t defined when the config opt isn\u0027t set. You can probably set it to None and then check for None here to avoid getting out of the conf again.",
+      "revId": "dd0b7694443975390c56e79d8f905f5694ea2525",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
