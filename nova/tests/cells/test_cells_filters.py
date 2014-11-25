@@ -32,7 +32,7 @@ class FiltersTestCase(test.NoDBTestCase):
         self.assertIn("TargetCellFilter", class_names)
 
 
-class _FilterTestClass(test.NoDBTestCase):
+class _FilterTestClass(test.TestCase):
     """Base class for testing individual filter plugins."""
     filter_cls_name = None
 
