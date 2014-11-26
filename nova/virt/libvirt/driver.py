@@ -1373,7 +1373,7 @@ class LibvirtDriver(driver.ComputeDriver):
             virt_dom = self._lookup_by_name(instance_name)
             xml = self._get_disk_xml(virt_dom.XMLDesc(0), disk_dev)
             if not xml:
-                raise exception.DiskNotFound(location=disk_dev)
+                LOG.warn("Device %s unknow to virt, continuing" % disk_dev)
             else:
                 # NOTE(vish): We can always affect config because our
                 #             domains are persistent, but we should only
