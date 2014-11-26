@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1af78d9a_ce8fa3cb",
+        "filename": "nova/virt/libvirt/driver.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1376,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2014-11-26T01:12:13Z",
+      "side": 1,
+      "message": "UNKNOW",
+      "revId": "566af76fd864189e79e23930d7fb2bc9a5507844",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
