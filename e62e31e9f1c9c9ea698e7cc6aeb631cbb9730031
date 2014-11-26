@@ -16,6 +16,24 @@
       "revId": "e62e31e9f1c9c9ea698e7cc6aeb631cbb9730031",
       "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1af78d9a_6e44af74",
+        "filename": "nova/cmd/manage.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 1275,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2014-11-26T02:55:13Z",
+      "side": 1,
+      "message": "I thought there might be more nectar stuff we might want to push into here. Upstreaming is a good idea too but I want to get this in our code quickly so operators can fix this asap",
+      "parentUuid": "1af78d9a_6e82ef01",
+      "revId": "e62e31e9f1c9c9ea698e7cc6aeb631cbb9730031",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
     }
   ]
 }
