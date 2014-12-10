@@ -1489,8 +1489,7 @@ class API(base.Base):
                 if self.servicegroup_api.service_is_up(service):
                     is_up = True
 
-                    if original_task_state in (task_states.DELETING,
-                                                  task_states.SOFT_DELETING):
+                    if original_task_state in (task_states.SOFT_DELETING):
                         LOG.info(_('Instance is already in deleting state, '
                                    'ignoring this request'), instance=instance)
                         if reservations:
