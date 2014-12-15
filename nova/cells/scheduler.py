@@ -277,14 +277,16 @@ class CellsScheduler(base.Base):
         try:
             for i in xrange(max(0, CONF.cells.scheduler_retries) + 1):
                 try:
+                    instances = method_kwargs.get('instances', [])
+                    availability_zone = [ins.get('availability_zone', None)
+                                         for ins in instances]
+                    our_azs = self.state_manager.get_my_state()\
+                                .capabilities.get('availability_zones', [])
+                    if CONF.internal_service_availability_zone in our_azs:
+                        our_azs.remove(CONF.internal_service_availability_zone)
 
-                    if self.state_manager.get_child_cells():
-                        instances = method_kwargs.get('instances', [])
-                        availability_zone = [ins.get('availability_zone', None)
-                                             for ins in instances]
-                        our_azs = self.state_manager.get_my_state()\
-                                    .capabilities.get('availability_zones', [])
-
+                    parent_cell = bool(self.state_manager.get_child_cells())
+                    if parent_cell:
                         # Try deprecated scheduler hint
                         if not any(availability_zone):
                             filter_props = method_kwargs.get(
@@ -297,13 +299,17 @@ class CellsScheduler(base.Base):
                             if scheduler_hints and cell_scheduled in our_azs:
                                 scheduler_hints.pop('cell')
 
-                        # If the instance is scheduled for our cell,
-                        # then remove the AZ from the instance.
-                        for instance in instances:
-                            az = instance.get('availability_zone', None)
-                            if az in our_azs:
+                    # If the instance is scheduled for our cell,
+                    # then remove the AZ from the instance.
+                    # If we're the bottom cell then the requested AZ must
+                    # be in our list of AZs. If it's not, just remove it.
+                    for instance in instances:
+                        az = instance.get('availability_zone', None)
+                        if ((parent_cell and az in our_azs) or
+                                (not parent_cell and az not in our_azs)):
+                            if 'availability_zone' in instance:
                                 instance.pop('availability_zone')
-                                filter_properties['request_spec']['instance_properties']['availability_zone'] = None
+                            filter_properties['request_spec']['instance_properties']['availability_zone'] = None
 
                     target_cells = self._grab_target_cells(filter_properties)
                     if target_cells is None:
