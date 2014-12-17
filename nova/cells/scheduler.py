@@ -282,10 +282,11 @@ class CellsScheduler(base.Base):
                                          for ins in instances]
                     our_azs = self.state_manager.get_my_state()\
                                 .capabilities.get('availability_zones', [])
-                    if CONF.internal_service_availability_zone in our_azs:
-                        our_azs.remove(CONF.internal_service_availability_zone)
 
                     parent_cell = bool(self.state_manager.get_child_cells())
+                    if not parent_cell and CONF.internal_service_availability_zone in our_azs:
+                        our_azs.remove(CONF.internal_service_availability_zone)
+
                     if parent_cell:
                         # Try deprecated scheduler hint
                         if not any(availability_zone):
@@ -307,7 +308,7 @@ class CellsScheduler(base.Base):
                         az = instance.get('availability_zone', None)
                         if ((parent_cell and az in our_azs) or
                                 (not parent_cell and az not in our_azs)):
-                            if 'availability_zone' in instance:
+                            if 'availabilty_zone' in instance:
                                 instance.pop('availability_zone')
                             try:
                                 filter_properties['request_spec']['instance_properties']['availability_zone'] = None
