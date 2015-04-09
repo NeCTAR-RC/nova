@@ -921,6 +921,18 @@ class _TargetedMessageMethods(_BaseMessageMethods):
                                         clean_shutdown=clean_shutdown,
                                         **extra_instance_updates)
 
+    def attach_interface(self, message, instance, network_id, port_id,
+                         requested_ip):
+        return self._call_compute_api_with_obj(message.ctxt, instance,
+                                               'attach_interface',
+                                               network_id=network_id,
+                                               port_id=port_id,
+                                               requested_ip=requested_ip)
+
+    def detach_interface(self, message, instance, port_id):
+        self._call_compute_api_with_obj(message.ctxt, instance,
+                                        'detach_interface', port_id=port_id)
+
     def live_migrate_instance(self, message, instance, block_migration,
                               disk_over_commit, host_name):
         """Live migrate an instance via compute_api.live_migrate()."""
@@ -2052,6 +2064,20 @@ class MessageRunner(object):
                             extra_instance_updates=extra_instance_updates,
                             clean_shutdown=clean_shutdown)
         self._instance_action(ctxt, instance, 'resize_instance',
+                              extra_kwargs=extra_kwargs)
+
+    def attach_interface(self, ctxt, instance, network_id,
+                       port_id, requested_ip):
+        extra_kwargs = dict(network_id=network_id,
+                            port_id=port_id,
+                            requested_ip=requested_ip)
+        return self._instance_action(ctxt, instance, 'attach_interface',
+                                    extra_kwargs=extra_kwargs,
+                                    need_response=True)
+
+    def detach_interface(self, ctxt, instance, port_id):
+        extra_kwargs = dict(port_id=port_id)
+        self._instance_action(ctxt, instance, 'detach_interface',
                               extra_kwargs=extra_kwargs)
 
     def live_migrate_instance(self, ctxt, instance, block_migration,
