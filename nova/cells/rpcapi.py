@@ -793,3 +793,23 @@ class CellsAPI(object):
                    instances=instances,
                    events=events)
 
+    def attach_interface(self, ctxt, instance, network_id, port_id,
+                         requested_ip):
+
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24.1')
+        return cctxt.call(ctxt, 'attach_interface',
+                          instance=instance,
+                          network_id=network_id,
+                          port_id=port_id,
+                          requested_ip=requested_ip)
+
+    def detach_interface(self, ctxt, instance, port_id):
+
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24.1')
+        cctxt.cast(ctxt, 'detach_interface',
+                   instance=instance,
+                   port_id=port_id)
