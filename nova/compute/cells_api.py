@@ -25,6 +25,7 @@ from nova.cells import utils as cells_utils
 from nova.compute import api as compute_api
 from nova.compute import rpcapi as compute_rpcapi
 from nova import exception
+from nova.network.security_group import openstack_driver
 from nova import objects
 from nova.objects import base as obj_base
 from nova.objects import instance as instance_obj
@@ -170,7 +171,8 @@ class ComputeCellsAPI(compute_api.API):
         self.compute_rpcapi = ComputeRPCAPIRedirect(self.cells_rpcapi)
         # Redirect conductor build_instances to cells
         self._compute_task_api = ConductorTaskRPCAPIRedirect(self.cells_rpcapi)
-        self.security_group_api = SecurityGroupAPI()
+        if not openstack_driver.is_neutron_security_groups():
+            self.security_group_api = SecurityGroupAPI()
         self._cell_type = 'api'
 
     def _cast_to_cells(self, context, instance, method, *args, **kwargs):
