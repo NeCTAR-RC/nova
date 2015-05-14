@@ -665,7 +665,6 @@ class LinuxNetworkTestCase(test.NoDBTestCase):
             '--bind-interfaces',
             '--conf-file=%s' % CONF.dnsmasq_config_file,
             '--pid-file=%s' % linux_net._dhcp_file(dev, 'pid'),
-            '--dhcp-optsfile=%s' % linux_net._dhcp_file(dev, 'opts'),
             '--listen-address=%s' % network_ref['dhcp_server'],
             '--except-interface=lo',
             "--dhcp-range=set:%s,%s,static,%s,%ss" % (network_ref['label'],

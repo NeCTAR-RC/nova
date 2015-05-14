@@ -1094,7 +1094,6 @@ def restart_dhcp(context, dev, network_ref, fixedips):
            '--bind-interfaces',
            '--conf-file=%s' % CONF.dnsmasq_config_file,
            '--pid-file=%s' % _dhcp_file(dev, 'pid'),
-           '--dhcp-optsfile=%s' % _dhcp_file(dev, 'opts'),
            '--listen-address=%s' % network_ref['dhcp_server'],
            '--except-interface=lo',
            '--dhcp-range=set:%s,%s,static,%s,%ss' %
