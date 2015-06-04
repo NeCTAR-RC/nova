@@ -100,6 +100,10 @@ linux_net_opts = [
     cfg.BoolOpt('disable_dhcp_opts',
                 default=False,
                 help="Don't use dhcp_opts file for dnsmasq"),
+    cfg.BoolOpt('per_network_dhcp_conf',
+                default=False,
+                help='Additional config for particular networks.'
+                     'Uses [dnsmasq_config_file].[dev]'),
     cfg.MultiStrOpt('forward_bridge_interface',
                     default=['all'],
                     help='An interface that bridges can forward to. If this '
@@ -1112,6 +1116,8 @@ def restart_dhcp(context, dev, network_ref, fixedips):
 
     if not CONF.disable_dhcp_opts:
         cmd.append('--dhcp-optsfile=%s' % _dhcp_file(dev, 'opts'))
+    if CONF.per_network_dhcp_conf:
+        cmd.append('--dhcp-optsfile=%s.%s' % (CONF.dnsmasq_config_file, dev))
 
     # dnsmasq currently gives an error for an empty domain,
     # rather than ignoring.  So only specify it if defined.
