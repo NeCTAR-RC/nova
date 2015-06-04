@@ -22,6 +22,30 @@
       "revId": "e8612be431237dbe0d09c1d447d5516f522652c9",
       "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba1f61a0_9cc0357e",
+        "filename": "nova/network/linux_net.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1119,
+      "author": {
+        "id": 1000088
+      },
+      "writtenOn": "2015-06-04T01:29:45Z",
+      "side": 1,
+      "message": "No, the config file for dhcp_opts is /var/lib/nova/network/nova-\u003cdev_name\u003e.opts which is controlled by nova while the new one is (given our local config) is for a /etc/nova/dnsmasq.conf.\u003cdev_name\u003e",
+      "parentUuid": "ba1f61a0_7ccaa1a2",
+      "range": {
+        "startLine": 1119,
+        "startChar": 4,
+        "endLine": 1119,
+        "endChar": 34
+      },
+      "revId": "e8612be431237dbe0d09c1d447d5516f522652c9",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
     }
   ]
 }
