@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba1f61a0_7ccaa1a2",
+        "filename": "nova/network/linux_net.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1119,
+      "author": {
+        "id": 1000082
+      },
+      "writtenOn": "2015-06-04T01:24:08Z",
+      "side": 1,
+      "message": "shouldn\u0027t this be:\nif not CONF.disable_dhcp_opts and CONF.per_network_dhcp_conf:",
+      "range": {
+        "startLine": 1119,
+        "startChar": 4,
+        "endLine": 1119,
+        "endChar": 34
+      },
+      "revId": "e8612be431237dbe0d09c1d447d5516f522652c9",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
