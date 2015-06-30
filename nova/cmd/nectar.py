@@ -3,7 +3,7 @@ import socket
 from nova import context
 from nova.compute import manager
 from nova.conductor import rpcapi as conductor_rpcapi
-from nova.objects import block_device
+from nova.objects import block_device, instance as instance_obj
 
 
 # Decorators for actions
@@ -22,7 +22,8 @@ class NectarCommands(object):
     def remove_bdm(self, instance, volume):
         ctx = context.get_admin_context()
         c = conductor_rpcapi.ConductorAPI()
-        instance = c.instance_get_by_uuid(ctx, instance)
+        instance = instance_obj.Instance.get_by_uuid(ctx, instance)
+
         if instance['host'] != socket.gethostname():
             print("Instance not running on this host")
             return
