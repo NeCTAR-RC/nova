@@ -937,3 +937,27 @@ class CellsManagerClassTestCase(test.NoDBTestCase):
     def test_remove_host_from_aggregate(self):
         self._test_aggregate_method('remove_host_from_aggregate',
                                     'context', 'fake_cell', 42, 'fake_host')
+
+    def test_get_keypair_at_top(self):
+        keypairs = [self._get_fake_response('fake_keypair'),
+                    self._get_fake_response('fake_keypair2')]
+        with mock.patch.object(self.msg_runner,
+                               'get_keypair_at_top',
+                               return_value=keypairs) as fake_get_keypair:
+            response = self.cells_manager.get_keypair_at_top(self.ctxt,
+                                                             'fake_user_id',
+                                                             'fake_name')
+            fake_get_keypair.assert_called_once_with(self.ctxt, 'fake_user_id',
+                                                     'fake_name')
+            self.assertEqual('fake_keypair', response)
+
+    def test_get_keypair_at_top_with_empty_responses(self):
+        with mock.patch.object(self.msg_runner,
+                               'get_keypair_at_top',
+                               return_value=[]) as fake_get_keypair:
+            self.assertIsNone(
+                self.cells_manager.get_keypair_at_top(self.ctxt,
+                                                      'fake_user_id',
+                                                      'fake_name'))
+            fake_get_keypair.assert_called_once_with(self.ctxt, 'fake_user_id',
+                                                     'fake_name')

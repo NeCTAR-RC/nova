@@ -112,6 +112,9 @@ class CellsAPI(object):
         ... Kilo supports message version 1.34.  So, any changes to
         existing methods in 1.x after that point should be done such that they
         can handle the version_cap being set to 1.34.
+        NECTAR backported this to version 1.34, was 1.37
+        * 1.34 - Add get_keypair_at_top to fetch keypair from api cell
+
     '''
 
     VERSION_ALIASES = {
@@ -775,3 +778,15 @@ class CellsAPI(object):
         cctxt.cast(ctxt, 'external_instance_event',
                    instances=instances,
                    events=events)
+
+    def get_keypair_at_top(self, ctxt, user_id, name):
+        if not CONF.cells.enable:
+            return
+
+        cctxt = self.client.prepare(version='1.34')
+        keypair = cctxt.call(ctxt, 'get_keypair_at_top', user_id=user_id,
+                             name=name)
+        if keypair is None:
+            raise exception.KeypairNotFound(user_id=user_id,
+                                            name=name)
+        return keypair

@@ -716,3 +716,19 @@ class CellsManager(manager.Manager):
     @periodic_task.periodic_task
     def _heal_volume_id_mappings(self, ctxt):
         self._heal_resource(ctxt, 'volume id mappings')
+
+    def get_keypair_at_top(self, ctxt, user_id, name):
+        responses = self.msg_runner.get_keypair_at_top(ctxt, user_id, name)
+        keypairs = [resp.value for resp in responses if resp.value is not None]
+
+        if len(keypairs) == 0:
+            return None
+        elif len(keypairs) > 1:
+            cell_names = ', '.join([resp.cell_name for resp in responses
+                                    if resp.value is not None])
+            LOG.warning(_LW("The same keypair name '%(name)s' exists in the "
+                            "following cells: %(cell_names)s. The keypair "
+                            "value from the first cell is returned."),
+                        {'name': name, 'cell_names': cell_names})
+
+        return keypairs[0]
