@@ -55,6 +55,7 @@ from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import timeutils
 from nova.openstack.common import uuidutils
+from nova import notifications
 from nova import rpc
 from nova import utils
 
@@ -1182,6 +1183,7 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         log_str = _("Got message to create instance fault: "
                     "%(instance_fault)s")
         LOG.debug(log_str, {'instance_fault': instance_fault})
+        notifications.send_cell_instance_fault(message.ctxt, instance_fault)
         fault = objects.InstanceFault(context=message.ctxt)
         fault.update(instance_fault)
         fault.create()

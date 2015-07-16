@@ -104,6 +104,14 @@ def send_api_fault(url, status, exception):
     rpc.get_notifier('api').error(None, 'api.fault', payload)
 
 
+def send_cell_instance_fault(ctxt, fault):
+    """Send an cell.instance.fault notification."""
+
+    payload = fault
+
+    rpc.get_notifier('api').error(ctxt, 'cell.instance.fault', payload)
+
+
 def send_update(context, old_instance, new_instance, service=None, host=None):
     """Send compute.instance.update notification to report any changes occurred
     in that instance
