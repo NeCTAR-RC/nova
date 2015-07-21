@@ -511,7 +511,10 @@ this optional configuration:
         }
     }
 
-""")
+"""),
+    cfg.StrOpt('capacity_aggregate_key',
+               help='Aggregate key to limit capacity reporting to '
+               'certain hosts')
 ]
 
 ALL_CELLS_OPTS = (cells_opts +
