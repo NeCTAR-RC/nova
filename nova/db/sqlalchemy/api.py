@@ -5560,6 +5560,15 @@ def _aggregate_metadata_get_query(context, aggregate_id, session=None,
                 filter_by(aggregate_id=aggregate_id)
 
 
+def aggregate_host_get_by_metadata_key(context, key):
+    rows = aggregate_get_by_metadata_key(context, key)
+    metadata = collections.defaultdict(set)
+    for agg in rows:
+        for agghost in agg._hosts:
+            metadata[agghost.host].add(agg._metadata[0]['value'])
+    return dict(metadata)
+
+
 @require_aggregate_exists
 def aggregate_metadata_get(context, aggregate_id):
     rows = model_query(context,

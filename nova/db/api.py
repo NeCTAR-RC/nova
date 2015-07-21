@@ -1765,6 +1765,15 @@ def aggregate_host_delete(context, aggregate_id, host):
     IMPL.aggregate_host_delete(context, aggregate_id, host)
 
 
+def aggregate_host_get_by_metadata_key(context, key):
+    """Get hosts with a specific metadata key metadata for all aggregates.
+
+    Returns a dictionary where each key is a hostname and each value is a set
+    of the key values
+    return value:  {machine: set( az1, az2 )}
+    """
+    return IMPL.aggregate_host_get_by_metadata_key(context, key)
+
 ####################
 
 
