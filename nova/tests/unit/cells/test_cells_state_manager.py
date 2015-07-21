@@ -190,6 +190,37 @@ class TestCellsStateManager(test.NoDBTestCase):
         units = 2  # 2 on host 3
         self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
 
+    @mock.patch.object(db, 'aggregate_host_get_by_metadata_key')
+    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_host):
+        cfg.CONF.set_override('capacity_aggregate_key', 'fakekey', 'cells')
+        # Fake an aggregate containing host 1-3
+        mock_aggregate_host.return_value = {
+            'host1': set([True]),
+            'host2': set([True]),
+            'host3': set([True]),
+        }
+        fake_computes_with_aggr = FAKE_COMPUTES[:-1]
+
+        # utilize entire cell
+        cap = self._capacity(0.0)
+
+        cell_free_ram = sum(compute[3] for compute in fake_computes_with_aggr)
+        self.assertEqual(cell_free_ram, cap['ram_free']['total_mb'])
+
+        cell_free_disk = 1024 * sum(compute[4] for compute in
+                                    fake_computes_with_aggr)
+        self.assertEqual(cell_free_disk, cap['disk_free']['total_mb'])
+
+        self.assertEqual(0, cap['ram_free']['units_by_mb']['0'])
+        self.assertEqual(0, cap['disk_free']['units_by_mb']['0'])
+
+        units = cell_free_ram / 50
+        self.assertEqual(units, cap['ram_free']['units_by_mb']['50'])
+
+        sz = 25 * 1024
+        units = 4  # 4 on host 3
+        self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
+
     def _get_state_manager(self, reserve_percent=0.0):
         self.flags(reserve_percent=reserve_percent, group='cells')
         return state.CellStateManager()
@@ -226,6 +257,36 @@ class TestCellsStateManagerNToOne(TestCellsStateManager):
 
         sz = 25 * 1024
         units = 1  # 1 on host 2
+        self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
+
+    @mock.patch.object(db, 'aggregate_host_get_by_metadata_key')
+    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_host):
+        cfg.CONF.set_override('capacity_aggregate_key', 'fakekey', 'cells')
+        # Fake an aggregate containing host 1-3
+        mock_aggregate_host.return_value = {
+            'host1': set([True]),
+            'host2': set([True]),
+        }
+        fake_computes_with_aggr = FAKE_COMPUTES_N_TO_ONE
+
+        # utilize entire cell
+        cap = self._capacity(0.0)
+
+        cell_free_ram = sum(compute[3] for compute in fake_computes_with_aggr)
+        self.assertEqual(cell_free_ram, cap['ram_free']['total_mb'])
+
+        cell_free_disk = 1024 * sum(compute[4] for compute in
+                                    fake_computes_with_aggr)
+        self.assertEqual(cell_free_disk, cap['disk_free']['total_mb'])
+
+        self.assertEqual(0, cap['ram_free']['units_by_mb']['0'])
+        self.assertEqual(0, cap['disk_free']['units_by_mb']['0'])
+
+        units = cell_free_ram / 50
+        self.assertEqual(units, cap['ram_free']['units_by_mb']['50'])
+
+        sz = 25 * 1024
+        units = 5
         self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
 
 

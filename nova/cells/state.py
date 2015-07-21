@@ -48,6 +48,9 @@ cell_state_manager_opts = [
                help='Configuration file from which to read cells '
                'configuration.  If given, overrides reading cells '
                'from the database.'),
+    cfg.StrOpt('capacity_aggregate_key',
+               help='Aggregate key to limit capacity reporting to '
+               'certain hosts'),
 ]
 
 
@@ -266,6 +269,11 @@ class CellStateManager(base.Base):
         compute_hosts = collections.defaultdict(_defaultdict_int)
 
         def _get_compute_hosts():
+            aggr_nodes = None
+            if CONF.cells.capacity_aggregate_key:
+                aggr_nodes = self.db.aggregate_host_get_by_metadata_key(
+                    ctxt, key=CONF.cells.capacity_aggregate_key).keys()
+
             service_refs = {service.host: service
                             for service in objects.ServiceList.get_by_binary(
                                 ctxt, 'nova-compute')}
@@ -273,6 +281,8 @@ class CellStateManager(base.Base):
             compute_nodes = objects.ComputeNodeList.get_all(ctxt)
             for compute in compute_nodes:
                 host = compute.host
+                if aggr_nodes is not None and host not in aggr_nodes:
+                    continue
                 service = service_refs.get(host)
                 if not service or service['disabled']:
                     continue
