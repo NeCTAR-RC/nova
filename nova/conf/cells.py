@@ -726,7 +726,10 @@ Services which consume this:
 Related options:
 
 * None
-""")
+"""),
+    cfg.StrOpt('capacity_aggregate_key',
+               help='Aggregate key to limit capacity reporting to '
+               'certain hosts')
 ]
 
 
