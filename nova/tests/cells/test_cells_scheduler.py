@@ -328,7 +328,7 @@ class CellsSchedulerTestCase(test.TestCase):
         method_kwargs = {
                 'image': 'fake_image',
                 'instances': instances,
-                'filter_properties': {}}
+                'filter_properties': {'instance_type': {}}}
 
         call_info = {'num_tries': 0,
                      'errored_uuids1': [],
