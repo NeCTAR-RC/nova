@@ -660,6 +660,20 @@ class _TargetedMessageMethods(_BaseMessageMethods):
 
     def build_instances(self, message, build_inst_kwargs):
         """Parent cell told us to schedule new instance creation."""
+
+        # NOTE(sorrison): Handle post-1.30 build_instances() call.
+        # Kilo sends us objects when we expect primitive
+        filter_properties = build_inst_kwargs.get('filter_properties')
+        if (filter_properties is not None and
+            isinstance(filter_properties['instance_type'],
+                       objects.Flavor)):
+            flavor = objects_base.obj_to_primitive(filter_properties['instance_type'])
+            build_inst_kwargs['filter_properties'] = dict(
+                filter_properties, instance_type=flavor)
+        instances = build_inst_kwargs['instances']
+        if isinstance(instances[0], objects.Instance):
+            build_inst_kwargs['instances'] = objects_base.obj_to_primitive(instances)
+
         self.msg_runner.scheduler.build_instances(message, build_inst_kwargs)
 
     def _run_api_method(self, message, method_info, fn):

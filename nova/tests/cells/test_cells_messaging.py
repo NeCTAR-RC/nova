@@ -652,9 +652,10 @@ class CellsTargetedMethodsTestCase(test.TestCase):
         self.tgt_a_api = methods_cls.aggregate_api
 
     def test_build_instances(self):
-        build_inst_kwargs = {'filter_properties': {},
+        build_inst_kwargs = {'filter_properties': {'instance_type': {}},
                              'key1': 'value1',
-                             'key2': 'value2'}
+                             'key2': 'value2',
+                             'instances': ['fake_instance']}
         self.mox.StubOutWithMock(self.tgt_scheduler, 'build_instances')
         self.tgt_scheduler.build_instances(self.ctxt, build_inst_kwargs)
         self.mox.ReplayAll()

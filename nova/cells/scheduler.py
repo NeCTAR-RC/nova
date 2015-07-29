@@ -95,8 +95,8 @@ class CellsScheduler(base.Base):
         # instance record.
         instance_values.pop('id')
         instance_values.pop('name')
-        instance_values.pop('info_cache')
-        instance_values.pop('security_groups')
+        instance_values.pop('info_cache', None)
+        instance_values.pop('security_groups', None)
 
         instances = []
         num_instances = len(instance_uuids)
