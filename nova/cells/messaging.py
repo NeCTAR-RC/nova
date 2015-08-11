@@ -894,7 +894,7 @@ class _TargetedMessageMethods(_BaseMessageMethods):
     def external_instance_event(self, message, instances, events):
         return self.compute_api.external_instance_event(message.ctxt, instances, events)
 
-    def stop_instance(self, message, instance):
+    def stop_instance(self, message, instance, clean_shutdown=True):
         """Stop an instance via compute_api.stop()."""
         do_cast = not message.need_response
         return self._call_compute_api_with_obj(message.ctxt, instance,
@@ -2026,7 +2026,7 @@ class MessageRunner(object):
         """Start an instance in its cell."""
         self._instance_action(ctxt, instance, 'start_instance')
 
-    def stop_instance(self, ctxt, instance, do_cast=True):
+    def stop_instance(self, ctxt, instance, do_cast=True, clean_shutdown=True):
         """Stop an instance in its cell."""
         if do_cast:
             self._instance_action(ctxt, instance, 'stop_instance')
