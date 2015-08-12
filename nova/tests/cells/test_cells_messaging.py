@@ -655,6 +655,7 @@ class CellsTargetedMethodsTestCase(test.TestCase):
         build_inst_kwargs = {'filter_properties': {'instance_type': {}},
                              'key1': 'value1',
                              'key2': 'value2',
+                             'block_device_mapping': [{'fake-bdm'}],
                              'instances': ['fake_instance']}
         self.mox.StubOutWithMock(self.tgt_scheduler, 'build_instances')
         self.tgt_scheduler.build_instances(self.ctxt, build_inst_kwargs)
