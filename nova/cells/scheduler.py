@@ -100,7 +100,7 @@ class CellsScheduler(base.Base):
         # sent in a useful form. Since it was getting ignored for cells
         # before it was part of the Instance, skip it now until cells RPC
         # is sending proper instance objects.
-        instance_values.pop('pci_requests', None)
+        pci_requests = instance_values.pop('pci_requests', None)
 
         instances = []
         num_instances = len(instance_uuids)
@@ -121,7 +121,14 @@ class CellsScheduler(base.Base):
                     num_instances, i)
 
             instances.append(instance)
+            if pci_requests:
+                instance_pci_requests = \
+                            objects.InstancePCIRequests.get_by_instance_uuid(
+                                ctxt, instance_uuid)
+                instance_pci_requests.requests = pci_requests['requests']
+                instance_pci_requests.save()
             self.msg_runner.instance_update_at_top(ctxt, instance)
+
         return instances
 
     def _create_action_here(self, ctxt, instance_uuids):
