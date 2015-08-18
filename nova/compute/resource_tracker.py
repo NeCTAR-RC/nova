@@ -394,7 +394,11 @@ class ResourceTracker(object):
 
         # initialise the compute node object, creating it
         # if it does not already exist.
-        self._init_compute_node(context, resources)
+        # This is broken in Kilo/Juno env
+        try:
+            self._init_compute_node(context, resources)
+        except:
+            pass
 
         # if we could not init the compute node the tracker will be
         # disabled and we should quit now
