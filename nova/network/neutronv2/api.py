@@ -579,7 +579,8 @@ class API(base_api.NetworkAPI):
             context, instance, networks=nets_in_requested_order,
             port_ids=ports_in_requested_order,
             admin_client=admin_client,
-            preexisting_port_ids=preexisting_port_ids)
+            preexisting_port_ids=preexisting_port_ids,
+            update_cells=True)
         # NOTE(danms): Only return info about ports we created in this run.
         # In the initial allocation case, this will be everything we created,
         # and in later runs will only be what was created that time. Thus,
@@ -716,7 +717,7 @@ class API(base_api.NetworkAPI):
         else:
             self._delete_ports(neutron, instance, [port_id],
                                raise_if_fail=True)
-        return self.get_instance_nw_info(context, instance)
+        return self.get_instance_nw_info(context, instance, update_cells=True)
 
     def list_ports(self, context, **search_opts):
         """List ports for the client based on search options."""
@@ -734,7 +735,8 @@ class API(base_api.NetworkAPI):
     def get_instance_nw_info(self, context, instance, networks=None,
                              port_ids=None, use_slave=False,
                              admin_client=None,
-                             preexisting_port_ids=None):
+                             preexisting_port_ids=None,
+                             update_cells=False):
         """Return network information for specified instance
            and update cache.
         """
@@ -748,7 +750,7 @@ class API(base_api.NetworkAPI):
             base_api.update_instance_cache_with_nw_info(self, context,
                                                         instance,
                                                         nw_info=result,
-                                                        update_cells=False)
+                                                        update_cells=update_cells)
         return result
 
     def _get_instance_nw_info(self, context, instance, networks=None,
