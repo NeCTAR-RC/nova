@@ -174,6 +174,9 @@ class InterfaceAttachmentController(wsgi.Controller):
             raise exc.HTTPNotFound(explanation=e.format_message())
         except NotImplementedError:
             common.raise_feature_not_supported()
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                    'detach_interface')
 
         ports = data.get('ports', [])
         results = [entity_maker(port) for port in ports]

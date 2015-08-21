@@ -3165,6 +3165,26 @@ class API(base.Base):
                 self.volume_api.roll_detaching(context, old_volume['id'])
                 self.volume_api.unreserve_volume(context, new_volume['id'])
 
+    def _attach_interface(self, context, instance, network_id, port_id,
+                          requested_ip):
+        """Use hotplug to add a network adapter to an instance.
+
+        This method is separated to make it possible for cells version
+        to override it.
+        """
+        return self.compute_rpcapi.attach_interface(context,
+            instance=instance, network_id=network_id, port_id=port_id,
+            requested_ip=requested_ip)
+
+    def _detach_interface(self, context, instance, port_id):
+        """Detach a network adapter from an instance.
+
+        This method is separated to make it possible for cells version
+        to override it.
+        """
+        self.compute_rpcapi.detach_interface(context, instance=instance,
+            port_id=port_id)
+
     @wrap_check_policy
     @check_instance_lock
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.PAUSED,
@@ -3173,9 +3193,8 @@ class API(base.Base):
     def attach_interface(self, context, instance, network_id, port_id,
                          requested_ip):
         """Use hotplug to add an network adapter to an instance."""
-        return self.compute_rpcapi.attach_interface(context,
-            instance=instance, network_id=network_id, port_id=port_id,
-            requested_ip=requested_ip)
+        return self._attach_interface(context, instance=instance,
+            network_id=network_id, port_id=port_id, requested_ip=requested_ip)
 
     @wrap_check_policy
     @check_instance_lock
@@ -3184,8 +3203,7 @@ class API(base.Base):
                           task_state=[None])
     def detach_interface(self, context, instance, port_id):
         """Detach an network adapter from an instance."""
-        self.compute_rpcapi.detach_interface(context, instance=instance,
-            port_id=port_id)
+        self._detach_interface(context, instance=instance, port_id=port_id)
 
     @wrap_check_policy
     def get_instance_metadata(self, context, instance):

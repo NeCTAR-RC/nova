@@ -182,6 +182,9 @@ class InterfaceAttachmentController(object):
         except NotImplementedError:
             msg = _("Network driver does not support this function.")
             raise webob.exc.HTTPNotImplemented(explanation=msg)
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                    'detach_interface')
 
         ports = data.get('ports', [])
         results = [entity_maker(port) for port in ports]
