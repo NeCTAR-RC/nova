@@ -1239,7 +1239,7 @@ class API(base_api.NetworkAPI):
             LOG.debug('VirtualInterface not found for port: %s',
                       port_id, instance=instance)
 
-        return self.get_instance_nw_info(context, instance)
+        return self.get_instance_nw_info(context, instance, update_cells=True)
 
     def list_ports(self, context, **search_opts):
         """List ports for the client based on search options."""
