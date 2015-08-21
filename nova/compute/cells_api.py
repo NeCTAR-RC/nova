@@ -459,6 +459,20 @@ class ComputeCellsAPI(compute_api.API):
                 volume)
 
     @check_instance_cell
+    def _attach_interface(self, context, instance, network_id, port_id,
+                         requested_ip):
+        """Use hotplug to add a network adapter to an instance."""
+        return self._call_to_cells(context, instance, 'attach_interface',
+                network_id=network_id, port_id=port_id,
+                requested_ip=requested_ip)
+
+    @check_instance_cell
+    def _detach_interface(self, context, instance, port_id):
+        """Detach a network adapter from an instance."""
+        return self._call_to_cells(context, instance, 'detach_interface',
+                port_id=port_id)
+
+    @check_instance_cell
     def associate_floating_ip(self, context, instance, address):
         """Makes calls to network_api to associate_floating_ip.
 
