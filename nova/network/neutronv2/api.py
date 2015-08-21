@@ -742,11 +742,15 @@ class API(base_api.NetworkAPI):
                                        preexisting_port_ids,
                                        neutron, port_client)
                     self._delete_ports(neutron, instance, created_port_ids)
+        # NOTE(mdorman): update_cells=True here so we sync the network_info
+        # in the instance_cache up to the API cell.
         nw_info = self.get_instance_nw_info(
             context, instance, networks=nets_in_requested_order,
             port_ids=ports_in_requested_order,
             admin_client=admin_client,
-            preexisting_port_ids=preexisting_port_ids)
+            preexisting_port_ids=preexisting_port_ids,
+            update_cells=True)
+
         # NOTE(danms): Only return info about ports we created in this run.
         # In the initial allocation case, this will be everything we created,
         # and in later runs will only be what was created that time. Thus,
@@ -883,7 +887,7 @@ class API(base_api.NetworkAPI):
         else:
             self._delete_ports(neutron, instance, [port_id],
                                raise_if_fail=True)
-        return self.get_instance_nw_info(context, instance)
+        return self.get_instance_nw_info(context, instance, update_cells=True)
 
     def list_ports(self, context, **search_opts):
         """List ports for the client based on search options."""
