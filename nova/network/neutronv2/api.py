@@ -1251,7 +1251,7 @@ class API(base_api.NetworkAPI):
             LOG.debug('VirtualInterface not found for port: %s',
                       port_id, instance=instance)
 
-        return self.get_instance_nw_info(context, instance)
+        return self.get_instance_nw_info(context, instance, update_cells=True)
 
     def _delete_nic_metadata(self, instance, vif):
         for device in instance.device_metadata.devices:
