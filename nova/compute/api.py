@@ -4209,6 +4209,26 @@ class API(base.Base):
                     self.volume_api.attachment_delete(
                         context, new_attachment_id)
 
+    def _attach_interface(self, context, instance, network_id, port_id,
+                          requested_ip, tag):
+        """Use hotplug to add a network adapter to an instance.
+
+        This method is separated to make it possible for cells version
+        to override it.
+        """
+        return self.compute_rpcapi.attach_interface(context,
+            instance=instance, network_id=network_id, port_id=port_id,
+            requested_ip=requested_ip, tag=tag)
+
+    def _detach_interface(self, context, instance, port_id):
+        """Detach a network adapter from an instance.
+
+        This method is separated to make it possible for cells version
+        to override it.
+        """
+        self.compute_rpcapi.detach_interface(context, instance=instance,
+            port_id=port_id)
+
     @check_instance_lock
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.PAUSED,
                                     vm_states.STOPPED],
@@ -4218,9 +4238,9 @@ class API(base.Base):
         """Use hotplug to add an network adapter to an instance."""
         self._record_action_start(
             context, instance, instance_actions.ATTACH_INTERFACE)
-        return self.compute_rpcapi.attach_interface(context,
-            instance=instance, network_id=network_id, port_id=port_id,
-            requested_ip=requested_ip, tag=tag)
+        return self._attach_interface(context, instance=instance,
+            network_id=network_id, port_id=port_id, requested_ip=requested_ip,
+            tag=tag)
 
     @check_instance_lock
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.PAUSED,
@@ -4230,8 +4250,7 @@ class API(base.Base):
         """Detach an network adapter from an instance."""
         self._record_action_start(
             context, instance, instance_actions.DETACH_INTERFACE)
-        self.compute_rpcapi.detach_interface(context, instance=instance,
-            port_id=port_id)
+        self._detach_interface(context, instance=instance, port_id=port_id)
 
     def get_instance_metadata(self, context, instance):
         """Get all metadata associated with an instance."""
