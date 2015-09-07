@@ -376,7 +376,7 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
         ctxt = context.get_admin_context(read_deleted='yes')
 
         instance.flavor = flavors.extract_flavor(instance)
-        flavors.delete_flavor_info(instance.system_metadata, '')
+        #flavors.delete_flavor_info(instance.system_metadata, '')
 
         for ftype in ('old', 'new'):
             attrname = '%s_flavor' % ftype
@@ -385,7 +385,7 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
             try:
                 flavor = flavors.extract_flavor(instance, prefix)
                 setattr(instance, attrname, flavor)
-                flavors.delete_flavor_info(instance.system_metadata, prefix)
+                #flavors.delete_flavor_info(instance.system_metadata, prefix)
             except KeyError:
                 setattr(instance, attrname, None)
 
@@ -751,7 +751,7 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
             attr = '%sflavor' % ftype
             try:
                 flavor = flavors.extract_flavor(self, prefix=ftype)
-                flavors.delete_flavor_info(self.system_metadata, ftype)
+                #flavors.delete_flavor_info(self.system_metadata, ftype)
                 # NOTE(danms): This may trigger a lazy-load of the flavor
                 # information, but only once and it avoids re-fetching and
                 # re-migrating the original flavor.
