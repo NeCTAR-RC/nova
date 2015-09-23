@@ -161,6 +161,9 @@ AGGREGATE_ACTION_DELETE = 'Delete'
 AGGREGATE_ACTION_ADD = 'Add'
 
 
+NECTAR_SUSPEND_LOCK = 'nectar_suspend_disabled'
+
+
 def check_instance_state(vm_state=None, task_state=(None,),
                          must_have_launched=True):
     """Decorator to check VM and/or task state before entry to API functions.
@@ -2825,6 +2828,11 @@ class API(base.Base):
     @check_instance_state(vm_state=[vm_states.ACTIVE])
     def suspend(self, context, instance):
         """Suspend the given instance."""
+        suspend_disabled = int(instance.system_metadata.get(NECTAR_SUSPEND_LOCK, 0))
+
+        if suspend_disabled == 1:
+            raise exception.InstanceSuspendDisabled(instance_uuid=instance.uuid)
+
         instance.task_state = task_states.SUSPENDING
         instance.save(expected_task_state=[None])
         self._record_action_start(context, instance, instance_actions.SUSPEND)

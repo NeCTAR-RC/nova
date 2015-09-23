@@ -1399,6 +1399,9 @@ class InstanceIsLocked(InstanceInvalidState):
     msg_fmt = _("Instance %(instance_uuid)s is locked")
 
 
+class InstanceSuspendDisabled(InstanceIsLocked):
+    msg_fmt = _("Instance %(instance_uuid)s cannot be suspended, please stop/start or hard reboot first")
+
 class ConfigDriveInvalidValue(Invalid):
     msg_fmt = _("Invalid value for Config Drive option: %(option)s")
 

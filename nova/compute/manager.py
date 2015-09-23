@@ -258,6 +258,8 @@ get_notifier = functools.partial(rpc.get_notifier, service='compute')
 wrap_exception = functools.partial(exception.wrap_exception,
                                    get_notifier=get_notifier)
 
+NECTAR_SUSPEND_LOCK = 'nectar_suspend_disabled'
+
 
 @utils.expects_func_args('migration')
 def errors_out_migration(function):
@@ -2812,6 +2814,11 @@ class ComputeManager(manager.Manager):
             instance.power_state = self._get_power_state(context, instance)
             instance.vm_state = vm_states.STOPPED
             instance.task_state = None
+
+            if NECTAR_SUSPEND_LOCK in instance.system_metadata.keys():
+                meta = {NECTAR_SUSPEND_LOCK: '0'}
+                instance.system_metadata.update(meta)
+
             instance.save(expected_task_state=expected_task_state)
             self._notify_about_instance_usage(context, instance,
                                               "power_off.end")
@@ -3224,6 +3231,11 @@ class ComputeManager(manager.Manager):
                     LOG.error(_LE('Cannot reboot instance: %s'), error,
                               context=context, instance=instance)
                     self._set_instance_obj_error_state(context, instance)
+
+        if reboot_type != "SOFT":
+            if NECTAR_SUSPEND_LOCK in instance.system_metadata.keys():
+                meta = {NECTAR_SUSPEND_LOCK: '0'}
+                instance.system_metadata.update(meta)
 
         if not new_power_state:
             new_power_state = self._get_power_state(context, instance)
