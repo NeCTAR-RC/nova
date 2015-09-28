@@ -6555,7 +6555,8 @@ class ComputeManager(manager.Manager):
                       {'event': event.key},
                       instance=instance)
             if event.name == 'network-changed':
-                self.network_api.get_instance_nw_info(context, instance)
+                self.network_api.get_instance_nw_info(context, instance,
+                                                      update_cells=True)
             else:
                 self._process_instance_event(instance, event)
 
