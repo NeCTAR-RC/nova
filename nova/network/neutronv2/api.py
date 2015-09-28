@@ -1546,8 +1546,9 @@ class API(base_api.NetworkAPI):
 
         # In that case we should repopulate ports from the state of
         # Neutron.
-        if not port_ids:
-            port_ids = current_neutron_port_map.keys()
+        # NeCTAR: Always trust neutron for port information
+        # if not port_ids:
+        port_ids = current_neutron_port_map.keys()
 
         for port_id in port_ids:
             current_neutron_port = current_neutron_port_map.get(port_id)
