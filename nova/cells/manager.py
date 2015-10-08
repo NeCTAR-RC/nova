@@ -254,15 +254,6 @@ class CellsManager(manager.Manager):
         if call:
             return response.value_or_raise()
 
-    def run_securitygroup_api_method(self, ctxt, cell_name, method_info, call):
-        """Call a securitygroup API method in a specific cell."""
-        response = self.msg_runner.run_securitygroup_api_method(ctxt,
-                                                                cell_name,
-                                                                method_info,
-                                                                call)
-        if call:
-            return response.value_or_raise()
-
     def instance_update_at_top(self, ctxt, instance):
         """Update an instance at the top level cell."""
         self.msg_runner.instance_update_at_top(ctxt, instance)
@@ -701,35 +692,6 @@ class CellsManager(manager.Manager):
                                             cell_name, values)
         return response.value_or_raise()
 
-    def security_group_create(self, ctxt, group):
-        self.msg_runner.security_group_create(ctxt, group)
-
-    def security_group_destroy(self, ctxt, group):
-        self.msg_runner.security_group_destroy(ctxt, group)
-
-    def security_group_rule_create(self, ctxt, group, rule):
-        self.msg_runner.security_group_rule_create(ctxt, group, rule)
-
-    def security_group_rule_destroy(self, ctxt, group, rule):
-        self.msg_runner.security_group_rule_destroy(ctxt, group, rule)
-
-    def instance_add_security_group(self, ctxt, instance_uuid, group_id):
-        group = self.db.security_group_get(ctxt.elevated(), group_id)
-        group_p = {'project_id': group['project_id'],
-                   'name': group['name']}
-        self.msg_runner.instance_add_security_group(ctxt,
-                instance_uuid, group_p)
-
-    def instance_remove_security_group(self, ctxt, instance_uuid, group_id):
-        try:
-            group = self.db.security_group_get(ctxt.elevated(), group_id)
-        except exception.SecurityGroupNotFound:
-            return
-        group_p = {'project_id': group['project_id'],
-                   'name': group['name']}
-        self.msg_runner.instance_remove_security_group(ctxt,
-                instance_uuid, group_p)
-
     def ec2_instance_create(self, ctxt, instance_uuid, ec2_id):
         self.msg_runner.ec2_instance_create(ctxt, instance_uuid, ec2_id)
 
@@ -746,18 +708,6 @@ class CellsManager(manager.Manager):
             return
         handler = self.consistency_handlers[resource_name]
         handler.heal_entries(ctxt)
-
-    @periodic_task.periodic_task
-    def _heal_security_groups(self, ctxt):
-        self._heal_resource(ctxt, 'security groups')
-
-    @periodic_task.periodic_task
-    def _heal_security_group_rules(self, ctxt):
-        self._heal_resource(ctxt, 'rules')
-
-    @periodic_task.periodic_task
-    def _heal_instance_associations(self, ctxt):
-        self._heal_resource(ctxt, 'instance associations', from_top=False)
 
     @periodic_task.periodic_task
     def _heal_instance_id_mappings(self, ctxt):

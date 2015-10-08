@@ -20,7 +20,6 @@ from oslo_utils import timeutils
 
 from nova.cells import rpcapi as cells_rpcapi
 from nova.i18n import _LE, _LI
-from nova import exception
 
 LOG = logging.getLogger('nova.cells.consistency')
 
@@ -160,95 +159,6 @@ class ConsistencyHandler(object):
                 self._sync_entry(ctxt, entry)
                 # TODO why is this break here?
                 break
-
-
-class GroupConsistencyHandler(ConsistencyHandler):
-    def __init__(self, *args, **kwargs):
-        super(GroupConsistencyHandler, self).__init__(*args, **kwargs)
-        self.get_entries_filtered = self.db.security_group_get_all_by_filters
-        self.model_name = 'group'
-        self.model_name_plural = 'groups'
-
-    def _send_create(self, ctxt, group):
-        self.cells_rpcapi.security_group_create(ctxt, group)
-
-    def _send_destroy(self, ctxt, group):
-        # A security group may have been deleted then created again
-        # with the same name/project id. We only want to delete it if
-        # it's the most recent occurence and it's marked deleted.
-        filters = {'project_id': group['project_id'],
-                   'name': group['name'],
-                   'deleted': False}
-        groups = self.db.security_group_get_all_by_filters(ctxt, filters,
-                                                      'created_at', 'desc')
-        if groups:
-            return
-        self.cells_rpcapi.security_group_destroy(ctxt, group)
-
-
-class RuleConsistencyHandler(ConsistencyHandler):
-    def __init__(self, *args, **kwargs):
-        super(RuleConsistencyHandler, self).__init__(*args, **kwargs)
-        self.get_entries_filtered = self.db.security_group_rule_get_all_by_filters
-        self.model_name = 'rule'
-        self.model_name_plural = 'rules'
-
-    def _send_create(self, ctxt, rule):
-        try:
-            group = self.db.security_group_get(ctxt, rule['parent_group_id'])
-        except exception.SecurityGroupNotFound:
-            # Rule exists but group deleted, do nothing.
-            return
-        self.cells_rpcapi.security_group_rule_create(ctxt, group, rule)
-
-    def _send_destroy(self, ctxt, rule):
-        filters = {'to_port': rule['to_port'],
-                   'from_port': rule['from_port'],
-                   'parent_group_id': rule['parent_group_id'],
-                   'protocol': rule['protocol']}
-        if rule['cidr']:
-            filters['cidr'] = rule['cidr']
-        if rule['group_id']:
-            filters['group_id'] = rule['group_id']
-        filters['deleted'] = False
-        rules = self.db.security_group_rule_get_all_by_filters(ctxt,
-                    filters, 'created_at', 'desc')
-        if rules:
-            return
-        try:
-            group = self.db.security_group_get(ctxt, rule['parent_group_id'])
-        except exception.SecurityGroupNotFound:
-            # Group is deleted so don't care
-            return
-        self.cells_rpcapi.security_group_rule_destroy(ctxt, group, rule)
-
-
-class InstanceAssociationConsistencyHandler(ConsistencyHandler):
-
-    def __init__(self, *args, **kwargs):
-        super(InstanceAssociationConsistencyHandler, self).__init__(
-            *args, **kwargs)
-        self.get_entries_filtered = self.db.security_group_instance_association_get_all_by_filters
-        self.model_name = 'instance association'
-        self.model_name_plural = 'instance associations'
-
-    def _send_create(self, ctxt, instance_association):
-        LOG.info(
-            _LI("Sending create to %s") % instance_association.iteritems())
-        self.cells_rpcapi.instance_add_security_group(
-            ctxt,
-            instance_association['instance_uuid'],
-            instance_association['security_group_id'],
-        )
-
-    def _send_destroy(self, ctxt, instance_association):
-        LOG.info(
-            _LI("Sending remove to %s") % instance_association['security_group_id'])
-        self.cells_rpcapi.instance_remove_security_group(
-            ctxt,
-            instance_association['instance_uuid'],
-            instance_association['security_group_id'],
-        )
 
 
 class MappingConsistencyHandler(ConsistencyHandler):

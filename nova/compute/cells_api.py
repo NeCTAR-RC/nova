@@ -25,7 +25,6 @@ from nova.cells import utils as cells_utils
 from nova.compute import api as compute_api
 from nova.compute import rpcapi as compute_rpcapi
 from nova import exception
-from nova.network.security_group import openstack_driver
 from nova import objects
 from nova.objects import base as obj_base
 from nova import rpc
@@ -33,7 +32,6 @@ from nova import rpc
 
 check_instance_state = compute_api.check_instance_state
 wrap_check_policy = compute_api.wrap_check_policy
-wrap_check_security_groups_policy = compute_api.wrap_check_security_groups_policy
 check_policy = compute_api.check_policy
 check_instance_lock = compute_api.check_instance_lock
 check_instance_cell = compute_api.check_instance_cell
@@ -169,8 +167,6 @@ class ComputeCellsAPI(compute_api.API):
         self.compute_rpcapi = ComputeRPCAPIRedirect(self.cells_rpcapi)
         # Redirect conductor build_instances to cells
         self._compute_task_api = ConductorTaskRPCAPIRedirect(self.cells_rpcapi)
-        if not openstack_driver.is_neutron_security_groups():
-            self.security_group_api = SecurityGroupAPI()
         self._cell_type = 'api'
 
     def _cast_to_cells(self, context, instance, method, *args, **kwargs):
@@ -703,44 +699,3 @@ class AggregateAPI(compute_api.AggregateAPI):
     def remove_host_from_aggregate(self, context, aggregate_id, host_name):
         return self._call_rpc_api(
             context, 'remove_host_from_aggregate', aggregate_id, host_name)
-
-
-class SecurityGroupRPCAPIRedirect(object):
-    def __getattr__(self, key):
-        def _noop_rpc_wrapper(*args, **kwargs):
-            return None
-        return _noop_rpc_wrapper
-
-
-class SecurityGroupAPI(compute_api.SecurityGroupAPI):
-    def __init__(self, *args, **kwargs):
-        super(SecurityGroupAPI, self).__init__(*args, **kwargs)
-        self.security_group_rpcapi = SecurityGroupRPCAPIRedirect()
-        self.cells_rpcapi = cells_rpcapi.CellsAPI()
-
-    def _cast_to_cells(self, context, instance, method, *args, **kwargs):
-        instance_uuid = instance['uuid']
-        cell_name = instance['cell_name']
-        if not cell_name:
-            raise exception.InstanceUnknownCell(instance_id=instance_uuid)
-        self.cells_rpcapi.cast_securitygroup_api_method(context, cell_name,
-                method, instance_uuid, *args, **kwargs)
-
-    def trigger_rules_refresh(self, context, id):
-        """Called when a rule is added to or removed from a security_group."""
-        # A rules refresh is triggered by the instance's own cell when
-        # it receives a security rule create/delete message. Nothing
-        # to do here.
-        pass
-
-    @wrap_check_security_groups_policy
-    def add_to_instance(self, context, instance, security_group_name):
-        """Add security group to the instance"""
-        super(SecurityGroupAPI, self).add_to_instance(context, instance, security_group_name)
-        self._cast_to_cells(context, instance, 'add_to_instance', security_group_name)
-
-    @wrap_check_security_groups_policy
-    def remove_from_instance(self, context, instance, security_group_name):
-        """Remove the security group associated with the instance"""
-        super(SecurityGroupAPI, self).remove_from_instance(context, instance, security_group_name)
-        self._cast_to_cells(context, instance, 'remove_from_instance', security_group_name)
