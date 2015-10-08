@@ -805,38 +805,17 @@ def instance_update_and_get_original(context, instance_uuid, values,
     return rv
 
 
-def instance_add_security_group(context, instance_id, security_group_id, update_cells=True):
+def instance_add_security_group(context, instance_id, security_group_id):
     """Associate the given security group with the given instance."""
-    rv = IMPL.instance_add_security_group(context, instance_id,
+    return IMPL.instance_add_security_group(context, instance_id,
                                             security_group_id)
-    if update_cells:
-        try:
-            cells_rpcapi.CellsAPI().instance_add_security_group(context,
-                instance_id,
-                security_group_id)
-        except Exception:
-            LOG.exception(_LE("Failed to notify cells of instance add security group"))
-    return rv
 
 
-def instance_remove_security_group(context, instance_id, security_group_id, update_cells=True):
+def instance_remove_security_group(context, instance_id, security_group_id):
     """Disassociate the given security group from the given instance."""
-    rv = IMPL.instance_remove_security_group(context, instance_id,
+    return IMPL.instance_remove_security_group(context, instance_id,
                                             security_group_id)
-    if update_cells:
-        try:
-            cells_rpcapi.CellsAPI().instance_remove_security_group(context,
-                instance_id,
-                security_group_id)
-        except Exception:
-            LOG.exception(_LE("Failed to notify cells of instance remove security group"))
-    return rv
 
-
-def security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
-        limit=None, marker=None):
-    return IMPL.security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
-                                limit=None, marker=None)
 
 ####################
 
@@ -1330,12 +1309,6 @@ def security_group_get(context, security_group_id, columns_to_join=None):
                                    columns_to_join)
 
 
-def security_group_get_all_by_filters(context, filters, sort_key, sort_dir,
-                                limit=None, marker=None):
-    return IMPL.security_group_get_all_by_filters(context, filters, sort_key,
-                                            sort_dir, limit=None, marker=None)
-
-
 def security_group_get_by_name(context, project_id, group_name,
                                columns_to_join=None):
     """Returns a security group with the specified name from a project."""
@@ -1358,17 +1331,9 @@ def security_group_in_use(context, group_id):
     return IMPL.security_group_in_use(context, group_id)
 
 
-def security_group_create(context, values, update_cells=True):
+def security_group_create(context, values):
     """Create a new security group."""
-    rv = IMPL.security_group_create(context, values)
-    if update_cells:
-        try:
-            cells_rpcapi.CellsAPI().security_group_create(context,
-                                                          rv)
-        except Exception:
-            LOG.exception(
-                _LE("Failed to notify cells of security_group_create"))
-    return rv
+    return IMPL.security_group_create(context, values)
 
 
 def security_group_update(context, security_group_id, values,
@@ -1388,35 +1353,17 @@ def security_group_ensure_default(context):
     return IMPL.security_group_ensure_default(context)
 
 
-def security_group_destroy(context, security_group_id, update_cells=True):
+def security_group_destroy(context, security_group_id):
     """Deletes a security group."""
-    group = security_group_get(context, security_group_id)
-    rv = IMPL.security_group_destroy(context, security_group_id)
-    if update_cells:
-        try:
-            cells_rpcapi.CellsAPI().security_group_destroy(context, group)
-        except Exception:
-            LOG.exception(
-                _LE("Failed to notify cells of security_group_destroy"))
-    return rv
+    return IMPL.security_group_destroy(context, security_group_id)
 
 
 ####################
 
 
-def security_group_rule_create(context, values, update_cells=True):
-    """Create a new security group rule"""
-    rv = IMPL.security_group_rule_create(context, values)
-    if update_cells:
-        try:
-            group = security_group_get(context, values['parent_group_id'])
-            cells_rpcapi.CellsAPI().security_group_rule_create(context,
-                                                               group, values)
-
-        except Exception:
-            LOG.exception(
-                _LE("Failed to notify cells of security_group_rule_create"))
-    return rv
+def security_group_rule_create(context, values):
+    """Create a new security group."""
+    return IMPL.security_group_rule_create(context, values)
 
 
 def security_group_rule_get_by_security_group(context, security_group_id,
@@ -1426,13 +1373,6 @@ def security_group_rule_get_by_security_group(context, security_group_id,
         context, security_group_id, columns_to_join=columns_to_join)
 
 
-def security_group_rule_get_all_by_filters(context, filters, sort_key,
-                                           sort_dir, limit=None, marker=None):
-    return IMPL.security_group_rule_get_all_by_filters(context, filters,
-                                                       sort_key, sort_dir,
-                                                       limit=None, marker=None)
-
-
 def security_group_rule_get_by_security_group_grantee(context,
                                                       security_group_id):
     """Get all rules that grant access to the given security group."""
@@ -1440,20 +1380,9 @@ def security_group_rule_get_by_security_group_grantee(context,
                                                              security_group_id)
 
 
-def security_group_rule_destroy(context, security_group_rule_id,
-                                update_cells=True):
+def security_group_rule_destroy(context, security_group_rule_id):
     """Deletes a security group rule."""
-    values = security_group_rule_get(context, security_group_rule_id)
-    rv = IMPL.security_group_rule_destroy(context, security_group_rule_id)
-    if update_cells:
-        try:
-            group = security_group_get(context, values['parent_group_id'])
-            cells_rpcapi.CellsAPI().security_group_rule_destroy(context,
-                                                                group, values)
-        except Exception:
-            LOG.exception(
-                _LE("Failed to notify cells of security_group_rule_destroy"))
-    return rv
+    return IMPL.security_group_rule_destroy(context, security_group_rule_id)
 
 
 def security_group_rule_get(context, security_group_rule_id):

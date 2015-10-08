@@ -28,7 +28,6 @@ CONF.register_opts(security_group_opts)
 NOVA_DRIVER = ('nova.compute.api.SecurityGroupAPI')
 NEUTRON_DRIVER = ('nova.network.security_group.neutron_driver.'
                   'SecurityGroupAPI')
-NOVA_CELLS_DRIVER = ('nova.compute.cells_api.SecurityGroupAPI')
 
 
 def get_openstack_security_group_driver(skip_policy_check=False):
@@ -37,9 +36,6 @@ def get_openstack_security_group_driver(skip_policy_check=False):
                                          skip_policy_check=skip_policy_check)
     elif is_neutron_security_groups():
         return importutils.import_object(NEUTRON_DRIVER,
-                                         skip_policy_check=skip_policy_check)
-    elif CONF.security_group_api.lower() == 'nova-cells':
-        return importutils.import_object(NOVA_CELLS_DRIVER,
                                          skip_policy_check=skip_policy_check)
     else:
         return importutils.import_object(CONF.security_group_api,
