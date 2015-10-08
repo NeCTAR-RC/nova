@@ -844,27 +844,3 @@ class CellsAPITestCase(test.NoDBTestCase):
                               aggregate_id=aggregate_id,
                               host_name=host_name),
                 version='1.24')
-
-    def test_security_group_rule_create(self):
-        fake_rule = 'fake_rule'
-        fake_group = 'fake_group'
-
-        call_info = self._stub_rpc_method('cast', None)
-        self.cells_rpcapi.security_group_rule_create(self.fake_context,
-                fake_group, fake_rule)
-
-        expected_args = {'group': fake_group, 'rule': fake_rule}
-        self._check_result(call_info, 'security_group_rule_create',
-                           expected_args, version='1.24')
-
-    def test_security_group_rule_destroy(self):
-        fake_rule = 'fake_rule'
-        fake_group = 'fake_group'
-
-        call_info = self._stub_rpc_method('cast', None)
-        self.cells_rpcapi.security_group_rule_destroy(self.fake_context,
-                fake_group, fake_rule)
-
-        expected_args = {'group': fake_group, 'rule': fake_rule}
-        self._check_result(call_info, 'security_group_rule_destroy',
-                           expected_args, version='1.24')

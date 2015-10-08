@@ -37,7 +37,6 @@ from nova import block_device
 from nova.cloudpipe import pipelib
 from nova import compute
 from nova.compute import api as compute_api
-from nova.compute import cells_api
 from nova.compute import vm_states
 from nova import exception
 from nova.i18n import _
@@ -594,9 +593,9 @@ class CloudController(object):
             if 'group_name' in group:
                 mykwargs['source_security_group_name'] = group['group_name']
             if 'user_id' in group:
-                mykwargs['source_security_group_owner_id'] = str(group['user_id'])
+                mykwargs['source_security_group_owner_id'] = group['user_id']
             if 'group_id' in group:
-                mykwargs['source_security_group_id'] = str(group['group_id'])
+                mykwargs['source_security_group_id'] = group['group_id']
             groups_args_split.append(mykwargs)
         return groups_args_split
 
@@ -715,7 +714,7 @@ class CloudController(object):
     def _get_source_project_id(self, context, source_security_group_owner_id):
         if source_security_group_owner_id:
             # Parse user:project for source group.
-            source_parts = str(source_security_group_owner_id).split(':')
+            source_parts = source_security_group_owner_id.split(':')
 
             # If no project name specified, assume it's same as user name.
             # Since we're looking up by project name, the user name is not
@@ -2013,18 +2012,10 @@ class CloudSecurityGroupNeutronAPI(EC2SecurityGroupExceptions,
     pass
 
 
-class CloudSecurityGroupNovaCellsAPI(EC2SecurityGroupExceptions,
-                                     cells_api.SecurityGroupAPI):
-    pass
-
-
 def get_cloud_security_group_api():
-    api_name_or_class = cfg.CONF.security_group_api.lower()
-    if api_name_or_class == 'nova':
+    if cfg.CONF.security_group_api.lower() == 'nova':
         return CloudSecurityGroupNovaAPI()
     elif openstack_driver.is_neutron_security_groups():
         return CloudSecurityGroupNeutronAPI()
-    elif api_name_or_class == 'nova-cells':
-        return CloudSecurityGroupNovaCellsAPI()
     else:
         raise NotImplementedError()

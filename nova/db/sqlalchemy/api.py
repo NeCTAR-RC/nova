@@ -2248,10 +2248,6 @@ def _get_regexp_op_for_connection(db_connection):
 
 
 def _regex_instance_filter(query, filters):
-    return _regex_filter(query, models.Instance, filters)
-
-
-def _regex_filter(query, model, filters):
     """Applies regular expression filtering to an Instance query.
 
     Returns the updated query.
@@ -2260,6 +2256,7 @@ def _regex_filter(query, model, filters):
     :param filters: dictionary of filters with regex values
     """
 
+    model = models.Instance
     db_regexp_op = _get_regexp_op_for_connection(CONF.database.connection)
     for filter_name in filters.iterkeys():
         try:
@@ -2278,10 +2275,6 @@ def _regex_filter(query, model, filters):
 
 
 def _exact_instance_filter(query, filters, legal_keys):
-    return _exact_filter(query, models.Instance, filters, legal_keys)
-
-
-def _exact_filter(query, model, filters, legal_keys):
     """Applies exact match filtering to an Instance query.
 
     Returns the updated query.  Modifies filters argument to remove
@@ -2296,6 +2289,7 @@ def _exact_filter(query, model, filters, legal_keys):
     """
 
     filter_dict = {}
+    model = models.Instance
 
     # Walk through all the keys
     for key in legal_keys:
@@ -2672,53 +2666,6 @@ def instance_remove_security_group(context, instance_uuid, security_group_id):
                 filter_by(instance_uuid=instance_uuid).\
                 filter_by(security_group_id=security_group_id).\
                 soft_delete()
-
-@require_context
-def security_group_instance_association_get_all_by_filters(context, filters, sort_key, sort_dir,
-        limit=None, marker=None):
-
-    sort_fn = {'desc': desc, 'asc': asc}
-    session = get_session()
-    query_prefix = session.query(models.SecurityGroupInstanceAssociation).\
-            order_by(sort_fn[sort_dir](getattr(models.SecurityGroupInstanceAssociation, sort_key)))
-
-    # Make a copy of the filters dictionary to use going forward, as we'll
-    # be modifying it and we shouldn't affect the caller's use of it.
-    filters = filters.copy()
-
-    if 'changes-since' in filters:
-        changes_since = timeutils.normalize_time(filters['changes-since'])
-        query_prefix = query_prefix.\
-                            filter(models.SecurityGroupInstanceAssociation.updated_at > changes_since)
-
-    if 'deleted' in filters:
-        if filters.pop('deleted'):
-            deleted = (models.SecurityGroupInstanceAssociation.deleted ==
-                          models.SecurityGroupInstanceAssociation.id)
-            query_prefix = query_prefix.filter(deleted)
-        else:
-            query_prefix = query_prefix.\
-                    filter_by(deleted=0)
-
-    if not context.is_admin:
-        # If we're not admin context, add appropriate filter..
-        if context.project_id:
-            filters['project_id'] = context.project_id
-        else:
-            filters['user_id'] = context.user_id
-
-    # Filters for exact matches that we can do along with the SQL query...
-    # For other filters that don't match this, we will do regexp matching
-    exact_match_filter_names = ['id', 'uuid']
-
-    # Filter the query
-    query_prefix = _exact_filter(query_prefix, models.SecurityGroupInstanceAssociation,
-                                filters, exact_match_filter_names)
-
-    query_prefix = _regex_filter(query_prefix, models.SecurityGroupInstanceAssociation, filters)
-
-    instance_associations = query_prefix.all()
-    return instance_associations
 
 
 ###################
@@ -4102,7 +4049,6 @@ def _security_group_create(context, values, session=None):
     # FIXME(devcamcar): Unless I do this, rules fails with lazy load exception
     # once save() is called.  This will get cleaned up in next orm pass.
     security_group_ref.rules
-    security_group_ref.instances
     security_group_ref.update(values)
     try:
         security_group_ref.save(session=session)
@@ -4146,51 +4092,6 @@ def _security_group_get_by_names(context, session, project_id, group_names):
 def security_group_get_all(context):
     return _security_group_get_query(context).all()
 
-@require_context
-def security_group_get_all_by_filters(context, filters, sort_key, sort_dir,
-                                limit=None, marker=None):
-    sort_fn = {'desc': desc, 'asc': asc}
-
-    session = get_session()
-    query_prefix = session.query(models.SecurityGroup).\
-            order_by(sort_fn[sort_dir](getattr(models.SecurityGroup, sort_key)))
-
-    # Make a copy of the filters dictionary to use going forward, as we'll
-    # be modifying it and we shouldn't affect the caller's use of it.
-    filters = filters.copy()
-
-    if 'changes-since' in filters:
-        changes_since = timeutils.normalize_time(filters['changes-since'])
-        query_prefix = query_prefix.\
-                            filter(models.SecurityGroup.updated_at > changes_since)
-
-    if 'deleted' in filters:
-        if filters.pop('deleted'):
-            deleted = models.SecurityGroup.deleted == models.SecurityGroup.id
-            query_prefix = query_prefix.filter(deleted)
-        else:
-            query_prefix = query_prefix.\
-                    filter_by(deleted=0)
-
-    if not context.is_admin:
-        # If we're not admin context, add appropriate filter..
-        if context.project_id:
-            filters['project_id'] = context.project_id
-        else:
-            filters['user_id'] = context.user_id
-
-    # Filters for exact matches that we can do along with the SQL query...
-    # For other filters that don't match this, we will do regexp matching
-    exact_match_filter_names = []
-
-    # Filter the query
-    query_prefix = _exact_filter(query_prefix, models.SecurityGroup,
-                                filters, exact_match_filter_names)
-
-    query_prefix = _regex_filter(query_prefix, models.SecurityGroup, filters)
-
-    rules = query_prefix.all()
-    return rules
 
 @require_context
 def security_group_get(context, security_group_id, columns_to_join=None):
@@ -4435,50 +4336,6 @@ def security_group_rule_get_by_security_group(context, security_group_id,
     for column in columns_to_join:
         query = query.options(joinedload_all(column))
     return query.all()
-
-
-@require_context
-def security_group_rule_get_all_by_filters(context, filters, sort_key, sort_dir,
-                                limit=None, marker=None):
-
-    sort_fn = {'desc': desc, 'asc': asc}
-
-    session = get_session()
-    query_prefix = session.query(models.SecurityGroupIngressRule).\
-            order_by(sort_fn[sort_dir](getattr(models.SecurityGroupIngressRule, sort_key)))
-
-    # Make a copy of the filters dictionary to use going forward, as we'll
-    # be modifying it and we shouldn't affect the caller's use of it.
-    filters = filters.copy()
-
-    if 'changes-since' in filters:
-        changes_since = timeutils.normalize_time(filters['changes-since'])
-        query_prefix = query_prefix.\
-                            filter(models.SecurityGroupIngressRule.updated_at > changes_since)
-
-    if 'deleted' in filters:
-        if filters.pop('deleted'):
-            deleted = (models.SecurityGroupIngressRule.deleted ==
-                          models.SecurityGroupIngressRule.id)
-            query_prefix = query_prefix.filter(deleted)
-        else:
-            query_prefix = query_prefix.\
-                    filter_by(deleted=0)
-
-    # Filters for exact matches that we can do along with the SQL query...
-    # For other filters that don't match this, we will do regexp matching
-    # Need to match on these as they can be None
-    exact_match_filter_names = ['cidr', 'group_id', 'parent_group_id',
-                                'protocol', 'from_port', 'to_port']
-
-    # Filter the query
-    query_prefix = _exact_filter(query_prefix, models.SecurityGroupIngressRule,
-                                filters, exact_match_filter_names)
-
-    query_prefix = _regex_filter(query_prefix, models.SecurityGroupIngressRule, filters)
-
-    rules = query_prefix.all()
-    return rules
 
 
 @require_context

@@ -65,9 +65,6 @@ class FakeDBApi(object):
     def instance_get_by_uuid(self, ctxt, instance_uuid):
         raise exception.InstanceNotFound(instance_id=instance_uuid)
 
-    def security_group_rule_get_all_by_filters(self, ctxt, *args, **kwargs):
-        return []
-
 
 class FakeCellsDriver(driver.BaseCellsDriver):
     pass

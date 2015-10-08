@@ -36,7 +36,7 @@ class CellsConsistencyHandlerTestCase(test.TestCase):
         self.ctxt = context.RequestContext('fake', 'fake')
         self.now = 1369634796.45673
         self.db = db
-        self.handler = consistency.GroupConsistencyHandler(self.db)
+        self.handler = consistency.InstanceIDMappingConsistencyHandler(self.db)
         self.fake_entries = [
             {'deleted': False, 'name': 'first'},
             {'deleted': False, 'name': 'second'},
@@ -140,110 +140,3 @@ class CellsConsistencyHandlerTestCase(test.TestCase):
         self.handler._heal_entries(self.ctxt)
         self.handler.reset()
         self.handler._heal_entries(self.ctxt)
-
-
-class CellsGroupConsistencyHandlerTestCase(test.TestCase):
-    """Test case for GroupConsistencyHandler class."""
-    def setUp(self):
-        super(CellsGroupConsistencyHandlerTestCase, self).setUp()
-        self.ctxt = context.RequestContext('fake', 'fake')
-        self.db = db
-        self.project_id = 'fake_project'
-        self.name = 'fake_name'
-        self.group = {'project_id': self.project_id, 'name': self.name}
-        self.filters = {'project_id': self.project_id,
-                        'name': self.name,
-                        'deleted': False}
-        self.handler = consistency.GroupConsistencyHandler(self.db)
-
-    def test_send_destroy(self, should_destroy=True):
-        handler = self.handler
-        self.mox.StubOutWithMock(self.db,
-                                 'security_group_get_all_by_filters')
-        self.mox.StubOutWithMock(handler.cells_rpcapi,
-                                 'security_group_destroy')
-
-        # send_destroy should ignore the call if there are existing
-        # undeleted groups.
-        groups = [] if should_destroy else [self.group]
-        self.db.security_group_get_all_by_filters(self.ctxt, self.filters,
-            'created_at', 'desc').AndReturn(groups)
-        if should_destroy:
-            handler.cells_rpcapi.security_group_destroy(self.ctxt, self.group)
-        self.mox.ReplayAll()
-
-        handler._send_destroy(self.ctxt, self.group)
-
-    def test_send_destroy_ignore_for_undeleted_group(self):
-        self.test_send_destroy(should_destroy=False)
-
-
-class CellsRulesConsistencyHandlerTestCase(test.TestCase):
-    """Test case for RulesConsistencyHandler class."""
-    def setUp(self):
-        super(CellsRulesConsistencyHandlerTestCase, self).setUp()
-        self.ctxt = context.RequestContext('fake', 'fake')
-        self.db = db
-        self.handler = consistency.RuleConsistencyHandler(self.db)
-
-    def test_send_create(self):
-        handler = self.handler
-        group = {'fake': 'fake'}
-        parent_group_id = 1
-        rule = {'parent_group_id': parent_group_id}
-
-        self.mox.StubOutWithMock(self.db, 'security_group_get')
-        self.mox.StubOutWithMock(handler.cells_rpcapi,
-                                 'security_group_rule_create')
-
-        self.db.security_group_get(self.ctxt, parent_group_id).AndReturn(group)
-        handler.cells_rpcapi.security_group_rule_create(self.ctxt, group, rule)
-        self.mox.ReplayAll()
-
-        handler._send_create(self.ctxt, rule)
-
-    def test_send_create_no_group(self):
-        handler = self.handler
-        parent_group_id = 1
-        rule = {'parent_group_id': parent_group_id}
-
-        self.mox.StubOutWithMock(self.db, 'security_group_get')
-        self.mox.StubOutWithMock(handler.cells_rpcapi,
-                                 'security_group_rule_create')
-
-        self.db.security_group_get(self.ctxt, parent_group_id).AndRaise(
-            exception.SecurityGroupNotFound(security_group_id=parent_group_id))
-        self.mox.ReplayAll()
-
-        handler._send_create(self.ctxt, rule)
-
-    def test_send_destroy(self, should_destroy=False):
-        parent_group_id = 42
-        rule = {'to_port': '80', 'from_port': '80',
-                'parent_group_id': parent_group_id, 'protocol': 'tcp',
-                'cidr': '0.0.0.0/0', 'group_id': '142'}
-        group = {'fake': 'fake'}
-        filters = rule.copy()
-        filters['deleted'] = False
-        handler = self.handler
-
-        self.mox.StubOutWithMock(self.db,
-                                 'security_group_rule_get_all_by_filters')
-        self.mox.StubOutWithMock(self.db, 'security_group_get')
-        self.mox.StubOutWithMock(handler.cells_rpcapi,
-                                 'security_group_rule_create')
-
-        rules = [] if should_destroy else [rule]
-        self.db.security_group_rule_get_all_by_filters(self.ctxt,
-            filters, 'created_at', 'desc').AndReturn(rules)
-        if should_destroy:
-            self.db.security_group_get(self.ctxt, parent_group_id).AndReturn(
-                group)
-            handler.cells_rpcapi.security_group_rule_destroy(self.ctxt,
-                                                             group, rule)
-        self.mox.ReplayAll()
-
-        handler._send_destroy(self.ctxt, rule)
-
-    def test_send_destroy_for_undeleted_rule(self):
-        self.test_send_destroy(should_destroy=False)
