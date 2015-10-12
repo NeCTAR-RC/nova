@@ -608,15 +608,14 @@ class CloudController(object):
         if source_security_group_name:
             source_project_id = self._get_source_project_id(context,
                 source_security_group_owner_id)
-
-            source_security_group = objects.SecurityGroup.get_by_name(
-                    context.elevated(),
-                    source_project_id,
-                    source_security_group_name)
+            source_security_group = self.security_group_api.get(context, source_security_group_name)
             notfound = exception.SecurityGroupNotFound
             if not source_security_group:
                 raise notfound(security_group_id=source_security_group_name)
-            group_id = source_security_group.id
+            if type(source_security_group) == dict:
+                group_id = source_security_group['id']
+            else:
+                group_id = source_security_group.id
             return self.security_group_api.new_group_ingress_rule(
                                     group_id, ip_protocol, from_port, to_port)
         else:
@@ -661,7 +660,8 @@ class CloudController(object):
             self._validate_rulevalues(rulesvalues)
             for values_for_rule in rulesvalues:
                 values_for_rule['parent_group_id'] = security_group['id']
-
+                if 'cidr' not in values_for_rule:
+                    values_for_rule['cidr'] = '0.0.0.0/0'
                 rule_ids.append(self.security_group_api.rule_exists(
                                              security_group, values_for_rule))
 
