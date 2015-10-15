@@ -219,6 +219,7 @@ class ResourceTracker(object):
         while the COMPUTE_RESOURCES_SEMAPHORE is held so the resource claim
         will not be lost if the audit process starts.
         """
+        self.conductor_api.instance_update(context, instance.uuid)
         instance.host = self.host
         instance.launched_on = self.host
         instance.node = self.nodename
