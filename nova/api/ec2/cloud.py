@@ -40,6 +40,7 @@ from nova.cloudpipe import pipelib
 from nova import compute
 from nova.compute import api as compute_api
 from nova.compute import vm_states
+from nova import context
 from nova import exception
 from nova.i18n import _
 from nova.i18n import _LI
@@ -1155,10 +1156,14 @@ class CloudController(object):
 
     @staticmethod
     def _format_group_set(instance, result):
+        security_group_api = get_cloud_security_group_api()
+        ctxt = context.get_admin_context()
         security_group_names = []
-        if instance.get('security_groups'):
-            for security_group in instance.security_groups:
-                security_group_names.append(security_group['name'])
+        security_groups = security_group_api.get_instance_security_groups(
+            ctxt, instance.uuid)
+
+        for security_group in security_groups:
+            security_group_names.append(security_group['name'])
         result['groupSet'] = utils.convert_to_list_dict(
             security_group_names, 'groupId')
 
