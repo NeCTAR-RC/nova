@@ -2949,15 +2949,21 @@ class CloudTestCase(test.TestCase):
         ec2_id = ec2utils.id_to_ec2_inst_id(inst1['uuid'])
 
         # Create some tags
-        md = {'key': 'foo', 'value': 'bar'}
+        md = [{'key': 'foo', 'value': 'bar'},
+              {'key': 'Name', 'value': 'displayname-1111'}]
         md_result = {'foo': 'bar'}
         self.cloud.create_tags(self.context, resource_id=[ec2_id],
-                tag=[md])
+                tag=md)
 
         metadata = self.cloud.compute_api.get_instance_metadata(self.context,
                 inst1)
         self.assertEqual(metadata, md_result)
         self.assertEqual(meta_changes, [{'foo': ['+', 'bar']}])
+
+        # Ensure that setting special tag 'Name' changes the actual instance
+        # name
+        instance = db.instance_get(self.context, inst1.id)
+        self.assertEqual(instance['display_name'], 'displayname-1111')
 
         # Delete them
         self.cloud.delete_tags(self.context, resource_id=[ec2_id],
@@ -2992,6 +2998,7 @@ class CloudTestCase(test.TestCase):
                 'instance_type_id': 1,
                 'vm_state': 'active',
                 'launched_at': timeutils.utcnow(),
+                'display_name': 'displayname-1111',
                 'hostname': 'server-1111',
                 'created_at': datetime.datetime(2012, 5, 1, 1, 1, 1)
         }
@@ -3002,6 +3009,7 @@ class CloudTestCase(test.TestCase):
                 'instance_type_id': 1,
                 'vm_state': 'active',
                 'launched_at': timeutils.utcnow(),
+                'display_name': 'displayname-1112',
                 'hostname': 'server-1112',
                 'created_at': datetime.datetime(2012, 5, 1, 1, 1, 2)
         }
@@ -3056,10 +3064,18 @@ class CloudTestCase(test.TestCase):
                 inst1)
         self.assertEqual(metadata, md3_result)
 
+        inst1_key_name = {'key': u'Name',
+                          'resource_id': 'i-00000001',
+                          'resource_type': 'instance',
+                          'value': u'displayname-1111'}
         inst1_key_foo = {'key': u'foo', 'resource_id': 'i-00000001',
                          'resource_type': 'instance', 'value': u'bar'}
         inst1_key_bax = {'key': u'bax', 'resource_id': 'i-00000001',
                          'resource_type': 'instance', 'value': u'wibble'}
+        inst2_key_name = {'key': u'Name',
+                          'resource_id': 'i-00000002',
+                          'resource_type': 'instance',
+                          'value': u'displayname-1112'}
         inst2_key_foo = {'key': u'foo', 'resource_id': 'i-00000002',
                          'resource_type': 'instance', 'value': u'bar'}
         inst2_key_baz = {'key': u'baz', 'resource_id': 'i-00000002',
@@ -3068,21 +3084,24 @@ class CloudTestCase(test.TestCase):
         # We should be able to search by:
         # No filter
         tags = self.cloud.describe_tags(self.context)['tagSet']
-        self.assertEqualSorted(tags, [inst1_key_foo, inst2_key_foo,
-                                inst2_key_baz, inst1_key_bax])
+        self.assertEqualSorted(tags, [inst1_key_name, inst1_key_foo,
+                                      inst1_key_bax, inst2_key_name,
+                                      inst2_key_foo, inst2_key_baz])
 
         # Resource ID
         tags = self.cloud.describe_tags(self.context,
                 filter=[{'name': 'resource-id',
                          'value': [ec2_id1]}])['tagSet']
-        self.assertEqualSorted(tags, [inst1_key_foo, inst1_key_bax])
+        self.assertEqualSorted(tags, [inst1_key_name, inst1_key_foo,
+                                      inst1_key_bax])
 
         # Resource Type
         tags = self.cloud.describe_tags(self.context,
                 filter=[{'name': 'resource-type',
                          'value': ['instance']}])['tagSet']
-        self.assertEqualSorted(tags, [inst1_key_foo, inst2_key_foo,
-                                inst2_key_baz, inst1_key_bax])
+        self.assertEqualSorted(tags, [inst1_key_name, inst1_key_foo,
+                                      inst1_key_bax, inst2_key_name,
+                                      inst2_key_foo, inst2_key_baz])
 
         # Key, either bare or with wildcards
         tags = self.cloud.describe_tags(self.context,

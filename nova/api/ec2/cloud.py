@@ -21,6 +21,7 @@ datastore.
 """
 
 import base64
+import re
 import time
 
 from oslo_config import cfg
@@ -90,6 +91,7 @@ CONF.import_opt('internal_service_availability_zone',
 LOG = logging.getLogger(__name__)
 
 QUOTAS = quota.QUOTAS
+SPECIAL_TAGS = ['Name']
 
 
 # EC2 ID can return the following error codes:
@@ -1242,6 +1244,8 @@ class CloudController(object):
             for k, v in six.iteritems(utils.instance_meta(instance)):
                 i['tagSet'].append({'key': k, 'value': v})
 
+            self._add_or_replace_special_tags(i['tagSet'], instance)
+
             client_token = self._get_client_token(context, instance_uuid)
             if client_token:
                 i['clientToken'] = client_token
@@ -1848,6 +1852,7 @@ class CloudController(object):
             raise exception.InvalidParameterValue(message=msg)
 
         metadata = {}
+        special_tags = {}
         for tag in tags:
             if not isinstance(tag, dict):
                 err = _('Expecting tagSet to be key/value pairs')
@@ -1859,8 +1864,10 @@ class CloudController(object):
             if key is None or val is None:
                 err = _('Expecting both key and value to be set')
                 raise exception.InvalidParameterValue(message=err)
-
-            metadata[key] = val
+            elif key in SPECIAL_TAGS:
+                special_tags[key] = val
+            else:
+                metadata[key] = val
 
         for ec2_id in resources:
             instance_uuid = ec2utils.ec2_inst_id_to_uuid(context, ec2_id)
@@ -1868,8 +1875,18 @@ class CloudController(object):
                                             want_objects=True)
             self.compute_api.update_instance_metadata(context,
                 instance, metadata)
+            self._create_special_tags(context, instance, special_tags)
 
         return True
+
+    def _create_special_tags(self, context, instance, special_tags):
+        """Processes creation of special tags like 'Name' which have special
+        meaning in EC2.
+        """
+        for key in special_tags.keys():
+            if key == 'Name':
+                instance['display_name'] = special_tags[key]
+                instance.save()
 
     def delete_tags(self, context, **kwargs):
         """Delete tags
@@ -1910,11 +1927,21 @@ class CloudController(object):
                 if key is None:
                     msg = _('Expecting key to be set')
                     raise exception.InvalidParameterValue(message=msg)
-
-                self.compute_api.delete_instance_metadata(context,
-                        instance, key)
+                elif key in SPECIAL_TAGS:
+                    self._delete_special_tags(context, instance, key)
+                else:
+                    self.compute_api.delete_instance_metadata(context,
+                            instance, key)
 
         return True
+
+    def _delete_special_tags(self, context, instance, key):
+        """Processes deletion of special tags like 'Name' which have special
+        meaning in EC2.
+        """
+        if key == 'Name':
+            instance['display_name'] = ''
+            instance.save()
 
     def describe_tags(self, context, **kwargs):
         """List tags
@@ -1961,7 +1988,85 @@ class CloudController(object):
                 'key': tag['key'],
                 'value': tag['value']
             })
+        self._describe_special_tags(ts, context, search_filts)
         return {"tagSet": ts}
+
+    def _describe_special_tags(self, ts, context, filters):
+        """Processes and adds in special tags like 'Name' which have special
+        meaning in EC2.
+        """
+        filter_out = \
+            [filter for block in filters
+             if 'resource_type' in block and
+             block.get('resource_type') != 'instance']
+        if filter_out:
+            return
+
+        uuids = [uuid
+                 for block in filters
+                 for uuid in block.get('resource_id', [])]
+        search_opts = {'uuid': uuids} if uuids else {}
+        instances = self.compute_api.get_all(context,
+                                             search_opts=search_opts,
+                                             want_objects=True)
+        for instance in instances:
+            self._add_or_replace_special_tags(ts, instance, filters)
+
+    def _add_or_replace_special_tags(self, tag_set, instance, filters=None):
+        """Replaces or adds special tags to a tag set.
+        For example, the special tag 'Name' is set to the value
+        of the actual instance display name.
+
+        The current behaviour for special tag handling is as follows:
+        1. When a 'Name' tag is provided to create_tag, the tag is intercepted
+           and the instance is renamed instead. The 'Name' tag does not get
+           included in actual instance metadata.
+        2. When an instance is retrieved, the instance's tagSet will have the
+           Name tag inserted automatically, The Name tag's value will be equal
+           to the instance's display_name. If the instance metadata happens
+           to have a 'Name' tag, it will be replaced with the display_name
+           before being returned.
+        3. When the Name tag is deleted with delete_tag, it's intercepted and
+           the instance name is set to an empty string. The actual metadata is
+           not affected.
+        4. When describe_tags() is called, a tag called 'Name' will be returned
+           for each instance, provided the filter conditions are matched.
+        """
+        if not instance.get('display_name'):
+            return
+
+        filter_out = \
+            [filter for block in filters or []
+             if (
+                 ('key' in block and not
+                     [val for val in block.get('key', [])
+                      if re.match(val, 'Name')]) or
+                 ('value' in block and not
+                     [val for val in block.get('value', [])
+                      if re.match(val, instance.get('display_name'))])
+                 )
+             ]
+        if filter_out:
+            return
+
+        existing_name_tag = \
+            [tag for tag in tag_set
+             if tag['key'] == 'Name' and
+             tag.get('resource_type') == 'instance' and
+             tag['resource_id'] ==
+                ec2utils.id_to_ec2_inst_id(instance['uuid'])]
+
+        if existing_name_tag:
+            existing_name_tag[0]['value'] = instance.get('display_name') or \
+                existing_name_tag[0]['value']
+        else:
+            tag_set.append({
+                'resource_id':
+                    ec2utils.id_to_ec2_inst_id(instance['uuid']),
+                'resource_type': 'instance',
+                'key': 'Name',
+                'value': instance.get('display_name')
+            })
 
 
 class EC2SecurityGroupExceptions(object):
