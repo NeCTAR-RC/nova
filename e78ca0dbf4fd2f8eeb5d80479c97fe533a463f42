@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a106d94_77b6388c",
+        "filename": "nova/api/ec2/cloud.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000152
+      },
+      "writtenOn": "2015-10-30T10:32:46Z",
+      "side": 1,
+      "message": "This check causes boto\u0027s get_all_volumes() call to fail in its entirety should even one volume happen to be out of sync/have stale attachment information.\n\nI tried to trace the origin of this check and it looks like the check was mainly an artefact of refactoring, and not put in to specifically guard against some condition. Therefore, removing it altogether seems like the best option. The one side-effect will be that state attachment information may be sent back to the client, but this is something that should probably be fixed at a different level.",
+      "revId": "e78ca0dbf4fd2f8eeb5d80479c97fe533a463f42",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
