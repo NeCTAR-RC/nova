@@ -22,6 +22,12 @@ class DiskFilter(filters.BaseCellFilter):
         """
         LOG.debug('Filtering on disk for cell %s' % cell)
         request_spec = filter_properties['request_spec']
+        props = request_spec.get('instance_properties', {})
+        availability_zone = props.get('availability_zone')
+        # If AZ specified then skip disk filter
+        if availability_zone:
+            return True
+
         instance_type = request_spec['instance_type']
         disk_needed = (instance_type['root_gb'] +
                        instance_type['ephemeral_gb']) * 1024
