@@ -2203,6 +2203,9 @@ class API(base.Base):
         suspend_disabled = int(instance.system_metadata.get(
             NECTAR_SUSPEND_LOCK, 0))
 
+        if instance.vm_state == vm_states.STOPPED:
+            suspend_disabled = 0
+
         if suspend_disabled == 1:
             raise exception.InstanceSuspendDisabled(
                 instance_uuid=instance.uuid)
