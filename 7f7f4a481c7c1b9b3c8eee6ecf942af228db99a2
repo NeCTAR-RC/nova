@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bad4c104_efc7ed62",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 421,
+      "author": {
+        "id": 1000082
+      },
+      "writtenOn": "2016-01-15T01:58:55Z",
+      "side": 1,
+      "message": "new arg here that isn\u0027t in parameter list for method def",
+      "range": {
+        "startLine": 421,
+        "startChar": 42,
+        "endLine": 421,
+        "endChar": 78
+      },
+      "revId": "7f7f4a481c7c1b9b3c8eee6ecf942af228db99a2",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bad4c104_cfca296e",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 3306,
+      "author": {
+        "id": 1000082
+      },
+      "writtenOn": "2016-01-15T01:58:55Z",
+      "side": 1,
+      "message": "this looks like an unrelated artefact...?",
+      "range": {
+        "startLine": 3299,
+        "startChar": 0,
+        "endLine": 3306,
+        "endChar": 33
+      },
+      "revId": "7f7f4a481c7c1b9b3c8eee6ecf942af228db99a2",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
