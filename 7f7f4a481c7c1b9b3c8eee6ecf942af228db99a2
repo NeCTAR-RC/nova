@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "bad4c104_4fa619c3",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 421,
+      "author": {
+        "id": 1000150
+      },
+      "writtenOn": "2016-01-15T02:50:45Z",
+      "side": 1,
+      "message": "Thanks for catching this. Forgot to remove it while cleaning up the debugging code.",
+      "parentUuid": "bad4c104_efc7ed62",
+      "range": {
+        "startLine": 421,
+        "startChar": 42,
+        "endLine": 421,
+        "endChar": 78
+      },
+      "revId": "7f7f4a481c7c1b9b3c8eee6ecf942af228db99a2",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "bad4c104_cfca296e",
         "filename": "nova/compute/api.py",
         "patchSetId": 1
@@ -36,6 +60,30 @@
       "writtenOn": "2016-01-15T01:58:55Z",
       "side": 1,
       "message": "this looks like an unrelated artefact...?",
+      "range": {
+        "startLine": 3299,
+        "startChar": 0,
+        "endLine": 3306,
+        "endChar": 33
+      },
+      "revId": "7f7f4a481c7c1b9b3c8eee6ecf942af228db99a2",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bad4c104_2fa1d5a9",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 3306,
+      "author": {
+        "id": 1000150
+      },
+      "writtenOn": "2016-01-15T02:50:45Z",
+      "side": 1,
+      "message": "It really shouldn\u0027t be there. I\u0027ll restore this method\u0027s code. Thanks! \n\nIt looks like one of my colleague made a mistake while restoring the stable/liberty branch after he committed wrong code.",
+      "parentUuid": "bad4c104_cfca296e",
       "range": {
         "startLine": 3299,
         "startChar": 0,
