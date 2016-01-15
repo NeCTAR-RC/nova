@@ -95,12 +95,13 @@ class _TestQuotasObject(object):
         self.mox.StubOutWithMock(QUOTAS, 'reserve')
         QUOTAS.reserve(self.context, expire='expire',
                        project_id='project_id', user_id='user_id',
+                       availability_zone='fake_zone',
                        moo='cow').AndReturn(fake_reservations)
 
         self.mox.ReplayAll()
         quotas.reserve(expire='expire',
                        project_id='project_id', user_id='user_id',
-                       moo='cow')
+                       availability_zone='fake_zone', moo='cow')
         self.assertEqual(self.context, quotas._context)
         self.assertEqual(fake_reservations, quotas.reservations)
         self.assertEqual('project_id', quotas.project_id)
