@@ -85,10 +85,11 @@ class Quotas(base.NovaObject):
 
     @base.remotable
     def reserve(self, expire=None, project_id=None, user_id=None,
-                **deltas):
+                availability_zone=None, **deltas):
         reservations = quota.QUOTAS.reserve(self._context, expire=expire,
                                             project_id=project_id,
                                             user_id=user_id,
+                                            availability_zone=availability_zone,
                                             **deltas)
         self.reservations = reservations
         self.project_id = project_id

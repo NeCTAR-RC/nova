@@ -316,9 +316,9 @@ class FakeDriver(object):
                             values, project_id, user_id))
 
     def reserve(self, context, resources, deltas, expire=None,
-                project_id=None, user_id=None):
+                project_id=None, user_id=None, availability_zone=None):
         self.called.append(('reserve', context, resources, deltas,
-                            expire, project_id, user_id))
+                            expire, project_id, user_id, availability_zone))
         return self.reservations
 
     def commit(self, context, reservations, project_id=None, user_id=None):
@@ -694,13 +694,15 @@ class QuotaEngineTestCase(test.TestCase):
                 'resv-01', 'resv-02', 'resv-03', 'resv-04',
                 ])
         quota_obj = self._make_quota_obj(driver)
-        result1 = quota_obj.reserve(context, test_resource1=4,
-                                    test_resource2=3, test_resource3=2,
-                                    test_resource4=1)
+        result1 = quota_obj.reserve(context, availability_zone='fake_zone',
+                                    test_resource1=4, test_resource2=3,
+                                    test_resource3=2, test_resource4=1)
         result2 = quota_obj.reserve(context, expire=3600,
+                                    availability_zone='fake_zone',
                                     test_resource1=1, test_resource2=2,
                                     test_resource3=3, test_resource4=4)
         result3 = quota_obj.reserve(context, project_id='fake_project',
+                                    availability_zone='fake_zone',
                                     test_resource1=1, test_resource2=2,
                                     test_resource3=3, test_resource4=4)
 
@@ -710,19 +712,19 @@ class QuotaEngineTestCase(test.TestCase):
                         test_resource2=3,
                         test_resource3=2,
                         test_resource4=1,
-                        ), None, None, None),
+                        ), None, None, None, 'fake_zone'),
                 ('reserve', context, quota_obj._resources, dict(
                         test_resource1=1,
                         test_resource2=2,
                         test_resource3=3,
                         test_resource4=4,
-                        ), 3600, None, None),
+                        ), 3600, None, None, 'fake_zone'),
                 ('reserve', context, quota_obj._resources, dict(
                         test_resource1=1,
                         test_resource2=2,
                         test_resource3=3,
                         test_resource4=4,
-                        ), None, 'fake_project', None),
+                        ), None, 'fake_project', None, 'fake_zone'),
                 ])
         self.assertEqual(result1, [
                 'resv-01', 'resv-02', 'resv-03', 'resv-04',
