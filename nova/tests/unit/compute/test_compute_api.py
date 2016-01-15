@@ -148,6 +148,7 @@ class _ComputeAPIUnitTestMixIn(object):
         instance.info_cache = objects.InstanceInfoCache()
         instance.flavor = flavor
         instance.old_flavor = instance.new_flavor = None
+        instance.availability_zone = None
 
         if params:
             instance.update(params)
@@ -176,6 +177,7 @@ class _ComputeAPIUnitTestMixIn(object):
                                      project_id=mox.IgnoreArg(),
                                      user_id=mox.IgnoreArg())
             quota.QUOTAS.reserve(self.context, instances=40,
+                                 availability_zone=None,
                                  cores=mox.IsA(int),
                                  expire=mox.IgnoreArg(),
                                  project_id=mox.IgnoreArg(),
@@ -819,6 +821,7 @@ class _ComputeAPIUnitTestMixIn(object):
             self._test_delete_resizing_part(inst, deltas)
         quota.QUOTAS.reserve(self.context, project_id=inst.project_id,
                              user_id=inst.user_id,
+                             availability_zone=inst.availability_zone,
                              expire=mox.IgnoreArg(),
                              **deltas).AndReturn(reservations)
 
@@ -2553,7 +2556,8 @@ class _ComputeAPIUnitTestMixIn(object):
         self.assertEqual(1, quota_commit.call_count)
         quota_reserve.assert_called_once_with(instances=1,
             cores=instance.flavor.vcpus, ram=instance.flavor.memory_mb,
-            project_id=instance.project_id, user_id=instance.user_id)
+            project_id=instance.project_id, user_id=instance.user_id,
+            availability_zone=instance.availability_zone)
 
     @mock.patch('nova.objects.Quotas.commit')
     @mock.patch('nova.objects.Quotas.reserve')
@@ -2574,7 +2578,8 @@ class _ComputeAPIUnitTestMixIn(object):
         self.assertEqual(1, quota_commit.call_count)
         quota_reserve.assert_called_once_with(instances=1,
             cores=instance.flavor.vcpus, ram=instance.flavor.memory_mb,
-            project_id=instance.project_id, user_id=instance.user_id)
+            project_id=instance.project_id, user_id=instance.user_id,
+            availability_zone=instance.availability_zone)
 
     def test_external_instance_event(self):
         instances = [

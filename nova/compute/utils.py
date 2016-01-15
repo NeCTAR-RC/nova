@@ -489,8 +489,9 @@ def reserve_quota_delta(context, deltas, instance):
     if deltas:
         project_id, user_id = objects.quotas.ids_from_instance(context,
                                                                instance)
+        availability_zone = instance.availability_zone
         quotas.reserve(project_id=project_id, user_id=user_id,
-                       **deltas)
+                       availability_zone=availability_zone, **deltas)
     return quotas
 
 
