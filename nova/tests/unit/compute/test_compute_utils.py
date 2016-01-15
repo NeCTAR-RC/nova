@@ -768,7 +768,10 @@ class ComputeUtilsQuotaDeltaTestCase(test.TestCase):
                                                   inst.old_flavor)
         compute_utils.reserve_quota_delta(self.context, deltas, inst)
         mock_reserve.assert_called_once_with(project_id=inst.project_id,
-                                             user_id=inst.user_id, **deltas)
+                                             user_id=inst.user_id,
+                                             availability_zone=\
+                                             inst.availability_zone,
+                                             **deltas)
 
 
 class ComputeUtilsMigrationTestCase(test.TestCase):
