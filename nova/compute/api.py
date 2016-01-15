@@ -309,7 +309,8 @@ class API(base.Base):
         return headroom
 
     def _check_num_instances_quota(self, context, instance_type, min_count,
-                                   max_count, project_id=None, user_id=None):
+                                   max_count, project_id=None, user_id=None,
+                                   availability_zone=None):
         """Enforce quota limits on number of instances created."""
 
         # Determine requested cores and ram
@@ -322,7 +323,8 @@ class API(base.Base):
             quotas = objects.Quotas(context=context)
             quotas.reserve(instances=max_count,
                            cores=req_cores, ram=req_ram,
-                           project_id=project_id, user_id=user_id)
+                           project_id=project_id, user_id=user_id,
+                           availability_zone=availability_zone)
         except exception.OverQuota as exc:
             # OK, we exceeded quota; let's figure out why...
             quotas = exc.kwargs['quotas']
@@ -332,14 +334,27 @@ class API(base.Base):
                       'cores': req_cores, 'ram': req_ram}
             headroom = self._get_headroom(quotas, usages, deltas)
 
-            allowed = headroom['instances']
+            # compose headroom keyname for AZ usage
+            cores_key = 'cores'
+            ram_key = 'ram'
+            instances_key = 'instances'
+            if availability_zone:
+                headroom_keys = headroom.keys()
+                if 'cores_' + availability_zone in headroom_keys:
+                    cores_key = 'cores_' + availability_zone
+                if 'ram_' + availability_zone in headroom_keys:
+                    ram_key = 'ram_' + availability_zone
+                if 'instances_' + availability_zone in headroom_keys:
+                    instances_key = 'instances_' + availability_zone
+
+            allowed = headroom[instances_key]
             # Reduce 'allowed' instances in line with the cores & ram headroom
             if instance_type['vcpus']:
                 allowed = min(allowed,
-                              headroom['cores'] // instance_type['vcpus'])
+                              headroom[cores_key] // instance_type['vcpus'])
             if instance_type['memory_mb']:
                 allowed = min(allowed,
-                              headroom['ram'] // (instance_type['memory_mb'] +
+                            headroom[ram_key] // (instance_type['memory_mb'] +
                                                   vram_mb))
 
             # Convert to the appropriate exception message
@@ -348,15 +363,20 @@ class API(base.Base):
             elif min_count <= allowed <= max_count:
                 # We're actually OK, but still need reservations
                 return self._check_num_instances_quota(context, instance_type,
-                                                       min_count, allowed)
+                                                       min_count, allowed,
+                                        availability_zone=availability_zone)
             else:
                 msg = (_("Can only run %s more instances of this type.") %
                        allowed)
 
             num_instances = (str(min_count) if min_count == max_count else
                 "%s-%s" % (min_count, max_count))
-            requested = dict(instances=num_instances, cores=req_cores,
-                             ram=req_ram)
+
+            requested = {}
+            requested[instances_key] = num_instances
+            requested[cores_key] = req_cores
+            requested[ram_key] = req_ram
+
             (overs, reqs, total_alloweds, useds) = self._get_over_quota_detail(
                 headroom, overs, quotas, requested)
             params = {'overs': overs, 'pid': context.project_id,
@@ -956,8 +976,12 @@ class API(base.Base):
             block_device_mapping, shutdown_terminate,
             instance_group, check_server_group_quota, filter_properties):
         # Reserve quotas
+        availability_zone = None
+        if 'availability_zone' in base_options.keys():
+            availability_zone = base_options['availability_zone']
         num_instances, quotas = self._check_num_instances_quota(
-                context, instance_type, min_count, max_count)
+                context, instance_type, min_count, max_count,
+                availability_zone=availability_zone)
         security_groups = self.security_group_api.populate_security_groups(
                 security_groups)
         LOG.debug("Going to run %s instances...", num_instances)
@@ -1772,9 +1796,11 @@ class API(base.Base):
             instance_vcpus = instance.vcpus
             instance_memory_mb = instance.memory_mb
 
+        availability_zone = instance.availability_zone
         quotas = objects.Quotas(context=context)
         quotas.reserve(project_id=project_id,
                        user_id=user_id,
+                       availability_zone=availability_zone,
                        instances=-1,
                        cores=-instance_vcpus,
                        ram=-instance_memory_mb)
