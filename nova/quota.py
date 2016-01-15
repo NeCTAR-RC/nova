@@ -17,6 +17,7 @@
 """Quotas for instances, and floating ips."""
 
 import datetime
+import re
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -247,6 +248,7 @@ class DbQuotaDriver(object):
         # Use the project quota for default user quota.
         proj_quotas = project_quotas or db.quota_get_all_by_project(
             context, project_id)
+        self._register_new_project_resources(proj_quotas)
         for key, value in six.iteritems(proj_quotas):
             if key not in user_quotas.keys():
                 user_quotas[key] = value
@@ -285,6 +287,7 @@ class DbQuotaDriver(object):
         """
         project_quotas = project_quotas or db.quota_get_all_by_project(
             context, project_id)
+        self._register_new_project_resources(project_quotas)
         project_usages = None
         if usages:
             LOG.debug('Getting all quota usages for project: %s', project_id)
@@ -332,6 +335,7 @@ class DbQuotaDriver(object):
 
         settable_quotas = {}
         db_proj_quotas = db.quota_get_all_by_project(context, project_id)
+        self._register_new_project_resources(db_proj_quotas)
         project_quotas = self.get_project_quotas(context, resources,
                                                  project_id, remains=True,
                                                  project_quotas=db_proj_quotas)
@@ -460,6 +464,7 @@ class DbQuotaDriver(object):
 
         # Get the applicable quotas
         project_quotas = db.quota_get_all_by_project(context, project_id)
+        self._register_new_project_resources(project_quotas)
         quotas = self._get_quotas(context, resources, values.keys(),
                                   has_sync=False, project_id=project_id,
                                   project_quotas=project_quotas)
@@ -484,7 +489,7 @@ class DbQuotaDriver(object):
                                       usages={}, headroom=headroom)
 
     def reserve(self, context, resources, deltas, expire=None,
-                project_id=None, user_id=None):
+                project_id=None, user_id=None, availability_zone=None):
         """Check quotas and reserve resources.
 
         For counting quotas--those quotas for which there is a usage
@@ -545,32 +550,49 @@ class DbQuotaDriver(object):
                       user_id)
 
         LOG.debug('Attempting to reserve resources for project %(project_id)s '
-                  'and user %(user_id)s. Deltas: %(deltas)s',
+                  'and user %(user_id)s in %(availability_zone)s zone. Deltas:'
+                  ' %(deltas)s',
                   {'project_id': project_id, 'user_id': user_id,
-                   'deltas': deltas})
+                   'availability_zone': availability_zone, 'deltas': deltas})
 
         # Get the applicable quotas.
         # NOTE(Vek): We're not worried about races at this point.
         #            Yes, the admin may be in the process of reducing
         #            quotas, but that's a pretty rare thing.
         project_quotas = db.quota_get_all_by_project(context, project_id)
+        self._register_new_project_resources(project_quotas)
         LOG.debug('Quota limits for project %(project_id)s: '
                   '%(project_quotas)s', {'project_id': project_id,
                                          'project_quotas': project_quotas})
 
+        if availability_zone:
+            project_quotas_keys = project_quotas.keys()
+            if 'cores_'+availability_zone in project_quotas_keys and \
+                'cores' in deltas.keys():
+                deltas['cores_'+availability_zone] = deltas.pop('cores')
+            if 'ram_'+availability_zone in project_quotas_keys and \
+                'ram' in deltas.keys():
+                deltas['ram_'+availability_zone] = deltas.pop('ram')
+            if 'instances_'+availability_zone in project_quotas_keys and \
+                'instances' in deltas.keys():
+                deltas['instances_'+availability_zone] = deltas.pop('instances')
+
         quotas = self._get_quotas(context, resources, deltas.keys(),
                                   has_sync=True, project_id=project_id,
                                   project_quotas=project_quotas)
-        LOG.debug('Quotas for project %(project_id)s after resource sync: '
-                  '%(quotas)s', {'project_id': project_id, 'quotas': quotas})
+        LOG.debug('Quotas for project %(project_id)s in %(availability_zone)s '
+                  'zone after resource sync: %(quotas)s',
+                  {'project_id': project_id,
+                   'availability_zone': availability_zone, 'quotas': quotas})
         user_quotas = self._get_quotas(context, resources, deltas.keys(),
                                        has_sync=True, project_id=project_id,
                                        user_id=user_id,
                                        project_quotas=project_quotas)
         LOG.debug('Quotas for project %(project_id)s and user %(user_id)s '
-                  'after resource sync: %(quotas)s',
+                  'in %(availability_zone)s zone after resource sync: '
+                  '%(quotas)s',
                   {'project_id': project_id, 'user_id': user_id,
-                   'quotas': quotas})
+                   'availability_zone': availability_zone, 'quotas': quotas})
 
         # NOTE(Vek): Most of the work here has to be done in the DB
         #            API, because we have to do it in a transaction,
@@ -688,6 +710,39 @@ class DbQuotaDriver(object):
         """
 
         db.reservation_expire(context)
+
+    def _register_new_project_resources(self, project_quotas):
+        # get new project resources to register
+        project_resources = project_quotas.keys()
+        if 'project_id' in project_resources:
+            project_resources.remove('project_id')
+        resources = QUOTAS.resources
+        new_resources = list(set(project_resources) - set(resources))
+        # get new config options to register
+        opts = CONF._opts.keys()
+        new_opts = list(set('quota_' + res for res in new_resources) -
+                        set(opts))
+        # register new project resources as config options
+        for new_opt in new_opts:
+            if re.search('cores',new_opt):
+                default = 20
+                description = 'Number of instance cores allowed per project'
+            if re.search('ram',new_opt):
+                default = 50 * 1024
+                description = 'Megabytes of instance RAM allowed per project'
+            if re.search('instances',new_opt):
+                default = 10
+                description = 'Number of instances allowed per project'
+            CONF.register_opt(cfg.IntOpt(new_opt,
+                                         default=default,
+                                         help=description))
+        opts = CONF._opts.keys()
+        # register new project resources as quota resources
+        for new_resource in new_resources:
+            QUOTAS.register_resource(ReservableResource(new_resource,
+                                                        '_sync_instances',
+                                                      'quota_' + new_resource))
+        resources = QUOTAS.resources
 
 
 class NoopQuotaDriver(object):
@@ -1302,7 +1357,7 @@ class QuotaEngine(object):
                                         project_id=project_id, user_id=user_id)
 
     def reserve(self, context, expire=None, project_id=None, user_id=None,
-                **deltas):
+                availability_zone=None, **deltas):
         """Check quotas and reserve resources.
 
         For counting quotas--those quotas for which there is a usage
@@ -1340,7 +1395,8 @@ class QuotaEngine(object):
         reservations = self._driver.reserve(context, self._resources, deltas,
                                             expire=expire,
                                             project_id=project_id,
-                                            user_id=user_id)
+                                            user_id=user_id,
+                                            availability_zone=availability_zone)
 
         LOG.debug("Created reservations %s", reservations)
 

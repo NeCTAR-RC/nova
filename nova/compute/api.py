@@ -372,6 +372,7 @@ class API(base.Base):
         headroom = {res: quotas[res] -
                          (usages[res]['in_use'] + usages[res]['reserved'])
                     for res in quotas.keys()}
+
         # If quota_cores is unlimited [-1]:
         # - set cores headroom based on instances headroom:
         if quotas.get('cores') == -1:
@@ -393,7 +394,8 @@ class API(base.Base):
         return headroom
 
     def _check_num_instances_quota(self, context, instance_type, min_count,
-                                   max_count, project_id=None, user_id=None):
+                                   max_count, project_id=None, user_id=None,
+                                   availability_zone=None):
         """Enforce quota limits on number of instances created."""
 
         # Determine requested cores and ram
@@ -406,7 +408,8 @@ class API(base.Base):
             quotas = objects.Quotas(context=context)
             quotas.reserve(instances=max_count,
                            cores=req_cores, ram=req_ram,
-                           project_id=project_id, user_id=user_id)
+                           project_id=project_id, user_id=user_id,
+                           availability_zone=availability_zone)
         except exception.OverQuota as exc:
             # OK, we exceeded quota; let's figure out why...
             quotas = exc.kwargs['quotas']
@@ -414,16 +417,30 @@ class API(base.Base):
             usages = exc.kwargs['usages']
             deltas = {'instances': max_count,
                       'cores': req_cores, 'ram': req_ram}
-            headroom = self._get_headroom(quotas, usages, deltas)
+            headroom = self._get_headroom(quotas, usages, deltas,
+                                          availability_zone=availability_zone)
 
-            allowed = headroom['instances']
+            # compose headroom keyname for AZ usage
+            cores_key = 'cores'
+            ram_key = 'ram'
+            instances_key = 'instances'
+            if availability_zone:
+                headroom_keys = headroom.keys()
+                if 'cores_'+availability_zone in headroom_keys:
+                    cores_key = 'cores_'+availability_zone
+                if 'ram_'+availability_zone in headroom_keys:
+                    ram_key = 'ram_'+availability_zone
+                if 'instances_'+availability_zone in headroom_keys:
+                    instances_key = 'instances_'+availability_zone
+
+            allowed = headroom[instances_key]
             # Reduce 'allowed' instances in line with the cores & ram headroom
             if instance_type['vcpus']:
                 allowed = min(allowed,
-                              headroom['cores'] // instance_type['vcpus'])
+                              headroom[cores_key] // instance_type['vcpus'])
             if instance_type['memory_mb']:
                 allowed = min(allowed,
-                              headroom['ram'] // (instance_type['memory_mb'] +
+                              headroom[ram_key] // (instance_type['memory_mb'] +
                                                   vram_mb))
 
             # Convert to the appropriate exception message
@@ -432,15 +449,20 @@ class API(base.Base):
             elif min_count <= allowed <= max_count:
                 # We're actually OK, but still need reservations
                 return self._check_num_instances_quota(context, instance_type,
-                                                       min_count, allowed)
+                                                       min_count, allowed,
+                                        availability_zone=availability_zone)
             else:
                 msg = (_("Can only run %s more instances of this type.") %
                        allowed)
 
             num_instances = (str(min_count) if min_count == max_count else
                 "%s-%s" % (min_count, max_count))
-            requested = dict(instances=num_instances, cores=req_cores,
-                             ram=req_ram)
+
+            requested = {}
+            requested[instances_key] = num_instances
+            requested[cores_key] = req_cores
+            requested[ram_key] = req_ram
+
             (overs, reqs, total_alloweds, useds) = self._get_over_quota_detail(
                 headroom, overs, quotas, requested)
             params = {'overs': overs, 'pid': context.project_id,
@@ -1009,8 +1031,10 @@ class API(base.Base):
             block_device_mapping, shutdown_terminate,
             instance_group, check_server_group_quota):
         # Reserve quotas
+        availability_zone = base_options['availability_zone']
         num_instances, quotas = self._check_num_instances_quota(
-                context, instance_type, min_count, max_count)
+                context, instance_type, min_count, max_count,
+                availability_zone=availability_zone)
         LOG.debug("Going to run %s instances..." % num_instances)
         instances = []
         try:
@@ -1796,9 +1820,11 @@ class API(base.Base):
                 instance_vcpus, instance_memory_mb = get_inst_attrs(migration,
                                                                     instance)
 
+        availability_zone = instance.availability_zone
         quotas = objects.Quotas(context=context)
         quotas.reserve(project_id=project_id,
                        user_id=user_id,
+                       availability_zone=availability_zone,
                        instances=-1,
                        cores=-instance_vcpus,
                        ram=-instance_memory_mb)
@@ -3271,12 +3297,13 @@ class API(base.Base):
         return bdms.root_bdm()
 
     def is_volume_backed_instance(self, context, instance, bdms=None):
+        if not instance.image_ref:
+            return True
+
         root_bdm = self._get_root_bdm(context, instance, bdms)
-        if root_bdm is not None:
-            return root_bdm.is_volume
-        # in case we hit a very old instance without root bdm, we _assume_ that
-        # instance is backed by a volume, if and only if image_ref is not set
-        return not instance.image_ref
+        if not root_bdm:
+            return False
+        return root_bdm.is_volume
 
     @check_instance_lock
     @check_instance_cell
