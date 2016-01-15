@@ -316,9 +316,9 @@ class FakeDriver(object):
                             values, project_id, user_id))
 
     def reserve(self, context, resources, deltas, expire=None,
-                project_id=None, user_id=None):
+                project_id=None, user_id=None, availability_zone=None):
         self.called.append(('reserve', context, resources, deltas,
-                            expire, project_id, user_id))
+                            expire, project_id, user_id, availability_zone))
         return self.reservations
 
     def commit(self, context, reservations, project_id=None, user_id=None):
@@ -694,13 +694,15 @@ class QuotaEngineTestCase(test.TestCase):
                 'resv-01', 'resv-02', 'resv-03', 'resv-04',
                 ])
         quota_obj = self._make_quota_obj(driver)
-        result1 = quota_obj.reserve(context, test_resource1=4,
-                                    test_resource2=3, test_resource3=2,
-                                    test_resource4=1)
+        result1 = quota_obj.reserve(context, availability_zone='fake_zone',
+                                    test_resource1=4, test_resource2=3,
+                                    test_resource3=2, test_resource4=1)
         result2 = quota_obj.reserve(context, expire=3600,
+                                    availability_zone='fake_zone',
                                     test_resource1=1, test_resource2=2,
                                     test_resource3=3, test_resource4=4)
         result3 = quota_obj.reserve(context, project_id='fake_project',
+                                    availability_zone='fake_zone',
                                     test_resource1=1, test_resource2=2,
                                     test_resource3=3, test_resource4=4)
 
@@ -710,19 +712,19 @@ class QuotaEngineTestCase(test.TestCase):
                         test_resource2=3,
                         test_resource3=2,
                         test_resource4=1,
-                        ), None, None, None),
+                        ), None, None, None, 'fake_zone'),
                 ('reserve', context, quota_obj._resources, dict(
                         test_resource1=1,
                         test_resource2=2,
                         test_resource3=3,
                         test_resource4=4,
-                        ), 3600, None, None),
+                        ), 3600, None, None, 'fake_zone'),
                 ('reserve', context, quota_obj._resources, dict(
                         test_resource1=1,
                         test_resource2=2,
                         test_resource3=3,
                         test_resource4=4,
-                        ), None, 'fake_project', None),
+                        ), None, 'fake_project', None, 'fake_zone'),
                 ])
         self.assertEqual(result1, [
                 'resv-01', 'resv-02', 'resv-03', 'resv-04',
@@ -2345,6 +2347,403 @@ class DbQuotaDriverTestCase(test.TestCase):
         exemplar = [('quota_usage_update', elevated, 'test_project',
                      'fake_user', res, dict(in_use=-1)) for res in resources]
         self.assertEqual(calls, exemplar)
+
+    def _stub_zone_get_by_project_and_user(self):
+        def fake_qgabpau(context, project_id, user_id):
+            self.calls.append('quota_get_all_by_project_and_user')
+            self.assertEqual(project_id, 'test_project')
+            self.assertEqual(user_id, 'fake_user')
+            return dict(
+                instances_fake_zone=10,
+                cores_fake_zone=20,
+                ram_fake_zone=50 * 1024,
+                )
+
+        def fake_qgabp(context, project_id):
+            self.calls.append('quota_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=10,
+                cores_fake_zone=20,
+                ram_fake_zone=50 * 1024,
+                )
+
+        def fake_qugabpau(context, project_id, user_id):
+            self.calls.append('quota_usage_get_all_by_project_and_user')
+            self.assertEqual(project_id, 'test_project')
+            self.assertEqual(user_id, 'fake_user')
+            return dict(
+                instances_fake_zone=dict(in_use=2, reserved=2),
+                cores_fake_zone=dict(in_use=4, reserved=4),
+                ram_fake_zone=dict(in_use=10 * 1024, reserved=10 * 1024),
+                )
+
+        self.stubs.Set(db, 'quota_get_all_by_project_and_user', fake_qgabpau)
+        self.stubs.Set(db, 'quota_get_all_by_project', fake_qgabp)
+        self.stubs.Set(db, 'quota_usage_get_all_by_project_and_user',
+                       fake_qugabpau)
+
+        self._stub_quota_class_get_all_by_name()
+
+    def test_zone_get_user_quotas(self):
+        self._stub_zone_get_by_project_and_user()
+        result = self.driver.get_user_quotas(
+            FakeContext('test_project', 'test_class'),
+            quota.QUOTAS._resources, 'test_project', 'fake_user')
+        self.assertEqual(self.calls, [
+                'quota_get_all_by_project_and_user',
+                'quota_get_all_by_project',
+                'quota_usage_get_all_by_project_and_user',
+                'quota_class_get_all_by_name',
+                ])
+        self.assertEqual(result, dict(
+                instances_fake_zone=dict(
+                    limit=10,
+                    in_use=2,
+                    reserved=2,
+                    ),
+               cores_fake_zone=dict(
+                    limit=20,
+                    in_use=4,
+                    reserved=4,
+                    ),
+                ram_fake_zone=dict(
+                    limit=50 * 1024,
+                    in_use=10 * 1024,
+                    reserved=10 * 1024,
+                    ),
+                instances=dict(
+                    limit=5,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                cores=dict(
+                    limit=20,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                ram=dict(
+                    limit=25 * 1024,
+                    in_use=0,
+                    reserved=0,
+                     ),
+                floating_ips=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                fixed_ips=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                metadata_items=dict(
+                    limit=64,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_files=dict(
+                    limit=5,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_file_content_bytes=dict(
+                    limit=5 * 1024,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_file_path_bytes=dict(
+                    limit=255,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                security_groups=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                security_group_rules=dict(
+                    limit=20,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                key_pairs=dict(
+                    limit=100,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                server_groups=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                server_group_members=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                ))
+
+    def _stub_zone_get_by_project(self):
+        def fake_qgabp(context, project_id):
+            self.calls.append('quota_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=10,
+                cores_fake_zone=20,
+                ram_fake_zone=50 * 1024,
+                )
+
+        def fake_qugabp(context, project_id):
+            self.calls.append('quota_usage_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=dict(in_use=2, reserved=2),
+                cores_fake_zone=dict(in_use=4, reserved=4),
+                ram_fake_zone=dict(in_use=10 * 1024, reserved=10 * 1024),
+                )
+
+        self.stubs.Set(db, 'quota_get_all_by_project', fake_qgabp)
+        self.stubs.Set(db, 'quota_usage_get_all_by_project', fake_qugabp)
+
+    def test_zone_get_project_quotas(self):
+        self._stub_zone_get_by_project()
+        self._stub_quota_class_get_all_by_name()
+        self._stub_quota_class_get_default()
+        result = self.driver.get_project_quotas(
+            FakeContext('test_project', 'test_class'),
+            quota.QUOTAS._resources, 'test_project')
+        self.assertEqual(self.calls, [
+                'quota_get_all_by_project',
+                'quota_usage_get_all_by_project',
+                'quota_class_get_all_by_name',
+                'quota_class_get_default',
+                ])
+        self.assertEqual(result, dict(
+                instances_fake_zone=dict(
+                    limit=10,
+                    in_use=2,
+                    reserved=2,
+                    ),
+               cores_fake_zone=dict(
+                    limit=20,
+                    in_use=4,
+                    reserved=4,
+                    ),
+                ram_fake_zone=dict(
+                    limit=50 * 1024,
+                    in_use=10 * 1024,
+                    reserved=10 * 1024,
+                    ),
+                instances=dict(
+                    limit=5,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                cores=dict(
+                    limit=20,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                ram=dict(
+                    limit=25 * 1024,
+                    in_use=0,
+                    reserved=0,
+                     ),
+                floating_ips=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                fixed_ips=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                metadata_items=dict(
+                    limit=64,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_files=dict(
+                    limit=5,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_file_content_bytes=dict(
+                    limit=5 * 1024,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                injected_file_path_bytes=dict(
+                    limit=255,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                security_groups=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                security_group_rules=dict(
+                    limit=20,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                key_pairs=dict(
+                    limit=100,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                server_groups=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                server_group_members=dict(
+                    limit=10,
+                    in_use=0,
+                    reserved=0,
+                    ),
+                ))
+
+    def _stub_zone_get_settable_quotas(self):
+        def fake_qgabp(context, project_id):
+            self.calls.append('quota_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=10,
+                cores_fake_zone=20,
+                ram_fake_zone=50 * 1024,
+                )
+
+        def fake_gpq(context, resources, project_id,
+                     quota_class=None, defaults=True, usages=True,
+                     remains=False, project_quotas=None):
+            self.calls.append('get_project_quotas')
+            return dict(
+                instances_fake_zone=dict(
+                    limit=10,
+                    in_use=2,
+                    reserved=2,
+                    remains=8
+                    ),
+               cores_fake_zone=dict(
+                    limit=20,
+                    in_use=4,
+                    reserved=4,
+                    remains=16
+                    ),
+                ram_fake_zone=dict(
+                    limit=50 * 1024,
+                    in_use=10 * 1024,
+                    reserved=10 * 1024,
+                    remains=40 * 1024
+                    ),
+                )
+
+        self.stubs.Set(db, 'quota_get_all_by_project', fake_qgabp)
+        self.stubs.Set(self.driver, 'get_project_quotas', fake_gpq)
+
+    def test_zone_get_settable_quotas(self):
+        self._stub_zone_get_settable_quotas()
+        result = self.driver.get_settable_quotas(
+            FakeContext('test_project', 'test_class'),
+            quota.QUOTAS._resources, 'test_project')
+        self.assertEqual(self.calls, [
+                'quota_get_all_by_project',
+                'get_project_quotas',
+                ])
+        self.assertEqual(result, {
+                'instances_fake_zone': {
+                    'minimum': 4,
+                    'maximum': -1,
+                    },
+                'cores_fake_zone': {
+                    'minimum': 8,
+                    'maximum': -1,
+                    },
+                'ram_fake_zone': {
+                    'minimum': 20 * 1024,
+                    'maximum': -1,
+                    },
+                })
+
+    def _stub_zone_quota_reserve(self):
+        def fake_quota_reserve(context, resources, quotas, user_quotas, deltas,
+                               expire, until_refresh, max_age, project_id=None,
+                               user_id=None):
+            self.calls.append(('quota_reserve', expire, until_refresh,
+                               max_age))
+            return ['resv-1', 'resv-2', 'resv-3']
+
+        def fake_gpq(context, resources, project_id,
+                     quota_class=None, defaults=True, usages=True,
+                     remains=False, project_quotas=None):
+            self.calls.append('get_project_quotas')
+            return dict(
+                instances_fake_zone=dict(
+                    limit=10,
+                    in_use=2,
+                    reserved=2,
+                    ),
+               cores_fake_zone=dict(
+                    limit=20,
+                    in_use=4,
+                    reserved=4,
+                    ),
+                ram_fake_zone=dict(
+                    limit=50 * 1024,
+                    in_use=10 * 1024,
+                    reserved=10 * 1024,
+                    ),
+                )
+
+        def fake_vmccr(resource, method):
+            self.calls.append('_valid_method_call_check_resources')
+
+        def fake_qgabp(context, project_id):
+            self.calls.append('quota_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=10,
+                cores_fake_zone=20,
+                ram_fake_zone=50 * 1024,
+                )
+
+        def fake_qugabp(context, project_id):
+            self.calls.append('quota_usage_get_all_by_project')
+            self.assertEqual(project_id, 'test_project')
+            return dict(
+                instances_fake_zone=dict(in_use=2, reserved=2),
+                cores_fake_zone=dict(in_use=4, reserved=4),
+                ram_fake_zone=dict(in_use=10 * 1024, reserved=10 * 1024),
+                )
+
+        self.stubs.Set(db, 'quota_reserve', fake_quota_reserve)
+        self.stubs.Set(self.driver, 'get_project_quotas', fake_gpq)
+        self.stubs.Set(quota, '_valid_method_call_check_resources', fake_vmccr)
+        self.stubs.Set(db, 'quota_get_all_by_project', fake_qgabp)
+        self.stubs.Set(db, 'quota_usage_get_all_by_project', fake_qugabp)
+
+    def test_zone_reserve(self):
+        self._stub_zone_quota_reserve()
+        result = self.driver.reserve(FakeContext('test_project', 'test_class'),
+                                     quota.QUOTAS._resources,
+                                     dict(instances=1,
+                                          cores=1,
+                                          ram=512,
+                                          ),
+                                     availability_zone='fake_zone')
+        expire = timeutils.utcnow() + datetime.timedelta(seconds=86400)
+        self.assertEqual(self.calls, [
+                '_valid_method_call_check_resources',
+                'quota_get_all_by_project',
+                'get_project_quotas',
+                ('quota_reserve', expire, 0, 0),
+                ])
+
+        self.assertEqual(result, ['resv-1', 'resv-2', 'resv-3'])
 
 
 class FakeSession(object):

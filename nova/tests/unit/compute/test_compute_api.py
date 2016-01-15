@@ -148,6 +148,7 @@ class _ComputeAPIUnitTestMixIn(object):
         instance.info_cache = objects.InstanceInfoCache()
         instance.flavor = flavor
         instance.old_flavor = instance.new_flavor = None
+        instance.availability_zone = None
 
         if params:
             instance.update(params)
@@ -176,6 +177,7 @@ class _ComputeAPIUnitTestMixIn(object):
                                      project_id=mox.IgnoreArg(),
                                      user_id=mox.IgnoreArg())
             quota.QUOTAS.reserve(self.context, instances=40,
+                                 availability_zone=None,
                                  cores=mox.IsA(int),
                                  expire=mox.IgnoreArg(),
                                  project_id=mox.IgnoreArg(),
@@ -819,6 +821,7 @@ class _ComputeAPIUnitTestMixIn(object):
             self._test_delete_resizing_part(inst, deltas)
         quota.QUOTAS.reserve(self.context, project_id=inst.project_id,
                              user_id=inst.user_id,
+                             availability_zone=inst.availability_zone,
                              expire=mox.IgnoreArg(),
                              **deltas).AndReturn(reservations)
 
@@ -1594,6 +1597,36 @@ class _ComputeAPIUnitTestMixIn(object):
                                                             instance_num)
             except exception.TooManyInstances as e:
                 self.assertEqual('cores, instances, ram', e.kwargs['overs'])
+                self.assertEqual('1, 1, 512', e.kwargs['req'])
+                self.assertEqual('1, 1, 512', e.kwargs['used'])
+                self.assertEqual('1, 1, 512', e.kwargs['allowed'])
+            else:
+                self.fail("Exception not raised")
+
+    def test_check_instance_quota_exceeds_with_zone_resources(self):
+        quotas = {'cores_fake_zone': 1,
+                  'instances_fake_zone': 1,
+                  'ram_fake_zone': 512}
+        usages = {'cores_fake_zone': dict(in_use=1, reserved=0),
+                  'instances_fake_zone': dict(in_use=1, reserved=0),
+                  'ram_fake_zone': dict(in_use=512, reserved=0)}
+        overs = ['cores_fake_zone', 'instances_fake_zone', 'ram_fake_zone']
+        over_quota_args = dict(quotas=quotas,
+                               usages=usages,
+                               overs=overs)
+        e = exception.OverQuota(**over_quota_args)
+        fake_flavor = self._create_flavor()
+        instance_num = 1
+        with mock.patch.object(objects.Quotas, 'reserve', side_effect=e):
+            try:
+                self.compute_api._check_num_instances_quota(self.context,
+                                                            fake_flavor,
+                                                            instance_num,
+                                                            instance_num,
+                                                availability_zone='fake_zone')
+            except exception.TooManyInstances as e:
+                self.assertEqual('cores_fake_zone, instances_fake_zone,'
+                                 ' ram_fake_zone', e.kwargs['overs'])
                 self.assertEqual('1, 1, 512', e.kwargs['req'])
                 self.assertEqual('1, 1, 512', e.kwargs['used'])
                 self.assertEqual('1, 1, 512', e.kwargs['allowed'])
@@ -2553,7 +2586,8 @@ class _ComputeAPIUnitTestMixIn(object):
         self.assertEqual(1, quota_commit.call_count)
         quota_reserve.assert_called_once_with(instances=1,
             cores=instance.flavor.vcpus, ram=instance.flavor.memory_mb,
-            project_id=instance.project_id, user_id=instance.user_id)
+            project_id=instance.project_id, user_id=instance.user_id,
+            availability_zone=instance.availability_zone)
 
     @mock.patch('nova.objects.Quotas.commit')
     @mock.patch('nova.objects.Quotas.reserve')
@@ -2574,7 +2608,8 @@ class _ComputeAPIUnitTestMixIn(object):
         self.assertEqual(1, quota_commit.call_count)
         quota_reserve.assert_called_once_with(instances=1,
             cores=instance.flavor.vcpus, ram=instance.flavor.memory_mb,
-            project_id=instance.project_id, user_id=instance.user_id)
+            project_id=instance.project_id, user_id=instance.user_id,
+            availability_zone=instance.availability_zone)
 
     def test_external_instance_event(self):
         instances = [
