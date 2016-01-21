@@ -2068,7 +2068,7 @@ class CloudController(object):
         existing_name_tag = \
             [tag for tag in tag_set
              if tag['key'] == 'Name' and
-             tag['resource_type'] == 'instance' and
+             tag.get('resource_type') == 'instance' and
              tag['resource_id'] ==
                 ec2utils.id_to_ec2_inst_id(instance['uuid'])]
 
