@@ -2013,7 +2013,7 @@ class CloudController(object):
         filter_out = \
             [filter for block in filters
              if 'resource_type' in block and
-             block.get('resource_type') != 'instance']
+             block.get('resource_type', None) != 'instance']
         if filter_out:
             return
 
@@ -2068,7 +2068,7 @@ class CloudController(object):
         existing_name_tag = \
             [tag for tag in tag_set
              if tag['key'] == 'Name' and
-             tag['resource_type'] == 'instance' and
+             tag.get('resource_type', None) == 'instance' and
              tag['resource_id'] ==
                 ec2utils.id_to_ec2_inst_id(instance['uuid'])]
 
