@@ -125,6 +125,10 @@ neutron_opts = [
     cfg.ListOpt('default_networks',
                 default=[],
                 help='Default networks to bind an instance too'),
+    cfg.StrOpt('floating_provider_network_filter',
+                help='Provider type to filter by when getting floating IP '
+                     'pools.'),
+
    ]
 
 NEUTRON_GROUP = 'neutron'
@@ -1407,6 +1411,10 @@ class API(base_api.NetworkAPI):
 
     def _get_floating_ip_pools(self, client, project_id=None):
         search_opts = {constants.NET_EXTERNAL: True}
+        if CONF.neutron.floating_provider_network_filter:
+            search_opts['provider:network_type'] = \
+                            CONF.neutron.floating_provider_network_filter
+
         if project_id:
             search_opts.update({'tenant_id': project_id})
         data = client.list_networks(**search_opts)
