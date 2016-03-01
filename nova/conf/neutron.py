@@ -73,6 +73,11 @@ extensions with no wait.
         default=[],
                 help='Default networks to bind an instance too'
 ),
+    cfg.StrOpt('floating_provider_network_filter',
+        help="""
+Provider type to filter by when getting floating IP'
+pools.
+"""),
 ]
 
 metadata_proxy_opts = [
