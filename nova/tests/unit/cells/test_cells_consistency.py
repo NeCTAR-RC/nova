@@ -18,7 +18,6 @@ import random
 from nova.cells import consistency
 from nova import context
 from nova import db
-from nova import exception
 from nova import test
 
 

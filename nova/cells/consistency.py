@@ -146,7 +146,8 @@ class ConsistencyHandler(object):
 
     def _heal_entries(self, ctxt):
         num_entries = self.update_number
-        LOG.info(_LI("Synching %s %s") % (num_entries, self.model_name_plural))
+        LOG.info(_LI("Synching %(num)s %(name)s") % {
+            'num': num_entries, 'name': self.model_name_plural})
         for i in xrange(num_entries):
             while True:
                 # Yield to other greenthreads
@@ -157,7 +158,7 @@ class ConsistencyHandler(object):
                         _LI("No more %s to sync") % (self.model_name_plural))
                     return
                 self._sync_entry(ctxt, entry)
-                # TODO why is this break here?
+                # TODO(sorrison) why is this break here?
                 break
 
 

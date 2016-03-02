@@ -2780,36 +2780,6 @@ class _ComputeAPIUnitTestMixIn(object):
         api = compute_api.API(skip_policy_check=True)
         api.create(self.context, None, None)
 
-    def _test_detach_interface_invalid_state(self, state):
-        instance = self._create_instance_obj(
-            params={'vm_state': state})
-        self.assertRaises(exception.InstanceInvalidState,
-                          self.compute_api.detach_interface,
-                          self.context, instance, '')
-
-    def test_detach_interface_invalid_state(self):
-        for state in [vm_states.BUILDING, vm_states.DELETED,
-                      vm_states.ERROR, vm_states.RESCUED,
-                      vm_states.RESIZED, vm_states.SOFT_DELETED,
-                      vm_states.SUSPENDED, vm_states.SHELVED,
-                      vm_states.SHELVED_OFFLOADED]:
-            self._test_detach_interface_invalid_state(state)
-
-    def _test_attach_interface_invalid_state(self, state):
-        instance = self._create_instance_obj(
-            params={'vm_state': state})
-        self.assertRaises(exception.InstanceInvalidState,
-                          self.compute_api.attach_interface,
-                          self.context, instance, '', '', [])
-
-    def test_attach_interface_invalid_state(self):
-        for state in [vm_states.BUILDING, vm_states.DELETED,
-                      vm_states.ERROR, vm_states.RESCUED,
-                      vm_states.RESIZED, vm_states.SOFT_DELETED,
-                      vm_states.SUSPENDED, vm_states.SHELVED,
-                      vm_states.SHELVED_OFFLOADED]:
-            self._test_attach_interface_invalid_state(state)
-
     def test_populate_instance_names_host_name(self):
         params = dict(display_name="vm1")
         instance = self._create_instance_obj(params=params)
