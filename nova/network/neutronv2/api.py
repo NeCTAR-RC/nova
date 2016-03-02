@@ -756,9 +756,9 @@ class API(base_api.NetworkAPI):
                                                 port_ids, admin_client,
                                                 preexisting_port_ids)
             base_api.update_instance_cache_with_nw_info(self, context,
-                                                        instance,
-                                                        nw_info=result,
-                                                        update_cells=update_cells)
+                                                instance,
+                                                nw_info=result,
+                                                update_cells=update_cells)
         return result
 
     def _get_instance_nw_info(self, context, instance, networks=None,

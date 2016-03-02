@@ -2774,13 +2774,13 @@ class CloudTestCase(test.TestCase):
         expected_bdm['blockDeviceMapping'].sort()
         self.assertEqual(bdm, expected_bdm)
         # NOTE(sorrison) Commented out
-        #groupSet = get_attribute('groupSet')
-        #groupSet['groupSet'].sort()
-        #expected_groupSet = {'instance_id': 'i-12345678',
+        # groupSet = get_attribute('groupSet')
+        # groupSet['groupSet'].sort()
+        # expected_groupSet = {'instance_id': 'i-12345678',
         #                     'groupSet': [{'groupId': 'fake0'},
         #                                  {'groupId': 'fake1'}]}
-        #expected_groupSet['groupSet'].sort()
-        #self.assertEqual(groupSet, expected_groupSet)
+        # expected_groupSet['groupSet'].sort()
+        # self.assertEqual(groupSet, expected_groupSet)
         self.assertEqual(get_attribute('instanceInitiatedShutdownBehavior'),
                          {'instance_id': 'i-12345678',
                           'instanceInitiatedShutdownBehavior': 'stop'})

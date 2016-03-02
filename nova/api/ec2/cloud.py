@@ -21,8 +21,8 @@ datastore.
 """
 
 import base64
-import time
 import re
+import time
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -608,9 +608,8 @@ class CloudController(object):
                                   source_security_group_owner_id=None):
 
         if source_security_group_name:
-            source_project_id = self._get_source_project_id(context,
-                source_security_group_owner_id)
-            source_security_group = self.security_group_api.get(context, source_security_group_name)
+            source_security_group = self.security_group_api.get(
+                context, source_security_group_name)
             notfound = exception.SecurityGroupNotFound
             if not source_security_group:
                 raise notfound(security_group_id=source_security_group_name)
@@ -1889,8 +1888,7 @@ class CloudController(object):
         return True
 
     def _create_special_tags(self, context, instance, special_tags):
-        """
-        Processes creation of special tags like 'Name' which have special
+        """Processes creation of special tags like 'Name' which have special
         meaning in EC2.
         """
         for key in special_tags.keys():
@@ -1946,8 +1944,7 @@ class CloudController(object):
         return True
 
     def _delete_special_tags(self, context, instance, key):
-        """
-        Processes deletion of special tags like 'Name' which have special
+        """Processes deletion of special tags like 'Name' which have special
         meaning in EC2.
         """
         if key == 'Name':
@@ -2003,8 +2000,7 @@ class CloudController(object):
         return {"tagSet": ts}
 
     def _describe_special_tags(self, ts, context, filters):
-        """
-        Processes and adds in special tags like 'Name' which have special
+        """Processes and adds in special tags like 'Name' which have special
         meaning in EC2.
         """
         filter_out = \
@@ -2025,8 +2021,7 @@ class CloudController(object):
             self._add_or_replace_special_tags(ts, instance, filters)
 
     def _add_or_replace_special_tags(self, tag_set, instance, filters=None):
-        """
-        Replaces or adds special tags to a tag set.
+        """Replaces or adds special tags to a tag set.
         For example, the special tag 'Name' is set to the value
         of the actual instance display name.
 
