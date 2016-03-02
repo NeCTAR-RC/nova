@@ -1754,8 +1754,8 @@ def s3_image_get(context, image_id):
 
 def s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
                                 limit=None, marker=None):
-    return IMPL.s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
-                                limit=None, marker=None)
+    return IMPL.s3_image_get_all_by_filters(context, filters, sort_key,
+                                            sort_dir, limit=None, marker=None)
 
 
 def s3_image_get_by_uuid(context, image_uuid):
@@ -1943,7 +1943,8 @@ def ec2_instance_create(context, instance_uuid, id=None, update_cells=True):
                                                         instance_uuid,
                                                         rv.id)
         except Exception:
-            LOG.exception(_LE("Failed to notify cells of e2c_instance_create."))
+            LOG.exception(
+                _LE("Failed to notify cells of e2c_instance_create."))
     return rv
 
 

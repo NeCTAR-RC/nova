@@ -371,7 +371,7 @@ class API(base_api.NetworkAPI):
                 LOG.exception(_LE("Unable to clear device ID "
                                   "for port '%s'"), port_id)
 
-    def allocate_for_instance(self, context, instance, **kwargs):
+    def allocate_for_instance(self, context, instance, **kwargs):  # noqa
         """Allocate network resources for the instance.
 
         :param context: The request context.
@@ -756,9 +756,9 @@ class API(base_api.NetworkAPI):
                                                 port_ids, admin_client,
                                                 preexisting_port_ids)
             base_api.update_instance_cache_with_nw_info(self, context,
-                                                        instance,
-                                                        nw_info=result,
-                                                        update_cells=update_cells)
+                                                instance,
+                                                nw_info=result,
+                                                update_cells=update_cells)
         return result
 
     def _get_instance_nw_info(self, context, instance, networks=None,

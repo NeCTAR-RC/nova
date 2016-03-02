@@ -30,9 +30,9 @@ from nova.api.ec2 import ec2utils
 from nova.api.metadata import password
 from nova import availability_zones as az
 from nova import block_device
-from nova import conductor
 from nova.cells import opts as cells_opts
 from nova.cells import rpcapi as cells_rpcapi
+from nova import conductor
 from nova import context
 from nova import network
 from nova.network.security_group import openstack_driver
@@ -220,8 +220,8 @@ class InstanceMetadata(object):
 
         hostname = self._get_hostname()
 
-        floating_ips = self.ip_info['floating_ips']
-        floating_ip = floating_ips and floating_ips[0] or ''
+        # floating_ips = self.ip_info['floating_ips']
+        # floating_ip = floating_ips and floating_ips[0] or ''
 
         fixed_ips = self.ip_info['fixed_ips']
         fixed_ip = fixed_ips and fixed_ips[0] or ''

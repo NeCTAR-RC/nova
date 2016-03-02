@@ -236,7 +236,8 @@ class CellsScheduler(base.Base):
                                 .capabilities.get('availability_zones', [])
 
                     parent_cell = bool(self.state_manager.get_child_cells())
-                    if not parent_cell and CONF.internal_service_availability_zone in our_azs:
+                    if not parent_cell and \
+                       CONF.internal_service_availability_zone in our_azs:
                         our_azs.remove(CONF.internal_service_availability_zone)
 
                     # If the instance is scheduled for our cell,
@@ -250,7 +251,10 @@ class CellsScheduler(base.Base):
                             if instance.availability_zone:
                                 instance.availability_zone = None
                             try:
-                                filter_properties['request_spec']['instance_properties']['availability_zone'] = None
+                                filter_properties[
+                                    'request_spec'][
+                                        'instance_properties'][
+                                            'availability_zone'] = None
                             except KeyError:
                                 pass
                     target_cells = self._grab_target_cells(filter_properties)
