@@ -82,7 +82,8 @@ class CellsSchedulerTestCase(test.TestCase):
         for x in xrange(3):
             instance_uuids.append(uuidutils.generate_uuid())
         self.instance_uuids = instance_uuids
-        self.instances = [objects.Instance(uuid=uuid, id=id, availability_zone=None)
+        self.instances = [objects.Instance(uuid=uuid, id=id,
+                                           availability_zone=None)
                           for id, uuid in enumerate(instance_uuids)]
         self.request_spec = {
                 'num_instances': len(instance_uuids),
@@ -281,7 +282,6 @@ class CellsSchedulerTestCase(test.TestCase):
     def test_schedule_method_on_random_exception(self):
         self.flags(scheduler_retries=7, group='cells')
         instances = self.instances
-        #instances = [{'uuid': uuid} for uuid in self.instance_uuids]
         method_kwargs = {
                 'image': 'fake_image',
                 'instances': instances,

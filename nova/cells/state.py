@@ -28,11 +28,11 @@ from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 from oslo_utils import units
 
-from nova.cells import rpc_driver
+from nova.availability_zones import get_availability_zones
 from nova.cells import opts as cell_opts
+from nova.cells import rpc_driver
 from nova import context
 from nova.db import base
-from nova.availability_zones import get_availability_zones
 from nova import exception
 from nova.i18n import _LE
 from nova import objects
@@ -483,14 +483,16 @@ class CellStateManagerDB(CellStateManager):
         return self.db.cell_delete(ctxt, cell_name)
 
     def update_cell_capabilities(self, cell_name, capabilities):
-        super(CellStateManagerDB, self).update_cell_capabilities(cell_name, capabilities)
+        super(CellStateManagerDB, self).update_cell_capabilities(cell_name,
+                                                                 capabilities)
         # This should probably be move to the parent class, but it's
         # not going to work for deployments using the cell state
         # manager file class.
         ctxt = context.get_admin_context()
         values = {'capabilities':
-                  jsonutils.dumps(dict((capab_name, list(values))
-                                   for (capab_name, values) in capabilities.items()))}
+                  jsonutils.dumps({capab_name: list(values)
+                                  for (capab_name, values) in
+                                       capabilities.items()})}
         self.db.cell_update(ctxt, cell_name, values)
 
 
