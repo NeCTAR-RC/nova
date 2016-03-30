@@ -9,12 +9,22 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from oslo_config import cfg
 from oslo_log import log as logging
 
 from nova.cells import filters
 
 
 LOG = logging.getLogger(__name__)
+
+free_disk_units_needed = cfg.IntOpt(
+    'free_disk_units_needed',
+    default=1,
+    help='Number of free disk units required to be accepted. '
+         'by the cell scheduler.')
+
+CONF = cfg.CONF
+CONF.register_opt(free_disk_units_needed, group='cells')
 
 
 class DiskFilter(filters.BaseCellFilter):
@@ -46,7 +56,11 @@ class DiskFilter(filters.BaseCellFilter):
         disk_free = cell.capacities.get('disk_free', {})
         units_by_mb = disk_free.get('units_by_mb', {})
 
-        if units_by_mb.get(str(disk_needed), 0) < 2:
+        units_needed = CONF.cells.free_disk_units_needed
+        units_avail = units_by_mb.get(str(disk_needed), 0)
+        LOG.debug('Disk units available: %d, units needed: %d' %
+                  (units_avail, units_needed))
+        if units_avail < units_needed:
             return False
 
         return True
