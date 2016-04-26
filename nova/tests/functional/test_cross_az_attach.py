@@ -51,49 +51,6 @@ class CrossAZAttachTestCase(test.TestCase,
         self.api.api_post('/os-aggregates/%s/action' % agg_id,
                           {'add_host': {'host': 'host1'}})
 
-    def test_cross_az_attach_false_boot_from_volume_no_az_specified(self):
-        """Tests the scenario where [cinder]/cross_az_attach=False and the
-        server is created with a pre-existing volume but the server create
-        request does not specify an AZ nor is [DEFAULT]/default_schedule_zone
-        set. In this case the server is created in the zone specified by the
-        volume.
-        """
-        self.flags(cross_az_attach=False, group='cinder')
-        # Do not need imageRef for boot from volume.
-        server = self._build_server(image_uuid='')
-        server['block_device_mapping_v2'] = [{
-            'source_type': 'volume',
-            'destination_type': 'volume',
-            'boot_index': 0,
-            'uuid': nova_fixtures.CinderFixture.IMAGE_BACKED_VOL
-        }]
-        server = self.api.post_server({'server': server})
-        server = self._wait_for_state_change(server, 'ACTIVE')
-        self.assertEqual(self.az, server['OS-EXT-AZ:availability_zone'])
-
-    def test_cross_az_attach_false_data_volume_no_az_specified(self):
-        """Tests the scenario where [cinder]/cross_az_attach=False and the
-        server is created with a pre-existing volume as a non-boot data volume
-        but the server create request does not specify an AZ nor is
-        [DEFAULT]/default_schedule_zone set. In this case the server is created
-        in the zone specified by the non-root data volume.
-        """
-        self.flags(cross_az_attach=False, group='cinder')
-        server = self._build_server()
-        # Note that we use the legacy block_device_mapping parameter rather
-        # than block_device_mapping_v2 because that will create an implicit
-        # source_type=image, destination_type=local, boot_index=0,
-        # uuid=$imageRef which is used as the root BDM and allows our
-        # non-boot data volume to be attached during server create. Otherwise
-        # we get InvalidBDMBootSequence.
-        server['block_device_mapping'] = [{
-            # This is a non-bootable volume in the CinderFixture.
-            'volume_id': nova_fixtures.CinderFixture.SWAP_OLD_VOL
-        }]
-        server = self.api.post_server({'server': server})
-        server = self._wait_for_state_change(server, 'ACTIVE')
-        self.assertEqual(self.az, server['OS-EXT-AZ:availability_zone'])
-
     def test_cross_az_attach_false_boot_from_volume_default_zone_match(self):
         """Tests the scenario where [cinder]/cross_az_attach=False and the
         server is created with a pre-existing volume and the
