@@ -28,6 +28,7 @@ from oslo_utils import timeutils
 import six
 from six.moves import range
 
+from nova.cells import consistency
 from nova.cells import messaging
 from nova.cells import state as cells_state
 from nova.cells import utils as cells_utils
@@ -100,6 +101,14 @@ class CellsManager(manager.Manager):
                 CONF.cells.driver)
         self.driver = cells_driver_cls()
         self.instances_to_heal = iter([])
+        self.consistency_handlers = {
+            'instance id mappings':
+                consistency.InstanceIDMappingConsistencyHandler(self.db),
+            'image id mappings':
+                consistency.S3ImageConsistencyHandler(self.db),
+            'volume id mappings':
+                consistency.VolumeIDMappingConsistencyHandler(self.db),
+        }
 
     def post_start_hook(self):
         """Have the driver start its servers for inter-cell communication.
@@ -668,3 +677,32 @@ class CellsManager(manager.Manager):
         response = self.msg_runner.flavor_create(ctxt,
                                             cell_name, values)
         return response.value_or_raise()
+
+    def ec2_instance_create(self, ctxt, instance_uuid, ec2_id):
+        self.msg_runner.ec2_instance_create(ctxt, instance_uuid, ec2_id)
+
+    def s3_image_create(self, ctxt, image_uuid, s3_id):
+        self.msg_runner.s3_image_create(ctxt, image_uuid, s3_id)
+
+    def ec2_volume_create(self, ctxt, volume_uuid, ec2_id):
+        self.msg_runner.ec2_volume_create(ctxt, volume_uuid, ec2_id)
+
+    def _heal_resource(self, ctxt, resource_name, from_top=True):
+        if from_top and self.state_manager.get_parent_cells():
+            return
+        elif not from_top and self.state_manager.get_child_cells():
+            return
+        handler = self.consistency_handlers[resource_name]
+        handler.heal_entries(ctxt)
+
+    @periodic_task.periodic_task
+    def _heal_instance_id_mappings(self, ctxt):
+        self._heal_resource(ctxt, 'instance id mappings')
+
+    @periodic_task.periodic_task
+    def _heal_s3_images(self, ctxt):
+        self._heal_resource(ctxt, 'image id mappings')
+
+    @periodic_task.periodic_task
+    def _heal_volume_id_mappings(self, ctxt):
+        self._heal_resource(ctxt, 'volume id mappings')

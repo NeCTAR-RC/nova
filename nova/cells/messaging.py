@@ -1275,6 +1275,18 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         response = self.aggregate_api.get_aggregate_list(message.ctxt)
         return jsonutils.to_primitive(response)
 
+    def ec2_instance_create(self, message, instance_uuid, ec2_id):
+        self.db.ec2_instance_create(message.ctxt, instance_uuid, ec2_id,
+                                    update_cells=False)
+
+    def s3_image_create(self, message, image_uuid, s3_id):
+        self.db.s3_image_create(message.ctxt, image_uuid, s3_id,
+                                update_cells=False)
+
+    def ec2_volume_create(self, message, volume_uuid, ec2_id):
+        self.db.ec2_volume_create(message.ctxt, volume_uuid, ec2_id,
+                                  update_cells=False)
+
 
 _CELL_MESSAGE_TYPE_TO_MESSAGE_CLS = {'targeted': _TargetedMessage,
                                      'broadcast': _BroadcastMessage,
@@ -1960,6 +1972,27 @@ class MessageRunner(object):
                                    dict(values=values),
                                    'down', cell_name, need_response=True)
         return message.process()
+
+    def ec2_instance_create(self, ctxt, instance_uuid, ec2_id):
+        method_kwargs = {'instance_uuid': instance_uuid, 'ec2_id': ec2_id}
+        message = _BroadcastMessage(self, ctxt, 'ec2_instance_create',
+                                    method_kwargs,
+                                    'down', run_locally=False)
+        message.process()
+
+    def s3_image_create(self, ctxt, image_uuid, s3_id):
+        method_kwargs = {'image_uuid': image_uuid, 's3_id': s3_id}
+        message = _BroadcastMessage(self, ctxt, 's3_image_create',
+                                    method_kwargs,
+                                    'down', run_locally=False)
+        message.process()
+
+    def ec2_volume_create(self, ctxt, volume_uuid, ec2_id):
+        method_kwargs = {'volume_uuid': volume_uuid, 'ec2_id': ec2_id}
+        message = _BroadcastMessage(self, ctxt, 'ec2_volume_create',
+                                    method_kwargs,
+                                    'down', run_locally=False)
+        message.process()
 
     @staticmethod
     def get_message_types():

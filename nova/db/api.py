@@ -631,7 +631,11 @@ def virtual_interface_get_all(context):
 
 def instance_create(context, values):
     """Create an instance from the values dictionary."""
-    return IMPL.instance_create(context, values)
+    instance_ref = IMPL.instance_create(context, values)
+
+    # create the instance uuid to ec2_id mapping entry for instance
+    ec2_instance_create(context, instance_ref['uuid'])
+    return instance_ref
 
 
 def instance_destroy(context, instance_uuid, constraint=None):
@@ -1146,8 +1150,22 @@ def reservation_expire(context):
 ###################
 
 
-def ec2_volume_create(context, volume_id, forced_id=None):
-    return IMPL.ec2_volume_create(context, volume_id, forced_id)
+def ec2_volume_create(context, volume_id, forced_id=None, update_cells=True):
+    rv = IMPL.ec2_volume_create(context, volume_id, forced_id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().ec2_volume_create(context,
+                                                      volume_id,
+                                                      rv.id)
+        except Exception:
+            LOG.exception(_LE("Failed to notify cells of ec2_volume_create."))
+    return rv
+
+
+def ec2_volume_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+    return IMPL.ec2_volume_get_all_by_filters(context, filters, sort_key,
+                                        sort_dir, limit=None, marker=None)
 
 
 def ec2_volume_get_by_id(context, volume_id):
@@ -1675,14 +1693,28 @@ def s3_image_get(context, image_id):
     return IMPL.s3_image_get(context, image_id)
 
 
+def s3_image_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                limit=None, marker=None):
+    return IMPL.s3_image_get_all_by_filters(context, filters, sort_key,
+                                            sort_dir, limit=None, marker=None)
+
+
 def s3_image_get_by_uuid(context, image_uuid):
     """Find local s3 image represented by the provided uuid."""
     return IMPL.s3_image_get_by_uuid(context, image_uuid)
 
 
-def s3_image_create(context, image_uuid):
+def s3_image_create(context, image_uuid, id=None, update_cells=True):
     """Create local s3 image represented by provided uuid."""
-    return IMPL.s3_image_create(context, image_uuid)
+    s3_image_ref = IMPL.s3_image_create(context, image_uuid, id=id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().s3_image_create(context,
+                                                    image_uuid,
+                                                    s3_image_ref.id)
+        except Exception:
+            LOG.exception(_LE("Failed to notify cells of s3_image_create"))
+    return s3_image_ref
 
 
 ####################
@@ -1837,9 +1869,25 @@ def get_instance_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_instance_uuid_by_ec2_id(context, ec2_id)
 
 
-def ec2_instance_create(context, instance_uuid, id=None):
+def ec2_instance_create(context, instance_uuid, id=None, update_cells=True):
     """Create the ec2 id to instance uuid mapping on demand."""
-    return IMPL.ec2_instance_create(context, instance_uuid, id)
+    rv = IMPL.ec2_instance_create(context, instance_uuid, id)
+    if update_cells:
+        try:
+            cells_rpcapi.CellsAPI().ec2_instance_create(context,
+                                                        instance_uuid,
+                                                        rv.id)
+        except Exception:
+            LOG.exception(
+                _LE("Failed to notify cells of e2c_instance_create."))
+    return rv
+
+
+def ec2_instance_get_all_by_filters(context, filters, sort_key, sort_dir,
+        limit=None, marker=None):
+    return IMPL.ec2_instance_get_all_by_filters(context, filters, sort_key,
+                                                sort_dir, limit=None,
+                                                marker=None)
 
 
 def ec2_instance_get_by_uuid(context, instance_uuid):
