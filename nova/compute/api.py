@@ -891,6 +891,7 @@ class API(base.Base):
         strategy being performed.
         """
         if availability_zone:
+
             available_zones = availability_zones.\
                 get_availability_zones(context.elevated(), True)
             if forced_host is None and availability_zone not in \

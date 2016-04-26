@@ -294,8 +294,11 @@ class CloudController(object):
             result.append({'zoneName': zone,
                            'zoneState': "available"})
         for zone in not_available_zones:
+            if zone == CONF.internal_service_availability_zone:
+                continue
             result.append({'zoneName': zone,
                            'zoneState': "not available"})
+
         return {'availabilityZoneInfo': result}
 
     def _describe_availability_zones_verbose(self, context, **kwargs):
