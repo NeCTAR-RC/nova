@@ -4410,6 +4410,27 @@ class ComputeTestCase(BaseTestCase,
                                              mock.ANY)
         mock_deallocate.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY)
 
+    def test_delete_instance_deletes_console_auth_tokens(self):
+        instance = self._create_fake_instance_obj()
+        self.flags(enabled=True, group='vnc')
+
+        self.tokens_deleted = False
+
+        def fake_delete_tokens(*args, **kwargs):
+            self.tokens_deleted = True
+
+        self.stub_out('nova.consoleauth.rpcapi.ConsoleAuthAPI.'
+                       'delete_tokens_for_instance',
+                       fake_delete_tokens)
+
+        self.compute._delete_instance(self.context, instance, [],
+                                      self.none_quotas)
+
+        self.assertTrue(self.tokens_deleted)
+
+    def test_delete_instance_deletes_console_auth_tokens_cells(self):
+        self.skipTest("Test no longer applies.")
+
     def test_delete_instance_changes_power_state(self):
         """Test that the power state is NOSTATE after deleting an instance."""
         instance = self._create_fake_instance_obj()
