@@ -782,3 +782,79 @@ class CellsAPITestCase(test.NoDBTestCase):
                          'name': 'fake_name'}
         self._check_result(call_info, 'get_keypair_at_top',
                            expected_args, version='1.37')
+
+    def test_create_aggregate(self):
+        call_info = self._stub_rpc_method('call', 'fake_response')
+
+        self.cells_rpcapi.create_aggregate(
+            self.fake_context, 'fake_cell', 'fake_aggregate', 'fake_zone')
+
+        expected_args = {'cell_name': 'fake_cell',
+                         'aggregate_name': 'fake_aggregate',
+                         'availability_zone': 'fake_zone'}
+        self._check_result(call_info, 'create_aggregate',
+                           expected_args, version='1.24')
+
+    def test_get_aggregate(self):
+        call_info = self._stub_rpc_method('call', 'fake_response')
+
+        self.cells_rpcapi.get_aggregate(self.fake_context,
+                                        'fake_cell', 'fake_id')
+        expected_args = {'cell_name': 'fake_cell',
+                         'aggregate_id': 'fake_id'}
+        self._check_result(call_info, 'get_aggregate',
+                           expected_args, version='1.24')
+
+    def test_get_aggregate_list(self):
+        call_info = self._stub_rpc_method('call', 'fake_response')
+
+        self.cells_rpcapi.get_aggregate_list(self.fake_context)
+        expected_args = {}
+        self._check_result(call_info, 'get_aggregate_list',
+                           expected_args, version='1.24')
+
+    def test_update_aggregate(self):
+        call_info = self._stub_rpc_method('call', 'fake_response')
+
+        self.cells_rpcapi.update_aggregate(self.fake_context, 'fake_cell',
+                                           'fake_id', {'name': 'spares'})
+        expected_args = dict(cell_name='fake_cell', aggregate_id='fake_id',
+                             values={'name': 'spares'})
+        self._check_result(call_info, 'update_aggregate',
+                           expected_args, version='1.24')
+
+    def test_update_aggregate_metadata(self):
+        call_info = self._stub_rpc_method('call', 'fake_response')
+
+        self.cells_rpcapi.update_aggregate_metadata(
+            self.fake_context, 'fake_cell', 'fake_id', {'is_spare': True})
+        expected_args = dict(cell_name='fake_cell', aggregate_id='fake_id',
+                             metadata={'is_spare': True})
+        self._check_result(call_info, 'update_aggregate_metadata',
+                           expected_args, version='1.24')
+
+    def test_delete_aggregate(self):
+        call_info = self._stub_rpc_method('call', None)
+
+        self.cells_rpcapi.delete_aggregate(self.fake_context,
+                                           'fake_cell', 'fake_id')
+        expected_args = {'cell_name': 'fake_cell',
+                         'aggregate_id': 'fake_id'}
+        self._check_result(call_info, 'delete_aggregate',
+                           expected_args, version='1.24')
+
+    def add_host_to_aggregate(self, ctxt, cell_name, aggregate_id, host_name):
+        return self.call(ctxt,
+                self.make_msg('add_host_to_aggregate',
+                              cell_name=cell_name,
+                              aggregate_id=aggregate_id, host_name=host_name),
+                version='1.24')
+
+    def remove_host_from_aggregate(self, ctxt, cell_name,
+                                   aggregate_id, host_name):
+        return self.call(ctxt,
+                self.make_msg('remove_host_from_aggregate',
+                              cell_name=cell_name,
+                              aggregate_id=aggregate_id,
+                              host_name=host_name),
+                version='1.24')

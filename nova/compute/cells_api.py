@@ -639,3 +639,51 @@ class InstanceActionAPI(compute_api.InstanceActionAPI):
     def action_events_get(self, context, instance, action_id):
         return self.cells_rpcapi.action_events_get(context, instance,
                                                    action_id)
+
+
+class AggregateAPI(compute_api.AggregateAPI):
+    """Sub-set of the Compute Manager API for managing host aggregates."""
+    def __init__(self, **kwargs):
+        super(AggregateAPI, self).__init__(**kwargs)
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
+
+    def _call_rpc_api(self, context, method_name, cell_and_item,
+                                    *args, **kwargs):
+        cell, item = cells_utils.split_cell_and_item(cell_and_item)
+        try:
+            item = int(item)
+        except ValueError:
+            pass
+        method = getattr(self.cells_rpcapi, method_name)
+        return method(context, cell, item, *args, **kwargs)
+
+    def create_aggregate(self, context, aggregate_name, availability_zone):
+        return self._call_rpc_api(
+            context, 'create_aggregate', aggregate_name, availability_zone)
+
+    def get_aggregate(self, context, aggregate_id):
+        return self._call_rpc_api(
+            context, 'get_aggregate', aggregate_id)
+
+    def get_aggregate_list(self, context):
+        return self.cells_rpcapi.get_aggregate_list(context)
+
+    def update_aggregate(self, context, aggregate_id, aggregate_values):
+        return self._call_rpc_api(
+            context, 'update_aggregate', aggregate_id, aggregate_values)
+
+    def update_aggregate_metadata(self, context, aggregate_id, metadata):
+        return self._call_rpc_api(
+            context, 'update_aggregate_metadata', aggregate_id, metadata)
+
+    def delete_aggregate(self, context, aggregate_id):
+        return self._call_rpc_api(
+            context, 'delete_aggregate', aggregate_id)
+
+    def add_host_to_aggregate(self, context, aggregate_id, host_name):
+        return self._call_rpc_api(
+            context, 'add_host_to_aggregate', aggregate_id, host_name)
+
+    def remove_host_from_aggregate(self, context, aggregate_id, host_name):
+        return self._call_rpc_api(
+            context, 'remove_host_from_aggregate', aggregate_id, host_name)

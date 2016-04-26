@@ -903,3 +903,63 @@ class CellsManagerClassTestCase(test.NoDBTestCase):
                                                       'fake_name'))
             fake_get_keypair.assert_called_once_with(self.ctxt, 'fake_user_id',
                                                      'fake_name')
+
+    def _test_aggregate_method(self, method_name, *args, **kwargs):
+        expected_response = {"name": "fun2", "id": 42}
+        self.mox.StubOutWithMock(
+            self.cells_manager.msg_runner, method_name)
+        to_be_called = getattr(self.cells_manager.msg_runner, method_name)
+        response = self._get_fake_response(expected_response)
+        to_be_called(*args, **kwargs).AndReturn(response)
+        self.mox.ReplayAll()
+        method = getattr(self.cells_manager, method_name)
+        response = method(*args, **kwargs)
+        self.assertEqual(expected_response, response)
+
+    def test_create_aggregate(self):
+        self._test_aggregate_method('create_aggregate',
+                                    'context', 'fake_cell', 'spares', None)
+
+    def test_get_aggregate(self):
+        self._test_aggregate_method('get_aggregate', 'context',
+                                    'fake_cell', 42)
+
+    def test_get_aggregate_list(self):
+        expected_response = [{"name": "fun2", "id": 42}]
+        response = self._get_fake_response(expected_response)
+        self.mox.StubOutWithMock(
+            self.cells_manager.msg_runner, 'get_aggregate_list')
+        self.cells_manager.msg_runner.get_aggregate_list(self.ctxt).AndReturn(
+            [response])
+        self.mox.ReplayAll()
+        response = self.cells_manager.get_aggregate_list(self.ctxt)
+        self.assertEqual(expected_response, response)
+
+    def test_update_aggregate(self):
+        self._test_aggregate_method('update_aggregate', 'context',
+                                    'fake_cell', 42, {'name': 'new_name'})
+
+    def test_update_aggregate_metadata(self):
+        self._test_aggregate_method('update_aggregate_metadata', 'context',
+                                    'fake_cell', 42, {'is_spare': True})
+
+    def test_delete_aggregate(self):
+        expected_response = None
+        response = self._get_fake_response(expected_response)
+        self.mox.StubOutWithMock(
+            self.cells_manager.msg_runner, 'delete_aggregate')
+        self.cells_manager.msg_runner.delete_aggregate(
+            self.ctxt, 'some_cell', 42).AndReturn(
+            response)
+        self.mox.ReplayAll()
+        response = self.cells_manager.delete_aggregate(
+            self.ctxt, 'some_cell', 42)
+        self.assertEqual(expected_response, response)
+
+    def test_add_host_to_aggregate(self):
+        self._test_aggregate_method('add_host_to_aggregate',
+                                    'context', 'fake_cell', 42, 'fake_host')
+
+    def test_remove_host_from_aggregate(self):
+        self._test_aggregate_method('remove_host_from_aggregate',
+                                    'context', 'fake_cell', 42, 'fake_host')

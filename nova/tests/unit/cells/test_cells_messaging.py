@@ -675,6 +675,7 @@ class CellsTargetedMethodsTestCase(test.TestCase):
         self.tgt_host_api = methods_cls.host_api
         self.tgt_db_inst = methods_cls.db
         self.tgt_c_rpcapi = methods_cls.compute_rpcapi
+        self.tgt_a_api = methods_cls.aggregate_api
 
     def test_build_instances(self):
         build_inst_kwargs = {'filter_properties': {},
@@ -685,6 +686,78 @@ class CellsTargetedMethodsTestCase(test.TestCase):
         self.mox.ReplayAll()
         self.src_msg_runner.build_instances(self.ctxt, self.tgt_cell_name,
                 build_inst_kwargs)
+
+    def test_create_aggregate(self):
+        self.mox.StubOutWithMock(self.tgt_a_api, 'create_aggregate')
+        self.tgt_a_api.create_aggregate(
+            self.ctxt, 'aggregate_name', 'availability_zone').AndReturn(
+                'fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.create_aggregate(
+            self.ctxt, self.tgt_cell_name,
+            'aggregate_name', 'availability_zone')
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
+
+    def test_get_aggregate(self):
+        self.mox.StubOutWithMock(self.tgt_a_api, 'get_aggregate')
+        self.tgt_a_api.get_aggregate(
+            self.ctxt, 'aggregate_id').AndReturn('fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.get_aggregate(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id')
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
+
+    def test_update_aggregate(self):
+        self.mox.StubOutWithMock(self.tgt_a_api, 'update_aggregate')
+        self.tgt_a_api.update_aggregate(
+            self.ctxt, 'aggregate_id', 'values').AndReturn('fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.update_aggregate(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id', 'values')
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
+
+    def test_update_aggregate_metadata(self):
+        self.mox.StubOutWithMock(
+            self.tgt_a_api, 'update_aggregate_metadata')
+        self.tgt_a_api.update_aggregate_metadata(
+            self.ctxt, 'aggregate_id', {'is_spare': True}).AndReturn(
+                'fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.update_aggregate_metadata(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id', {'is_spare': True})
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
+
+    def test_delete_aggregate(self):
+        self.mox.StubOutWithMock(self.tgt_a_api, 'delete_aggregate')
+        self.tgt_a_api.delete_aggregate(self.ctxt, 'aggregate_id')
+        self.mox.ReplayAll()
+        self.src_msg_runner.delete_aggregate(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id')
+
+    def test_add_host_to_aggregate(self):
+        self.mox.StubOutWithMock(self.tgt_a_api, 'add_host_to_aggregate')
+        self.tgt_a_api.add_host_to_aggregate(
+            self.ctxt, 'aggregate_id', 'host_name').AndReturn('fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.add_host_to_aggregate(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id', 'host_name')
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
+
+    def test_remove_host_from_aggregate(self):
+        self.mox.StubOutWithMock(
+            self.tgt_a_api, 'remove_host_from_aggregate')
+        self.tgt_a_api.remove_host_from_aggregate(
+            self.ctxt, 'aggregate_id', 'host_name').AndReturn('fake_response')
+        self.mox.ReplayAll()
+        response = self.src_msg_runner.remove_host_from_aggregate(
+            self.ctxt, self.tgt_cell_name, 'aggregate_id', 'host_name')
+        result = response.value_or_raise()
+        self.assertEqual('fake_response', result)
 
     def _run_compute_api_method(self, method_name):
         instance = fake_instance.fake_instance_obj(self.ctxt)
@@ -1436,6 +1509,7 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
         self.src_methods_cls = methods_cls
         self.src_db_inst = methods_cls.db
         self.src_compute_api = methods_cls.compute_api
+        self.src_aggregate_api = methods_cls.aggregate_api
         self.src_ca_rpcapi = methods_cls.consoleauth_rpcapi
 
         if not up:
@@ -1450,6 +1524,7 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
         self.mid_methods_cls = methods_cls
         self.mid_db_inst = methods_cls.db
         self.mid_compute_api = methods_cls.compute_api
+        self.mid_aggregate_api = methods_cls.aggregate_api
         self.mid_ca_rpcapi = methods_cls.consoleauth_rpcapi
 
         self.tgt_msg_runner = fakes.get_message_runner(tgt_cell)
@@ -1457,12 +1532,42 @@ class CellsBroadcastMethodsTestCase(test.TestCase):
         self.tgt_methods_cls = methods_cls
         self.tgt_db_inst = methods_cls.db
         self.tgt_compute_api = methods_cls.compute_api
+        self.tgt_aggregate_api = methods_cls.aggregate_api
         self.tgt_ca_rpcapi = methods_cls.consoleauth_rpcapi
 
     def test_at_the_top(self):
         self.assertTrue(self.tgt_methods_cls._at_the_top())
         self.assertFalse(self.mid_methods_cls._at_the_top())
         self.assertFalse(self.src_methods_cls._at_the_top())
+
+    def test_list_aggregates(self):
+        # Reset this, as this is a broadcast down.
+        self._setup_attrs(up=False)
+
+        self.mox.StubOutWithMock(
+            self.src_aggregate_api, 'get_aggregate_list')
+        self.mox.StubOutWithMock(
+            self.mid_aggregate_api, 'get_aggregate_list')
+        self.mox.StubOutWithMock(
+            self.tgt_aggregate_api, 'get_aggregate_list')
+
+        self.src_aggregate_api.get_aggregate_list(self.ctxt).AndReturn(
+            ['source_aggregate_list'])
+        self.mid_aggregate_api.get_aggregate_list(self.ctxt).AndReturn(
+            ['mid_aggregate_list'])
+        self.tgt_aggregate_api.get_aggregate_list(self.ctxt).AndReturn(
+            ['target_aggregate_list'])
+
+        self.mox.ReplayAll()
+
+        responses = self.src_msg_runner.get_aggregate_list(self.ctxt)
+        response_values = [(resp.cell_name, resp.value_or_raise())
+                           for resp in responses]
+        expected = [('api-cell!child-cell2!grandchild-cell1',
+                     ['target_aggregate_list']),
+                    ('api-cell!child-cell2', ['mid_aggregate_list']),
+                    ('api-cell', ['source_aggregate_list'])]
+        self.assertEqual(expected, response_values)
 
     def test_apply_expected_states_building(self):
         instance_info = objects.Instance(vm_state=vm_states.BUILDING)
