@@ -50,8 +50,7 @@ def HostAPI(*args, **kwargs):
 
 
 def AggregateAPI(*args, **kwargs):
-    """
-    Returns the 'AggregateAPI' class from the same module as the configured
+    """Returns the 'AggregateAPI' class from the same module as the configured
     compute api
     """
     compute_api_class_name = _get_compute_api_class_name()
