@@ -4410,6 +4410,9 @@ class ComputeTestCase(BaseTestCase,
                                              mock.ANY)
         mock_deallocate.assert_called_once_with(mock.ANY, mock.ANY, mock.ANY)
 
+    def test_delete_instance_deletes_console_auth_tokens_cells(self):
+        self.skipTest("Test no longer applies.")
+
     def test_delete_instance_changes_power_state(self):
         """Test that the power state is NOSTATE after deleting an instance."""
         instance = self._create_fake_instance_obj()
