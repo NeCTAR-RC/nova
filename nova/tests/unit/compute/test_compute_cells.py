@@ -149,6 +149,12 @@ class CellsComputeAPITestCase(test_compute.ComputeAPITestCase):
     def test_error_evacuate(self):
         self.skipTest("Test is incompatible with cells.")
 
+    def test_spice_console(self):
+        self.skipTest("Test doesn't apply to API cell.")
+
+    def test_vnc_console(self):
+        self.skipTest("Test doesn't apply to API cell.")
+
     def _test_delete_instance_no_cell(self, method_name):
         cells_rpcapi = self.compute_api.cells_rpcapi
         self.mox.StubOutWithMock(cells_rpcapi,
