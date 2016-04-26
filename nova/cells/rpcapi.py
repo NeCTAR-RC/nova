@@ -714,3 +714,30 @@ class CellsAPI(object):
                           cell_name=cell_name,
                           aggregate_id=aggregate_id,
                           host_name=host_name)
+
+    def ec2_instance_create(self, ctxt, instance_uuid, ec2_id):
+        """Broadcast EC2 mappings downwards."""
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24')
+        cctxt.cast(ctxt, 'ec2_instance_create',
+                   instance_uuid=instance_uuid,
+                   ec2_id=ec2_id)
+
+    def s3_image_create(self, ctxt, image_uuid, s3_id):
+        """Broadcast S3 mappings downwards."""
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24')
+        cctxt.cast(ctxt, 's3_image_create',
+                   image_uuid=image_uuid,
+                   s3_id=s3_id)
+
+    def ec2_volume_create(self, ctxt, volume_uuid, ec2_id):
+        """Broadcast EC2 mappings downwards."""
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24')
+        cctxt.cast(ctxt, 'ec2_volume_create',
+                   volume_uuid=volume_uuid,
+                   ec2_id=ec2_id)
