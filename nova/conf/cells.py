@@ -288,7 +288,11 @@ Related options:
 * This value is used with the ``instance_updated_at_threshold``
   value in a periodic task run.
 
-""")
+"""),
+        cfg.BoolOpt("expire_reservations",
+                default=False,
+                help="If True, enable the periodic task for reservation "
+                "expiry."),
 ]
 
 cell_messaging_opts = [
