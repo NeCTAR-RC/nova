@@ -76,7 +76,8 @@ class CellsSchedulerTestCase(test.TestCase):
         for x in range(3):
             instance_uuids.append(uuidutils.generate_uuid())
         self.instance_uuids = instance_uuids
-        self.instances = [objects.Instance(uuid=uuid, id=id)
+        self.instances = [objects.Instance(uuid=uuid, id=id,
+                                           availability_zone=None)
                           for id, uuid in enumerate(instance_uuids)]
         self.request_spec = {
                 'num_instances': len(instance_uuids),
@@ -327,7 +328,8 @@ class CellsSchedulerTestCase(test.TestCase):
         self.flags(scheduler='nova.cells.scheduler.CellsScheduler',
                    scheduler_retries=7, group='cells')
 
-        instances = [objects.Instance(uuid=uuid) for uuid in
+        instances = [objects.Instance(uuid=uuid,
+                                      availability_zone='nova') for uuid in
                      self.instance_uuids]
         method_kwargs = {
                 'image': 'fake_image',
@@ -377,7 +379,7 @@ class CellsSchedulerTestCase(test.TestCase):
         mock_func = mock.Mock()
         self.scheduler._grab_target_cells = mock.Mock(return_value=None)
         self.scheduler._schedule_build_to_cells(None, None, None,
-                                                mock_func, None)
+                                                mock_func, {})
         mock_func.assert_not_called()
 
     def test_cells_filter_args_correct(self):

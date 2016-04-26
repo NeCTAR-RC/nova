@@ -116,6 +116,9 @@ class AvailabilityZoneController(wsgi.Controller):
         context = req.environ['nova.context']
         context.can(az_policies.POLICY_ROOT % 'detail')
 
+        if CONF.cells.enable:
+            # verbose doesn't work for cells
+            return self._describe_availability_zones(context)
         return self._describe_availability_zones_verbose(context)
 
 
