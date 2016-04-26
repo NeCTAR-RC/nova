@@ -19,10 +19,13 @@ Cells Utility Methods
 import random
 import sys
 
+from oslo_utils import uuidutils
 import six
 
 import nova.conf
+from nova import context as nova_context
 from nova import objects
+from nova.objects import aggregate as aggregate_obj
 from nova.objects import base as obj_base
 
 
@@ -61,11 +64,17 @@ class _CellProxy(object):
     def host(self):
         return cell_with_item(self._cell_path, self._obj.host)
 
+    @property
+    def name(self):
+        return cell_with_item(self._cell_path, self._obj.name)
+
     def __getitem__(self, key):
         if key == 'id':
             return self.id
         if key == 'host':
             return self.host
+        if key == 'name':
+            return self.name
 
         return getattr(self._obj, key)
 
@@ -100,6 +109,8 @@ class _CellProxy(object):
                     yield name, self.id
                 elif name == 'host':
                     yield name, self.host
+                elif name == 'name':
+                    yield name, self.name
                 else:
                     yield name, getattr(self._obj, name)
 
@@ -110,6 +121,10 @@ class _CellProxy(object):
 
     def __getattr__(self, key):
         return getattr(self._obj, key)
+
+
+class AggregateProxy(_CellProxy):
+    pass
 
 
 class ComputeNodeProxy(_CellProxy):
@@ -206,6 +221,23 @@ def add_cell_to_service(service, cell_name):
     # for adding the cell_path information
     service_proxy = ServiceProxy(service, cell_name)
     return service_proxy
+
+
+def add_cell_to_aggregate(aggregate, cell_name):
+    """Fix aggregate attributes that should be unique.
+    Changes the aggregate's name and ID to include the cell_name,
+    making them unique in the context of the api cell
+    """
+    if type(aggregate) == dict:
+        # Aggreggate has come from Liberty so turn it into an object
+        ctxt = nova_context.get_admin_context()
+        aggregate['uuid'] = uuidutils.generate_uuid()
+        aggregate['metadetails'] = aggregate['metadata']
+        aggregate = aggregate_obj.Aggregate._from_db_object(
+            ctxt, aggregate_obj.Aggregate(), aggregate)
+
+    aggregate_proxy = AggregateProxy(aggregate, cell_name)
+    return aggregate_proxy
 
 
 def add_cell_to_task_log(task_log, cell_name):
