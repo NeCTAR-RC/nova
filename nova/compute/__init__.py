@@ -49,6 +49,17 @@ def HostAPI(*args, **kwargs):
     return importutils.import_object(class_name, *args, **kwargs)
 
 
+def AggregateAPI(*args, **kwargs):
+    """
+    Returns the 'AggregateAPI' class from the same module as the configured
+    compute api
+    """
+    compute_api_class_name = _get_compute_api_class_name()
+    compute_api_class = importutils.import_class(compute_api_class_name)
+    class_name = compute_api_class.__module__ + ".AggregateAPI"
+    return importutils.import_object(class_name, *args, **kwargs)
+
+
 def InstanceActionAPI(*args, **kwargs):
     """Returns the 'InstanceActionAPI' class from the same module as the
     configured compute api.

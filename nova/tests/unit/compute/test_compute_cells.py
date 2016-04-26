@@ -451,3 +451,85 @@ class CellsComputePolicyTestCase(test_compute.ComputePolicyTestCase):
         global ORIG_COMPUTE_API
         self.compute_api = ORIG_COMPUTE_API
         super(CellsComputePolicyTestCase, self).tearDown()
+
+
+class AggregateAPITestCase(test_compute.BaseTestCase):
+
+    def setUp(self):
+        super(AggregateAPITestCase, self).setUp()
+        self.api = compute_cells_api.AggregateAPI()
+
+    def test_create_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi, 'create_aggregate')
+        self.api.cells_rpcapi.create_aggregate(
+            'context', 'fake_cell', 'aggregate_name', None).AndReturn(
+                'fake_result')
+        self.mox.ReplayAll()
+        result = self.api.create_aggregate(
+            'context', 'fake_cell@aggregate_name', None)
+        self.assertEqual('fake_result', result)
+
+    def test_get_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi, 'get_aggregate')
+        self.api.cells_rpcapi.get_aggregate(
+            'context', 'fake_cell', 42).AndReturn('fake_result')
+        self.mox.ReplayAll()
+        result = self.api.get_aggregate('context', 'fake_cell@42')
+        self.assertEqual('fake_result', result)
+
+    def test_get_aggregate_list(self):
+        ctxt = context.get_admin_context()
+        self.mox.StubOutWithMock(self.api.cells_rpcapi, 'get_aggregate_list')
+        self.api.cells_rpcapi.get_aggregate_list(ctxt).AndReturn(
+            ['fake', 'result'])
+        self.mox.ReplayAll()
+        result = self.api.get_aggregate_list(ctxt)
+        self.assertEqual(['fake', 'result'], result)
+
+    def test_update_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi, 'update_aggregate')
+        self.api.cells_rpcapi.update_aggregate(
+            'context', 'fake_cell', 42, {'name': 'spares'}).AndReturn(
+                'fake_result')
+        self.mox.ReplayAll()
+        result = self.api.update_aggregate('context', 'fake_cell@42',
+                                           {'name': 'spares'})
+        self.assertEqual('fake_result', result)
+
+    def test_update_aggregate_metadata(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi,
+                                 'update_aggregate_metadata')
+        self.api.cells_rpcapi.update_aggregate_metadata(
+            'context', 'fake_cell', 42, {'is_spare': True}).AndReturn(
+                'fake_result')
+        self.mox.ReplayAll()
+        result = self.api.update_aggregate_metadata(
+            'context', 'fake_cell@42', {'is_spare': True})
+        self.assertEqual('fake_result', result)
+
+    def test_delete_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi, 'delete_aggregate')
+        self.api.cells_rpcapi.delete_aggregate(
+            'context', 'fake_cell', 42)
+        self.mox.ReplayAll()
+        self.api.delete_aggregate('context', 'fake_cell@42')
+
+    def test_add_host_to_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi,
+                                 'add_host_to_aggregate')
+        self.api.cells_rpcapi.add_host_to_aggregate(
+            'context', 'fake_cell', 42, 'fake_host').AndReturn('fake_result')
+        self.mox.ReplayAll()
+        result = self.api.add_host_to_aggregate('context', 'fake_cell@42',
+                                                'fake_host')
+        self.assertEqual('fake_result', result)
+
+    def test_remove_host_from_aggregate(self):
+        self.mox.StubOutWithMock(self.api.cells_rpcapi,
+                                 'remove_host_from_aggregate')
+        self.api.cells_rpcapi.remove_host_from_aggregate(
+            'context', 'fake_cell', 42, 'fake_host').AndReturn('fake_result')
+        self.mox.ReplayAll()
+        result = self.api.remove_host_from_aggregate('context', 'fake_cell@42',
+                                                     'fake_host')
+        self.assertEqual('fake_result', result)
