@@ -527,7 +527,10 @@ class API(object):
         # the reserve call.
         if instance and not CONF.cinder.cross_az_attach:
             instance_az = az.get_instance_availability_zone(context, instance)
-            if instance_az != volume['availability_zone']:
+            if not instance_az:
+                msg = "Must pass an availability-zone when booting from volume"
+                raise exception.InvalidVolume(reason=msg)
+            elif not instance_az.startswith(volume['availability_zone']):
                 msg = _("Instance %(instance)s and volume %(vol)s are not in "
                         "the same availability_zone. Instance is in "
                         "%(ins_zone)s. Volume is in %(vol_zone)s") % {
