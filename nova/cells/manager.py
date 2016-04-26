@@ -38,11 +38,13 @@ from nova import manager
 from nova import objects
 from nova.objects import base as base_obj
 from nova.objects import instance as instance_obj
+from nova import quota
 
 
 CONF = nova.conf.CONF
 
 LOG = logging.getLogger(__name__)
+QUOTAS = quota.QUOTAS
 
 
 class CellsManager(manager.Manager):
@@ -109,6 +111,11 @@ class CellsManager(manager.Manager):
         """
         self.msg_runner.tell_parents_our_capabilities(ctxt)
         self.msg_runner.tell_parents_our_capacities(ctxt)
+
+    @periodic_task.periodic_task
+    def _expire_reservations(self, context):
+        if CONF.cells.expire_reservations:
+            QUOTAS.expire(context)
 
     @periodic_task.periodic_task
     def _heal_instances(self, ctxt):
