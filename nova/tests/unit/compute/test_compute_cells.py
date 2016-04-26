@@ -254,6 +254,12 @@ class CellsComputeAPITestCase(test_compute.ComputeAPITestCase):
 
         test()
 
+    def test_spice_console(self):
+        self.skipTest("Test doesn't apply to API cell.")
+
+    def test_vnc_console(self):
+        self.skipTest("Test doesn't apply to API cell.")
+
     @mock.patch.object(compute_api.API, '_local_delete')
     def _test_delete_instance_no_cell(self, method_name, mock_local_delete):
         cells_rpcapi = self.compute_api.cells_rpcapi
