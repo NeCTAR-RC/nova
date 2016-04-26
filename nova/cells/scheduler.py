@@ -225,6 +225,32 @@ class CellsScheduler(base.Base):
         try:
             for i in range(max(0, CONF.cells.scheduler_retries) + 1):
                 try:
+                    instances = method_kwargs.get('instances', [])
+                    our_azs = self.state_manager.get_my_state()\
+                                .capabilities.get('availability_zones', [])
+
+                    parent_cell = bool(self.state_manager.get_child_cells())
+                    if not parent_cell \
+                       and CONF.internal_service_availability_zone in our_azs:
+                        our_azs.remove(CONF.internal_service_availability_zone)
+
+                    # If the instance is scheduled for our cell,
+                    # then remove the AZ from the instance.
+                    # If we're the bottom cell then the requested AZ must
+                    # be in our list of AZs. If it's not, just remove it.
+                    for instance in instances:
+                        az = instance.availability_zone
+                        if ((parent_cell and az in our_azs) or
+                                (not parent_cell and az not in our_azs)):
+                            if instance.availability_zone:
+                                instance.availability_zone = None
+                            try:
+                                filter_properties[
+                                    'request_spec'][
+                                        'instance_properties'][
+                                            'availability_zone'] = None
+                            except KeyError:
+                                pass
                     target_cells = self._grab_target_cells(filter_properties)
                     if target_cells is None:
                         # a filter took care of scheduling.  skip.

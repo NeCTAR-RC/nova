@@ -30,6 +30,8 @@ from oslo_utils import timeutils
 from oslo_utils import units
 import six
 
+from nova import availability_zones as az
+from nova.cells import opts as cell_opts
 from nova.cells import rpc_driver
 from nova import context
 from nova.db import base
@@ -68,7 +70,7 @@ class CellState(object):
     def __init__(self, cell_name, is_me=False):
         self.name = cell_name
         self.is_me = is_me
-        self.last_seen = datetime.datetime.min
+        self.last_seen = timeutils.utcnow()
         self.capabilities = {}
         self.capacities = {}
         self.db_info = {}
@@ -109,6 +111,7 @@ class CellState(object):
             if url.hosts:
                 for field, canonical in url_fields_to_return.items():
                     cell_info[canonical] = getattr(url.hosts[0], field)
+        cell_info['last_seen'] = self.last_seen
         return cell_info
 
     def send_message(self, message):
@@ -183,16 +186,6 @@ class CellStateManager(base.Base):
                 LOG.exception(_LE('DB error'))
                 time.sleep(30)
 
-        my_cell_capabs = {}
-        for cap in CONF.cells.capabilities:
-            name, value = cap.split('=', 1)
-            if ';' in value:
-                values = set(value.split(';'))
-            else:
-                values = set([value])
-            my_cell_capabs[name] = values
-        self.my_cell_state.update_capabilities(my_cell_capabs)
-
     def _refresh_cells_from_dict(self, db_cells_dict):
         """Make our cell info map match the db."""
 
@@ -220,6 +213,23 @@ class CellStateManager(base.Base):
         """Is it time to sync the DB against our memory cache?"""
         diff = timeutils.utcnow() - self.last_cell_db_check
         return diff.seconds >= CONF.cells.db_check_interval
+
+    def _update_our_capabilities(self, ctxt=None):
+        my_cell_capabs = {}
+        for cap in CONF.cells.capabilities:
+            name, value = cap.split('=', 1)
+            if ';' in value:
+                values = set(value.split(';'))
+            else:
+                values = set([value])
+            my_cell_capabs[name] = values
+        ctxt = context.get_admin_context()
+        cell_type = cell_opts.get_cell_type()
+        if cell_type == 'compute':
+            active, disabled = az.get_availability_zones(ctxt)
+            # Only send up available AZs
+            my_cell_capabs['availability_zones'] = set(active)
+        self.my_cell_state.update_capabilities(my_cell_capabs)
 
     def _update_our_capacity(self, ctxt=None):
         """Update our capacity in the self.my_cell_state CellState.
@@ -464,6 +474,7 @@ class CellStateManagerDB(CellStateManager):
             db_cells_dict = {cell['name']: cell for cell in db_cells}
             self._refresh_cells_from_dict(db_cells_dict)
             self._update_our_capacity(ctxt)
+            self._update_our_capabilities(ctxt)
 
     @sync_after
     def cell_create(self, ctxt, values):
@@ -504,6 +515,7 @@ class CellStateManagerFile(CellStateManager):
         if force or self._time_to_sync():
             self.last_cell_db_check = timeutils.utcnow()
             self._update_our_capacity()
+            self._update_our_capabilities()
 
     def cell_create(self, ctxt, values):
         raise exception.CellsUpdateUnsupported()

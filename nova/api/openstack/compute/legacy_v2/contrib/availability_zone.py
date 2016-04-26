@@ -114,6 +114,9 @@ class AvailabilityZoneController(wsgi.Controller):
         # NOTE(alex_xu): back-compatible with db layer hard-code admin
         # permission checks.
         nova_context.require_admin_context(context)
+        if CONF.cells.enable:
+            # verbose doesn't work for cells
+            return self._describe_availability_zones(context)
         return self._describe_availability_zones_verbose(context)
 
 

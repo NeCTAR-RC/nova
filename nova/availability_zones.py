@@ -18,9 +18,13 @@
 import collections
 
 from oslo_config import cfg
+from oslo_utils import timeutils
 
+from nova.cells import opts as cell_opts
+from nova.cells import rpcapi as cell_rpcapi
 from nova import objects
 from nova.openstack.common import memorycache
+from nova import utils
 
 # NOTE(vish): azs don't change that often, so cache them for an hour to
 #             avoid hitting the db multiple times on every request.
@@ -37,6 +41,7 @@ availability_zone_opts = [
     ]
 
 CONF = cfg.CONF
+CONF.import_opt('mute_child_interval', 'nova.cells.opts', group='cells')
 CONF.register_opts(availability_zone_opts)
 
 
@@ -59,8 +64,8 @@ def reset_cache():
     MC = None
 
 
-def _make_cache_key(host):
-    return "azcache-%s" % host.encode('utf-8')
+def _make_cache_key(host, cell_name=None):
+    return "azcache-%s-%s" % (cell_name or 'none', host.encode('utf-8'))
 
 
 def _build_metadata_by_host(aggregates, hosts=None):
@@ -127,8 +132,39 @@ def get_availability_zones(context, get_only_available=False,
         :param with_hosts: whether to return hosts part of the AZs
         :type with_hosts: bool
     """
+    # Override for cells
+    cell_type = cell_opts.get_cell_type()
+    if cell_type == 'api':
+        cache = _get_cache()
+        available_zones = cache.get('az-availabile-list')
+        unavailable_zones = cache.get('az-unavailabile-list')
+
+        if not available_zones:
+            cells_rpcapi = cell_rpcapi.CellsAPI()
+            cell_info = cells_rpcapi.get_cell_info_for_neighbors(context)
+            global_azs = []
+            mute_azs = []
+            secs = CONF.cells.mute_child_interval
+            for cell in cell_info:
+                last_seen = cell['last_seen']
+                if 'availability_zones' not in cell['capabilities']:
+                    continue
+                if last_seen and timeutils.is_older_than(last_seen, secs):
+                    mute_azs.extend(cell['capabilities']['availability_zones'])
+                else:
+                    global_azs.extend(
+                        cell['capabilities']['availability_zones'])
+                available_zones = list(set(global_azs))
+                unavailable_zones = list(set(mute_azs))
+                cache.set('az-availabile-list', available_zones, 300)
+                cache.set('az-unavailabile-list', unavailable_zones, 300)
+        if get_only_available:
+            return available_zones
+        return (available_zones, unavailable_zones)
+
     enabled_services = objects.ServiceList.get_all(context, disabled=False,
-                                                   set_zones=True)
+                                                   set_zones=False)
+    enabled_services = set_availability_zones(context, enabled_services)
 
     available_zones = []
     for (zone, host) in [(service['availability_zone'], service['host'])
@@ -175,7 +211,15 @@ def get_instance_availability_zone(context, instance):
         az = instance.get('availability_zone')
         return az
 
-    cache_key = _make_cache_key(host)
+    cache_string = host
+    cell_type = cell_opts.get_cell_type()
+    if cell_type == 'api':
+        cell_name = str(instance.get('cell_name'))
+        if not cell_name:
+            return None
+        cache_string += cell_name
+    cache_key = _make_cache_key(cache_string)
+
     cache = _get_cache()
     az = cache.get(cache_key)
     az_inst = instance.get('availability_zone')
@@ -194,6 +238,12 @@ def get_instance_availability_zone(context, instance):
         az = None
     if not az:
         elevated = context.elevated()
-        az = get_host_availability_zone(elevated, host)
+        if cell_type == 'api':
+            sys_metadata = utils.instance_sys_meta(instance)
+            az = sys_metadata.get('availability_zone')
+            if not az:
+                return None
+        else:
+            az = get_host_availability_zone(elevated, host)
         cache.set(cache_key, az, AZ_CACHE_SECONDS)
     return az
