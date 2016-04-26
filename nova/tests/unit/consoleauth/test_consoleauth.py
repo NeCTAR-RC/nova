@@ -204,20 +204,3 @@ class ControlauthMemcacheEncodingTestCase(test.NoDBTestCase):
             mock_instance_get.assert_has_calls([mock.call('instance')])
             mock_instance_delete.assert_has_calls([mock.call('instance')])
             mock_delete_multi.assert_has_calls([mock.call(['token'])])
-
-
-class CellsConsoleauthTestCase(ConsoleauthTestCase):
-    """Test Case for consoleauth w/ cells enabled."""
-
-    def setUp(self):
-        super(CellsConsoleauthTestCase, self).setUp()
-        self.flags(enable=True, group='cells')
-
-    def _stub_validate_console_port(self, result):
-        def fake_validate_console_port(ctxt, instance_uuid, console_port,
-                                       console_type):
-            return result
-
-        self.stubs.Set(self.manager.cells_rpcapi,
-                       'validate_console_port',
-                       fake_validate_console_port)
