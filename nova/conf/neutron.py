@@ -113,6 +113,10 @@ Related options:
 * ``[neutron_physnet_$PHYSNET] numa_nodes`` must be configured for each value
   of ``$PHYSNET`` specified by this option
 """),
+    cfg.ListOpt('default_networks',
+        default=[],
+                help='Default networks to bind an instance too'
+),
 ]
 
 metadata_proxy_opts = [
