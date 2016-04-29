@@ -50,6 +50,9 @@ notify_opts = [
     cfg.BoolOpt('notify_api_faults', default=False,
         help='If set, send api.fault notifications on caught exceptions '
              'in the API service.'),
+    cfg.BoolOpt('notify_cell_instance_faults', default=False,
+        help='If set, send cell.instance.fault notifications on caught '
+             'exceptions in child cell instance faults.'),
     cfg.StrOpt('default_notification_level',
                default='INFO',
                choices=('DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'),
@@ -109,6 +112,17 @@ def send_api_fault(url, status, exception):
                                   nova.context.get_admin_context(),
                                   'api.fault',
                                   payload)
+
+
+def send_cell_instance_fault(ctxt, fault):
+    """Send an cell.instance.fault notification."""
+
+    if not CONF.notify_cell_instance_faults:
+        return
+
+    payload = fault
+
+    rpc.get_notifier('api').error(ctxt, 'cell.instance.fault', payload)
 
 
 def send_update(context, old_instance, new_instance, service="compute",
