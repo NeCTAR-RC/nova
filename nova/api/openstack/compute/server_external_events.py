@@ -18,6 +18,7 @@ import webob
 from nova.api.openstack.compute.schemas import server_external_events
 from nova.api.openstack import wsgi
 from nova.api import validation
+from nova.cells import opts as cell_opts
 from nova import compute
 from nova import context as nova_context
 from nova.i18n import _
@@ -62,6 +63,13 @@ class ServerExternalEventsController(wsgi.Controller):
 
         return instances
 
+    def _get_instances_cells_v1(self, context, instance_uuids):
+        instances = {inst.uuid: inst for inst in
+                     objects.InstanceList.get_by_filters(
+                         context, {'uuid': instance_uuids},
+                         expected_attrs=['migration_context', 'info_cache'])}
+        return instances
+
     @wsgi.expected_errors((403, 404))
     @wsgi.response(200)
     @validation.schema(server_external_events.create, '2.0', '2.50')
@@ -80,10 +88,14 @@ class ServerExternalEventsController(wsgi.Controller):
 
         # Fetch instance objects for all relevant instances
         instance_uuids = set([event['server_uuid'] for event in body_events])
-        instance_mappings = objects.InstanceMappingList.get_by_instance_uuids(
-                context, list(instance_uuids))
-        instances = self._get_instances_all_cells(context, instance_uuids,
-                                                  instance_mappings)
+        if cell_opts.get_cell_type() == 'api':
+            instances = self._get_instances_cells_v1(context, instance_uuids)
+        else:
+            instance_mappings = \
+                objects.InstanceMappingList.get_by_instance_uuids(
+                    context, list(instance_uuids))
+            instances = self._get_instances_all_cells(context, instance_uuids,
+                                                      instance_mappings)
 
         for _event in body_events:
             client_event = dict(_event)
