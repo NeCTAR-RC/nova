@@ -860,6 +860,10 @@ class _TargetedMessageMethods(_BaseMessageMethods):
                                                'stop', do_cast=do_cast,
                                                clean_shutdown=clean_shutdown)
 
+    def external_instance_event(self, message, instances, events):
+        return self.compute_api.external_instance_event(message.ctxt,
+                                                        instances, events)
+
     def reboot_instance(self, message, instance, reboot_type):
         """Reboot an instance via compute_api.reboot()."""
         self._call_compute_api_with_obj(message.ctxt, instance, 'reboot',
@@ -1905,6 +1909,14 @@ class MessageRunner(object):
                                     dict(user_id=user_id, name=name),
                                     'up',
                                     need_response=True, run_locally=False)
+        return message.process()
+
+    def external_instance_event(self, ctxt, instances, events):
+        method_kwargs = dict(instances=instances,
+                             events=events)
+        message = _TargetedMessage(self, ctxt, 'external_instance_event',
+                                   method_kwargs, 'down',
+                                   instances[0].cell_name, need_response=False)
         return message.process()
 
     def create_aggregate(self, ctxt, cell_name, aggregate_name,

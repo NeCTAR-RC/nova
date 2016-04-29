@@ -50,7 +50,7 @@ class ComputeRPCAPIRedirect(object):
                         'confirm_resize', 'reset_network',
                         'inject_network_info',
                         'backup_instance', 'snapshot_instance',
-                        'set_admin_password']
+                        'set_admin_password', 'external_instance_event']
 
     def __init__(self, cells_rpcapi):
         self.cells_rpcapi = cells_rpcapi

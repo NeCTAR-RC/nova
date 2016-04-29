@@ -522,6 +522,9 @@ class CellsManager(manager.Manager):
         if not do_cast:
             return response.value_or_raise()
 
+    def external_instance_event(self, ctxt, instances, events):
+        self.msg_runner.external_instance_event(ctxt, instances, events)
+
     def cell_create(self, ctxt, values):
         return self.state_manager.cell_create(ctxt, values)
 

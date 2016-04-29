@@ -1992,7 +1992,8 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
             self.compute.external_instance_event(self.context,
                                                  instances, events)
             get_instance_nw_info.assert_called_once_with(self.context,
-                                                         instances[0])
+                                                         instances[0],
+                                                         update_cells=True)
             _process_instance_event.assert_called_once_with(instances[1],
                                                             events[1])
             _process_instance_vif_deleted_event.assert_called_once_with(
@@ -2037,7 +2038,8 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
             self.compute.external_instance_event(self.context,
                                                  instances, events)
             get_instance_nw_info.assert_called_once_with(self.context,
-                                                         instances[0])
+                                                         instances[0],
+                                                         update_cells=True)
             update_instance_cache_with_nw_info.assert_called_once_with(
                                                    self.compute.network_api,
                                                    self.context,
