@@ -108,6 +108,10 @@ Possible values:
 
 * Any integer value. 0 means connection is attempted only once
 """),
+    cfg.ListOpt('default_networks',
+        default=[],
+                help='Default networks to bind an instance too'
+),
 ]
 
 metadata_proxy_opts = [
