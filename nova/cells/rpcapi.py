@@ -673,3 +673,12 @@ class CellsAPI(object):
             raise exception.KeypairNotFound(user_id=user_id,
                                             name=name)
         return keypair
+
+    def external_instance_event(self, ctxt, instances, events, host=None):
+        """Broadcast external_instance_event downwards."""
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24')
+        cctxt.cast(ctxt, 'external_instance_event',
+                   instances=instances,
+                   events=events)
