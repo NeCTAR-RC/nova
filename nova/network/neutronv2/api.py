@@ -54,6 +54,9 @@ neutron_opts = [
                 default=600,
                 help='Number of seconds before querying neutron for'
                      ' extensions'),
+    cfg.ListOpt('default_networks',
+                default=[],
+                help='Default networks to bind an instance too'),
    ]
 
 NEUTRON_GROUP = 'neutron'
@@ -384,6 +387,16 @@ class API(base_api.NetworkAPI):
         :raises nova.exception.PortNotUsableDNS: If a requested port has a
             value assigned to its dns_name attribute.
         """
+        default_id = '00000000-0000-0000-0000-000000000000'
+        if requested_networks and CONF.neutron.default_networks:
+            for request in requested_networks:
+                if request.network_id == default_id:
+                    default_index = requested_networks.index(request)
+                    requested_networks.objects.remove(request)
+                    for default_net_id in CONF.neutron.default_networks:
+                        requested_networks.objects.insert(default_index,
+                            objects.NetworkRequest(network_id=default_net_id))
+                        default_index += 1
 
         available_macs = None
         if hypervisor_macs is not None:
@@ -606,12 +619,17 @@ class API(base_api.NetworkAPI):
                     project_id=instance.project_id)
             # bug/1267723 - if no network is requested and more
             # than one is available then raise NetworkAmbiguous Exception
-            if len(nets) > 1:
-                msg = _("Multiple possible networks found, use a Network "
-                         "ID to be more specific.")
-                raise exception.NetworkAmbiguous(msg)
-            ordered_networks.append(
-                objects.NetworkRequest(network_id=nets[0]['id']))
+            if CONF.neutron.default_networks:
+                for default_net_id in CONF.neutron.default_networks:
+                    ordered_networks.append(
+                        objects.NetworkRequest(network_id=default_net_id))
+            else:
+                if len(nets) > 1:
+                    msg = _("Multiple possible networks found, use a Network "
+                            "ID to be more specific.")
+                    raise exception.NetworkAmbiguous(msg)
+                ordered_networks.append(
+                    objects.NetworkRequest(network_id=nets[0]['id']))
 
         # NOTE(melwitt): check external net attach permission after the
         #                check for ambiguity, there could be another
