@@ -72,6 +72,10 @@ needs to create a resource in Neutron it will requery Neutron for the
 extensions that it has loaded.  Setting value to 0 will refresh the
 extensions with no wait.
 """),
+    cfg.ListOpt('default_networks',
+        default=[],
+                help='Default networks to bind an instance too'
+),
 ]
 
 metadata_proxy_opts = [
