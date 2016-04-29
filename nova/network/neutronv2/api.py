@@ -479,6 +479,16 @@ class API(base_api.NetworkAPI):
         :raises nova.exception.PortInUse: If a requested port is already
             attached to another instance.
         """
+        default_id = '00000000-0000-0000-0000-000000000000'
+        if requested_networks and CONF.neutron.default_networks:
+            for request in requested_networks:
+                if request.network_id == default_id:
+                    default_index = requested_networks.index(request)
+                    requested_networks.objects.remove(request)
+                    for default_net_id in CONF.neutron.default_networks:
+                        requested_networks.objects.insert(default_index,
+                            objects.NetworkRequest(network_id=default_net_id))
+                        default_index += 1
 
         available_macs = None
         if hypervisor_macs is not None:
