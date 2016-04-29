@@ -6508,7 +6508,8 @@ class ComputeManager(manager.Manager):
                       instance=instance)
             if event.name == 'network-changed':
                 try:
-                    self.network_api.get_instance_nw_info(context, instance)
+                    self.network_api.get_instance_nw_info(context, instance,
+                                                          update_cells=True)
                 except exception.NotFound as e:
                     LOG.info(_LI('Failed to process external instance event '
                                  '%(event)s due to: %(error)s'),
