@@ -7712,10 +7712,12 @@ class ComputeManager(manager.Manager):
                       instance=instance)
             if event.name == 'network-changed':
                 try:
+
                     LOG.debug('Refreshing instance network info cache due to '
                               'event %s.', event.key, instance=instance)
                     self.network_api.get_instance_nw_info(
-                        context, instance, refresh_vif_id=event.tag)
+                        context, instance, refresh_vif_id=event.tag,
+                        update_cells=True)
                 except exception.NotFound as e:
                     LOG.info('Failed to process external instance event '
                              '%(event)s due to: %(error)s',
