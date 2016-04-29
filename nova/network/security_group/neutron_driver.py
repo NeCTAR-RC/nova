@@ -133,7 +133,8 @@ class SecurityGroupAPI(security_group_base.SecurityGroupBase):
             nova_rule['from_port'] = rule.get('port_range_min')
             nova_rule['to_port'] = rule.get('port_range_max')
         nova_rule['group_id'] = rule['remote_group_id']
-        nova_rule['cidr'] = self.parse_cidr(rule.get('remote_ip_prefix'))
+        if not rule['remote_group_id']:
+            nova_rule['cidr'] = self.parse_cidr(rule.get('remote_ip_prefix'))
         return nova_rule
 
     def get(self, context, name=None, id=None, map_exception=False):

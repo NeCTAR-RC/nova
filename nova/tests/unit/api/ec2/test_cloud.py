@@ -585,12 +585,12 @@ class CloudTestCase(test.TestCase):
             'name': 'test'
         }
         db.security_group_create(self.context,
-                                 {'project_id': 'someuser',
+                                 {'project_id': 'fake',
                                  'user_id': 'someuser',
                                  'description': '',
                                  'name': 'somegroup1'})
         db.security_group_create(self.context,
-                                 {'project_id': 'someuser',
+                                 {'project_id': 'fake',
                                   'user_id': 'someuser',
                                   'description': '',
                                   'name': 'othergroup2'})
@@ -612,12 +612,12 @@ class CloudTestCase(test.TestCase):
         }
         sec1 = db.security_group_create(self.context, kwargs)
         sec2 = db.security_group_create(self.context,
-                                       {'project_id': 'someuser',
+                                       {'project_id': 'fake',
                                         'user_id': 'someuser',
                                         'description': '',
                                         'name': 'somegroup1'})
         sec3 = db.security_group_create(self.context,
-                                       {'project_id': 'someuser',
+                                       {'project_id': 'fake',
                                         'user_id': 'someuser',
                                         'description': '',
                                         'name': 'othergroup2'})
@@ -638,25 +638,25 @@ class CloudTestCase(test.TestCase):
         self.assertEqual(len(actual_rules), 4)
         expected_rules = [{'fromPort': -1,
                            'groups': [{'groupName': 'somegroup1',
-                                       'userId': 'someuser'}],
+                                       'userId': 'fake'}],
                            'ipProtocol': 'icmp',
                            'ipRanges': [],
                            'toPort': -1},
                           {'fromPort': 1,
                            'groups': [{'groupName': u'somegroup1',
-                                       'userId': u'someuser'}],
+                                       'userId': u'fake'}],
                            'ipProtocol': 'tcp',
                            'ipRanges': [],
                            'toPort': 65535},
                           {'fromPort': 1,
                            'groups': [{'groupName': u'somegroup1',
-                                       'userId': u'someuser'}],
+                                       'userId': u'fake'}],
                            'ipProtocol': 'udp',
                            'ipRanges': [],
                            'toPort': 65535},
                           {'fromPort': 80,
                            'groups': [{'groupName': u'othergroup2',
-                                       'userId': u'someuser'}],
+                                       'userId': u'fake'}],
                            'ipProtocol': u'tcp',
                            'ipRanges': [],
                            'toPort': 80}]
