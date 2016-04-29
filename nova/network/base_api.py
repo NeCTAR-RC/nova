@@ -247,7 +247,8 @@ class NetworkAPI(base.Base):
         """Associate or disassociate host or project to network."""
         raise NotImplementedError()
 
-    def get_instance_nw_info(self, context, instance, **kwargs):
+    def get_instance_nw_info(self, context, instance, update_cells=False,
+                             **kwargs):
         """Returns all network info related to an instance."""
         with lockutils.lock('refresh_cache-%s' % instance.uuid):
             result = self._get_instance_nw_info(context, instance, **kwargs)

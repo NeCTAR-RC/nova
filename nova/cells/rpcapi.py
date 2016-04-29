@@ -718,3 +718,12 @@ class CellsAPI(object):
                           cell_name=cell_name,
                           aggregate_id=aggregate_id,
                           host_name=host_name)
+
+    def external_instance_event(self, ctxt, instances, events):
+        """Broadcast external_instance_event downwards."""
+        if not CONF.cells.enable:
+            return
+        cctxt = self.client.prepare(version='1.24')
+        cctxt.cast(ctxt, 'external_instance_event',
+                   instances=instances,
+                   events=events)
