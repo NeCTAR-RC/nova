@@ -286,6 +286,13 @@ class _TestInstanceObject(object):
         expected_updates = dict(vm_state='meow', task_state='wuff',
                                 user_data='new')
 
+        if cell_type == 'compute':
+            expected_system_metadata = {u'instance_name': u'instance-00000002',
+                                        u'availability_zone': u'nova'}
+            expected_updates['system_metadata'] = expected_system_metadata
+        else:
+            expected_system_metadata = {}
+
         new_ref = dict(old_ref, host='newhost', **expected_updates)
         exp_vm_state = save_kwargs.get('expected_vm_state')
         exp_task_state = save_kwargs.get('expected_task_state')
@@ -316,10 +323,16 @@ class _TestInstanceObject(object):
                                                  'security_groups'],
                                 use_slave=False
                                 ).AndReturn(old_ref)
+
+        if cell_type == 'compute':
+            columns_to_join = ['system_metadata', 'info_cache',
+                               'security_groups']
+        else:
+            columns_to_join = ['info_cache', 'security_groups',
+                               'system_metadata', 'extra', 'extra.flavor']
         db.instance_update_and_get_original(
                 self.context, fake_uuid, expected_updates,
-                columns_to_join=['info_cache', 'security_groups',
-                                 'system_metadata', 'extra', 'extra.flavor']
+                columns_to_join=columns_to_join
                 ).AndReturn((old_ref, new_ref))
         if cell_type == 'api':
             cells_rpcapi.CellsAPI().AndReturn(cells_api_mock)
@@ -345,12 +358,16 @@ class _TestInstanceObject(object):
         inst.vm_state = 'meow'
         inst.task_state = 'wuff'
         inst.user_data = 'new'
+        if cell_type == 'compute':
+            inst.system_metadata = {}
         save_kwargs.pop('context', None)
         inst.save(**save_kwargs)
         self.assertEqual('newhost', inst.host)
         self.assertEqual('meow', inst.vm_state)
         self.assertEqual('wuff', inst.task_state)
         self.assertEqual('new', inst.user_data)
+        if cell_type == 'compute':
+            self.assertEqual(expected_system_metadata, inst.system_metadata)
         # NOTE(danms): Ignore flavor migrations for the moment
         self.assertEqual(set([]), inst.obj_what_changed() - set(['flavor']))
 
@@ -539,7 +556,9 @@ class _TestInstanceObject(object):
         inst.vm_state = 'foo'
         inst.task_state = 'bar'
         inst.cell_name = 'foo!bar@baz'
-
+        if cell_type == 'compute':
+            inst.system_metadata = {'instance_name': 'fake',
+                                    'availability_zone': 'fake'}
         old_ref = dict(base.obj_to_primitive(inst), vm_state='old',
                 task_state='old')
         new_ref = dict(old_ref, vm_state='foo', task_state='bar')
@@ -576,20 +595,34 @@ class _TestInstanceObject(object):
             actual_inst_p = base.obj_to_primitive(actual_inst)
             self.assertEqual(expected_inst_p, actual_inst_p)
             self.assertFalse(fake_update_from_api.called)
+
+            sys_meta = {'instance_name': 'fake',
+                        'availability_zone': 'fake'}
+            expected_calls = [
+                mock.call(self.context, inst.uuid,
+                          {'vm_state': 'foo', 'task_state': 'bar',
+                           'cell_name': 'foo!bar@baz',
+                           'system_metadata': sys_meta},
+                          columns_to_join=['system_metadata']),
+                mock.call(self.context, inst.uuid,
+                          {'vm_state': 'bar', 'task_state': 'foo'},
+                          columns_to_join=['system_metadata'])]
+
         elif cell_type == 'api':
             self.assertFalse(mock_update_at_top.called)
             fake_update_from_api.assert_called_once_with(self.context,
                     mock.ANY, None, None, False)
 
-        expected_calls = [
+            expected_calls = [
                 mock.call(self.context, inst.uuid,
-                    {'vm_state': 'foo', 'task_state': 'bar',
-                     'cell_name': 'foo!bar@baz'},
-                    columns_to_join=['system_metadata', 'extra',
-                        'extra.flavor']),
+                          {'vm_state': 'foo', 'task_state': 'bar',
+                           'cell_name': 'foo!bar@baz'},
+                          columns_to_join=['system_metadata', 'extra',
+                                           'extra.flavor']),
                 mock.call(self.context, inst.uuid,
-                    {'vm_state': 'bar', 'task_state': 'foo'},
-                    columns_to_join=['system_metadata'])]
+                          {'vm_state': 'bar', 'task_state': 'foo'},
+                          columns_to_join=['system_metadata'])]
+
         mock_db_update.assert_has_calls(expected_calls)
 
     def test_skip_cells_api(self):

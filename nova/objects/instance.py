@@ -20,6 +20,7 @@ from oslo_log import log as logging
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 
+from nova import availability_zones
 from nova.cells import opts as cells_opts
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
@@ -549,6 +550,14 @@ class _BaseInstance(base.NovaPersistentObject, base.NovaObject,
         else:
             objects.MigrationContext._destroy(context, self.uuid)
 
+    def _ensure_cells_system_metadata(self):
+        if u'instance_name' not in self.system_metadata:
+            self.system_metadata[u'instance_name'] = self.name
+        if self.host and u'availability_zone' not in self.system_metadata:
+            host_az = availability_zones.get_host_availability_zone(
+                self._context, self.host)
+            self.system_metadata['availability_zone'] = host_az
+
     @base.remotable
     def save(self, expected_vm_state=None,
              expected_task_state=None, admin_state_reset=False):
@@ -599,6 +608,10 @@ class _BaseInstance(base.NovaPersistentObject, base.NovaObject,
                             admin_state_reset)
 
         updates = {}
+
+        if cell_type == 'compute':
+            self._ensure_cells_system_metadata()
+
         changes = self.obj_what_changed()
         if 'scheduled_at' in changes:
             # NOTE(sbiswas7): Since 'scheduled_at' is removed from models,

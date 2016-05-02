@@ -7807,11 +7807,13 @@ class ComputeAPITestCase(BaseTestCase):
         sys_meta = {k: v for k, v in instance.system_metadata.items()
                     if not k.startswith('instance_type')}
         self.assertEqual(sys_meta,
-                {'image_kernel_id': 'fake_kernel_id',
-                'image_min_disk': '1',
-                'image_ramdisk_id': 'fake_ramdisk_id',
-                'image_something_else': 'meow',
-                'preserved': 'preserve this!'})
+                {'availability_zone': 'nova',
+                 'instance_name': 'instance-00000001',
+                 'image_kernel_id': 'fake_kernel_id',
+                 'image_min_disk': '1',
+                 'image_ramdisk_id': 'fake_ramdisk_id',
+                 'image_something_else': 'meow',
+                 'preserved': 'preserve this!'})
 
     def test_rebuild(self):
         self._test_rebuild(vm_state=vm_states.ACTIVE)
