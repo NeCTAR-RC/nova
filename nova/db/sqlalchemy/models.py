@@ -1089,6 +1089,9 @@ class Cell(BASE, NovaBase, models.SoftDeleteMixin):
     weight_scale = Column(Float(), default=1.0)
     is_parent = Column(Boolean())
 
+    # json-encode string containing the cells capabilities
+    capabilities = Column(Text, default='{}')
+
 
 # NOTE(alaski): This table exists in the nova_api database and its usage here
 # is deprecated.
