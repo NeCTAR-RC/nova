@@ -488,6 +488,19 @@ class CellStateManagerDB(CellStateManager):
     def cell_delete(self, ctxt, cell_name):
         return self.db.cell_delete(ctxt, cell_name)
 
+    def update_cell_capabilities(self, cell_name, capabilities):
+        super(CellStateManagerDB, self).update_cell_capabilities(cell_name,
+                                                                 capabilities)
+        # This should probably be move to the parent class, but it's
+        # not going to work for deployments using the cell state
+        # manager file class.
+        ctxt = context.get_admin_context()
+        values = {'capabilities':
+                  jsonutils.dumps({capab_name: list(values)
+                                   for (capab_name, values) in
+                                   capabilities.items()})}
+        self.db.cell_update(ctxt, cell_name, values)
+
 
 class CellStateManagerFile(CellStateManager):
     def __init__(self, cell_state_cls=None):

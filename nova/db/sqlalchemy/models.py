@@ -1070,6 +1070,9 @@ class Cell(BASE, NovaBase):
     weight_scale = Column(Float(), default=1.0)
     is_parent = Column(Boolean())
 
+    # json-encode string containing the cells capabilities
+    capabilities = Column(Text, default='{}')
+
 
 class AggregateHost(BASE, NovaBase):
     """Represents a host that is member of an aggregate."""
