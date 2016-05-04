@@ -8342,6 +8342,7 @@ class CellTestCase(test.TestCase, ModelsObjectComparatorMixin):
             'weight_offset': 0.5,
             'weight_scale': 1.5,
             'is_parent': True,
+            'capabilities': '{}',
         }
 
     def _cell_value_modify(self, value, step):
@@ -8381,7 +8382,8 @@ class CellTestCase(test.TestCase, ModelsObjectComparatorMixin):
         test_cellname = self._get_cell_base_values()['name']
         updated_cell = db.cell_update(self.ctxt, test_cellname, new_values)
         self._assertEqualObjects(updated_cell, new_values,
-                                 ignored_keys=self._ignored_keys + ['name'])
+                                 ignored_keys=self._ignored_keys + ['name',
+                                                            'capabilities'])
 
     def test_cell_delete(self):
         new_cells = self._create_cells()
