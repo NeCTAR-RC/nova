@@ -18,10 +18,11 @@
 import collections
 
 from oslo_config import cfg
+from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 
 from nova.cells import opts as cell_opts
-from nova.cells import rpcapi as cell_rpcapi
+from nova import db
 from nova import objects
 from nova.openstack.common import memorycache
 from nova import utils
@@ -135,29 +136,21 @@ def get_availability_zones(context, get_only_available=False,
     # Override for cells
     cell_type = cell_opts.get_cell_type()
     if cell_type == 'api':
-        cache = _get_cache()
-        available_zones = cache.get('az-availabile-list')
-        unavailable_zones = cache.get('az-unavailabile-list')
-
-        if not available_zones:
-            cells_rpcapi = cell_rpcapi.CellsAPI()
-            cell_info = cells_rpcapi.get_cell_info_for_neighbors(context)
-            global_azs = []
-            mute_azs = []
-            secs = CONF.cells.mute_child_interval
-            for cell in cell_info:
-                last_seen = cell['last_seen']
-                if 'availability_zones' not in cell['capabilities']:
-                    continue
-                if last_seen and timeutils.is_older_than(last_seen, secs):
-                    mute_azs.extend(cell['capabilities']['availability_zones'])
-                else:
-                    global_azs.extend(
-                        cell['capabilities']['availability_zones'])
-                available_zones = list(set(global_azs))
-                unavailable_zones = list(set(mute_azs))
-                cache.set('az-availabile-list', available_zones, 300)
-                cache.set('az-unavailabile-list', unavailable_zones, 300)
+        ctxt = context.elevated()
+        global_azs = []
+        mute_azs = []
+        secs = CONF.cells.mute_child_interval
+        for cell in db.cell_get_all(ctxt):
+            last_seen = cell.updated_at
+            capabilities = jsonutils.loads(cell.capabilities)
+            if 'availability_zones' not in capabilities:
+                continue
+            if last_seen and timeutils.is_older_than(last_seen, secs):
+                mute_azs.extend(capabilities['availability_zones'])
+            else:
+                global_azs.extend(capabilities['availability_zones'])
+            available_zones = list(set(global_azs))
+            unavailable_zones = list(set(mute_azs))
         if get_only_available:
             return available_zones
         return (available_zones, unavailable_zones)
