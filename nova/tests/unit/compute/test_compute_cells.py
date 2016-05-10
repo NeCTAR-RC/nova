@@ -20,7 +20,6 @@ import inspect
 
 import mock
 from oslo_config import cfg
-from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 
 from nova import block_device
@@ -226,34 +225,6 @@ class CellsComputeAPITestCase(test_compute.ComputeAPITestCase):
 
         # one targeted message should have been created
         self.assertEqual(1, mock_msg.call_count)
-
-    def test_get_all_by_multiple_options_at_once(self):
-        # Test searching by multiple options at once.
-
-        def fake_network_info(ip):
-            info = [{
-                'address': 'aa:bb:cc:dd:ee:ff',
-                'id': 1,
-                'network': {
-                    'bridge': 'br0',
-                    'id': 1,
-                    'label': 'private',
-                    'subnets': [{
-                        'cidr': '192.168.0.0/24',
-                        'ips': [{
-                            'address': ip,
-                            'type': 'fixed',
-                        }]
-                    }]
-                }
-            }]
-            return jsonutils.dumps(info)
-
-        self._create_fake_instance_obj({
-            'display_name': 'woot',
-            'uuid': '00000000-0000-0000-0000-000000000010',
-            'info_cache': objects.InstanceInfoCache(
-                network_info=fake_network_info('192.168.0.1'))})
 
 
 class CellsConductorAPIRPCRedirect(test.NoDBTestCase):

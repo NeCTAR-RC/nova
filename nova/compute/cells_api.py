@@ -192,22 +192,6 @@ class ComputeCellsAPI(compute_api.API):
         """
         return max_count
 
-    def _get_instances_by_filters(self, context, filters,
-                                  limit=None, marker=None, expected_attrs=None,
-                                  sort_keys=None, sort_dirs=None):
-        if 'ip' in filters:
-            filters['access_ip_v4'] = filters['ip']
-        if 'ip6' in filters:
-            filters['access_ip_v6'] = filters['ip6']
-
-        fields = ['metadata', 'system_metadata', 'info_cache',
-                  'security_groups']
-        if expected_attrs:
-            fields.extend(expected_attrs)
-        return objects.InstanceList.get_by_filters(
-            context, filters=filters, limit=limit, marker=marker,
-            expected_attrs=fields, sort_keys=sort_keys, sort_dirs=sort_dirs)
-
     def create(self, *args, **kwargs):
         """We can use the base functionality, but I left this here just
         for completeness.
