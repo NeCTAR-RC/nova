@@ -1211,6 +1211,7 @@ class CellsTargetedMethodsTestCase(test.NoDBTestCase):
         instance.task_state = 'meow'
         instance.vm_state = 'wuff'
         instance.user_data = 'foo'
+        instance.system_metadata = {'availability_zone': 'nova'}
         message = ''
 
         inst_ref = dict(objects_base.obj_to_primitive(instance))
