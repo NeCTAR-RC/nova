@@ -782,6 +782,11 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
             _handle_cell_update_from_api()
         elif cell_type == 'compute':
             if self._sync_cells:
+                if u'instance_name' not in self.system_metadata:
+                    self.system_metadata[u'instance_name'] = self.name
+                if 'instance_name' not in stale_instance.system_metadata:
+                    stale_instance.system_metadata[u'instance_name'] = self.name
+
                 cells_api = cells_rpcapi.CellsAPI()
                 cells_api.instance_update_at_top(context, stale_instance)
 
