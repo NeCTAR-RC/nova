@@ -8381,6 +8381,8 @@ class ComputeAPITestCase(BaseTestCase):
             self.assertEqual(instance.task_state, task_states.REBUILDING)
             sys_meta = {k: v for k, v in instance.system_metadata.items()
                         if not k.startswith('instance_type')}
+            if 'instance_name' in sys_meta:
+                sys_meta.pop('instance_name')
             self.assertEqual(
                     {'image_kernel_id': uuids.kernel_id,
                      'image_min_disk': '1',
