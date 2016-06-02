@@ -481,9 +481,18 @@ class _TestInstanceObject(object):
         self.assertEqual('new', inst.user_data)
         # NOTE(danms): Ignore flavor migrations for the moment
         self.assertEqual(set([]), inst.obj_what_changed() - set(['flavor']))
-        mock_db_instance_get_by_uuid.assert_called_once_with(
-            self.context, fake_uuid, columns_to_join=['info_cache',
-                                                      'security_groups'])
+
+        db_get_by_uuid_calls = [
+            mock.call(self.context, fake_uuid,
+                      columns_to_join=['info_cache', 'security_groups']),
+        ]
+
+        if cell_type == 'compute':
+            db_get_by_uuid_calls.append(mock.call(
+                self.context, fake_uuid, columns_to_join=['system_metadata']))
+
+        mock_db_instance_get_by_uuid.assert_has_calls(db_get_by_uuid_calls)
+
         mock_db_instance_update_and_get_original.assert_called_once_with(
             self.context, fake_uuid, expected_updates,
             columns_to_join=['info_cache', 'security_groups',
