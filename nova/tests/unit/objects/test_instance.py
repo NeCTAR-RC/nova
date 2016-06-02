@@ -425,6 +425,9 @@ class _TestInstanceObject(object):
                     self.context, mox.IsA(objects.Instance),
                     exp_vm_state, exp_task_state, admin_reset)
         elif cell_type == 'compute':
+            db.instance_get_by_uuid(self.context, fake_uuid,
+                                columns_to_join=['system_metadata']
+                                             ).AndReturn(old_ref)
             cells_rpcapi.CellsAPI().AndReturn(cells_api_mock)
             cells_api_mock.instance_update_at_top(self.context,
                                                   mox.IsA(objects.Instance))
