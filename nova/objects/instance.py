@@ -638,6 +638,10 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
                 value = jsonutils.dumps(obj.obj_to_primitive())
             self._extra_values_to_save[field] = value
 
+    def _ensure_cells_system_metadata(self):
+        if u'instance_name' not in self.system_metadata:
+            self.system_metadata[u'instance_name'] = self.name
+
     @base.remotable
     def save(self, expected_vm_state=None,
              expected_task_state=None, admin_state_reset=False):
@@ -765,6 +769,7 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
         if cells_update_from_api:
             _handle_cell_update_from_api()
         elif cell_type == 'compute':
+            self._ensure_cells_system_metadata()
             if self._sync_cells:
                 cells_api = cells_rpcapi.CellsAPI()
                 cells_api.instance_update_at_top(context, stale_instance)
