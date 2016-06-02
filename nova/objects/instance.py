@@ -772,6 +772,12 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
         if 'system_metadata' not in expected_attrs:
             expected_attrs.append('system_metadata')
             expected_attrs.append('flavor')
+
+        if 'instance_name' not in self.system_metadata:
+            self.system_metadata['instance_name'] = self.name
+            updates['system_metadata'] = self.system_metadata
+            stale_instance.system_metadata = self.system_metadata
+
         old_ref, inst_ref = db.instance_update_and_get_original(
                 context, self.uuid, updates,
                 columns_to_join=_expected_cols(expected_attrs))
