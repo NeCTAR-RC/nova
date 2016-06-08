@@ -1,6 +1,6 @@
 --- a/nova/tests/unit/test_cinder.py
 +++ b/nova/tests/unit/test_cinder.py
-@@ -115,15 +115,21 @@ class CinderTestCase(BaseCinderTestCase,
+@@ -115,15 +115,21 @@
                           self.create_client().client.endpoint_override)
  
      def test_get_non_existing_volume(self):
@@ -25,7 +25,7 @@
  
          volume = self.api.get(self.context, '5678')
          self.assertThat(m.last_request.path,
-@@ -175,19 +181,28 @@ class CinderV2TestCase(BaseCinderTestCas
+@@ -175,19 +181,28 @@
      def test_cinder_endpoint_template(self):
          endpoint = 'http://other_host:8776/v2/%(project_id)s'
          self.flags(endpoint_template=endpoint, group='cinder')

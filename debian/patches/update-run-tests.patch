@@ -4,7 +4,7 @@ Forwarded: not-needed
 
 --- a/run_tests.sh
 +++ b/run_tests.sh
-@@ -140,14 +140,7 @@ function run_tests {
+@@ -140,14 +140,7 @@
      ${wrapper} python setup.py egg_info
    fi
    echo "Running \`${wrapper} $TESTRTESTS\`"

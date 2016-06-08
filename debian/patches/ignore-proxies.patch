@@ -4,7 +4,7 @@ Forwarded: no
 
 --- a/nova/tests/unit/test_wsgi.py
 +++ b/nova/tests/unit/test_wsgi.py
-@@ -315,6 +315,7 @@
+@@ -306,6 +306,7 @@
  
      @testtools.skipIf(not utils.is_ipv6_supported(), "no ipv6 support")
      def test_app_using_ipv6_and_ssl(self):

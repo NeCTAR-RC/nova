@@ -1,6 +1,6 @@
 --- a/nova/tests/unit/virt/libvirt/test_driver.py
 +++ b/nova/tests/unit/virt/libvirt/test_driver.py
-@@ -1243,7 +1243,7 @@
+@@ -1234,7 +1234,7 @@
          self.assertEqual(1, cfg.vcpus)
          self.assertEqual(vm_mode.EXE, cfg.os_type)
          self.assertEqual("/sbin/init", cfg.os_init_path)
@@ -9,7 +9,7 @@
          self.assertIsNone(cfg.os_root)
          self.assertEqual(3, len(cfg.devices))
          self.assertIsInstance(cfg.devices[0],
-@@ -1268,7 +1268,7 @@
+@@ -1259,7 +1259,7 @@
          self.assertEqual(1, cfg.vcpus)
          self.assertEqual(vm_mode.EXE, cfg.os_type)
          self.assertEqual("/sbin/init", cfg.os_init_path)
@@ -20,7 +20,7 @@
          self.assertIsInstance(cfg.devices[0],
 --- a/nova/virt/libvirt/driver.py
 +++ b/nova/virt/libvirt/driver.py
-@@ -311,7 +311,7 @@
+@@ -312,7 +312,7 @@
  DISABLE_REASON_UNDEFINED = None
  
  # Guest config console string
