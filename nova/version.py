@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pbr.version
+from pbr import packaging
 
 from nova.i18n import _LE
 
@@ -21,8 +21,18 @@ NOVA_PRODUCT = "OpenStack Nova"
 NOVA_PACKAGE = None  # OS distro package version suffix
 
 loaded = False
-version_info = pbr.version.VersionInfo('nova')
-version_string = version_info.version_string
+
+class FakeVersionInfo(object):
+    def __init__(self, version):
+        self.version = version
+    def release_string(self):
+        return self.version
+    def version_string(self):
+        return self.version
+
+def version_string():
+    return packaging.get_version('nova')
+version_info = FakeVersionInfo(version_string)
 
 
 def _load_config():
@@ -82,7 +92,4 @@ def package_string():
 
 
 def version_string_with_package():
-    if package_string() is None:
-        return version_info.version_string()
-    else:
-        return "%s-%s" % (version_info.version_string(), package_string())
+    return version_string
