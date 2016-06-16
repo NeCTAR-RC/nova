@@ -6,3 +6,4 @@ neutron-floating-ip-list.patch
 skip-cinder-tests.patch
 ignore-proxies.patch
 disable-sphinxcontrib.seqdiag.patch
+fix-manifest.patch
