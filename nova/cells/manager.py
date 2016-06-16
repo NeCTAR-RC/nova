@@ -81,7 +81,7 @@ class CellsManager(manager.Manager):
     Scheduling requests get passed to the scheduler class.
     """
 
-    target = oslo_messaging.Target(version='1.34')
+    target = oslo_messaging.Target(version='1.35')
 
     def __init__(self, *args, **kwargs):
         LOG.warning(_LW('The cells feature of Nova is considered experimental '
@@ -571,7 +571,7 @@ class CellsManager(manager.Manager):
         """Resume an instance in its cell."""
         self.msg_runner.resume_instance(ctxt, instance)
 
-    def terminate_instance(self, ctxt, instance):
+    def terminate_instance(self, ctxt, instance, delete_type=None):
         """Delete an instance in its cell."""
         self.msg_runner.terminate_instance(ctxt, instance)
 

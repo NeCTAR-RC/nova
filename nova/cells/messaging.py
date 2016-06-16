@@ -886,7 +886,7 @@ class _TargetedMessageMethods(_BaseMessageMethods):
     def get_host_uptime(self, message, host_name):
         return self.host_api.get_host_uptime(message.ctxt, host_name)
 
-    def terminate_instance(self, message, instance):
+    def terminate_instance(self, message, instance, delete_type=None):
         self._call_compute_api_with_obj(message.ctxt, instance, 'delete')
 
     def soft_delete_instance(self, message, instance):
@@ -1838,7 +1838,7 @@ class MessageRunner(object):
         """Resume an instance in its cell."""
         self._instance_action(ctxt, instance, 'resume_instance')
 
-    def terminate_instance(self, ctxt, instance):
+    def terminate_instance(self, ctxt, instance, delete_type=None):
         self._instance_action(ctxt, instance, 'terminate_instance')
 
     def soft_delete_instance(self, ctxt, instance):
