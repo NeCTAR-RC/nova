@@ -197,7 +197,10 @@ class CellsAPI(object):
         """Update instance at API level."""
         version = '1.35'
         if not self.client.can_send_version('1.35'):
-            instance = objects_base.obj_to_primitive(instance)
+            try:
+                instance = objects_base.obj_to_primitive(instance)
+            except:
+                return
             version = '1.34'
         cctxt = self.client.prepare(version=version)
         cctxt.cast(ctxt, 'instance_update_at_top', instance=instance)
@@ -206,7 +209,10 @@ class CellsAPI(object):
         """Destroy instance at API level."""
         version = '1.35'
         if not self.client.can_send_version('1.35'):
-            instance = objects_base.obj_to_primitive(instance)
+            try:
+                instance = objects_base.obj_to_primitive(instance)
+            except:
+                return
             version = '1.34'
         cctxt = self.client.prepare(version=version)
         cctxt.cast(ctxt, 'instance_destroy_at_top', instance=instance)

@@ -165,6 +165,10 @@ class Service(base.NovaPersistentObject, base.NovaObject,
                 # NOTE(danms): Special handling of the version field, since
                 # it is read_only and set in our init.
                 setattr(service, base.get_attrname(key), db_service[key])
+            elif key == 'forced_down':
+                service[key] = False
+            elif key == 'last_seen_up':
+                service[key] = None
             else:
                 service[key] = db_service[key]
         service._context = context
