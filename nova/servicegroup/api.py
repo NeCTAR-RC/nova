@@ -86,9 +86,11 @@ class API(object):
         """Check if the given member is up."""
         # NOTE(johngarbutt) no logging in this method,
         # so this doesn't slow down the scheduler
-        if member.get('forced_down'):
-            return False
-
+        try:
+            if member.get('forced_down'):
+                return False
+        except:  # noqa
+            pass
         return self._driver.is_up(member)
 
     def get_all(self, group_id):

@@ -60,7 +60,11 @@ class DbDriver(base.Driver):
         """
         # Keep checking 'updated_at' if 'last_seen_up' isn't set.
         # Should be able to use only 'last_seen_up' in the M release
-        last_heartbeat = (service_ref.get('last_seen_up') or
+        try:
+            last_seen_up = service_ref.get('last_seen_up')
+        except:  # noqa
+            last_seen_up = None
+        last_heartbeat = (last_seen_up or
             service_ref['updated_at'] or service_ref['created_at'])
         if isinstance(last_heartbeat, six.string_types):
             # NOTE(russellb) If this service_ref came in over rpc via

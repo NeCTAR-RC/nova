@@ -1064,6 +1064,16 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         if not self._at_the_top():
             return
 
+        try:
+            instance.uuid
+        except:  # noqa
+            inst_obj = objects.Instance()
+            expected_attrs = ['system_metadata', 'info_cache', 'numa_topology',
+                              'pci_requests', 'vcpu_model', 'flavor']
+            inst_obj._from_db_object(message.ctxt, inst_obj, instance,
+                                     expected_attrs=expected_attrs)
+            instance = inst_obj
+
         # Remove things that we can't update in the top level cells.
         # 'metadata' is only updated in the API cell, so don't overwrite
         # it based on what child cells say.  Make sure to update
@@ -1100,8 +1110,17 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         """Destroy an instance from the DB if we're a top level cell."""
         if not self._at_the_top():
             return
+        try:
+            instance.uuid
+        except:  # noqa
+            inst_obj = objects.Instance()
+            expected_attrs = []
+            inst_obj._from_db_object(message.ctxt, inst_obj, instance,
+                                     expected_attrs=expected_attrs)
+            instance = inst_obj
         LOG.debug("Got update to delete instance",
                   instance_uuid=instance.uuid)
+
         try:
             instance.destroy()
         except exception.InstanceNotFound:
