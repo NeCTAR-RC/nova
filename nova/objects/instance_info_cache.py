@@ -19,6 +19,7 @@ from nova.cells import rpcapi as cells_rpcapi
 from nova import db
 from nova import exception
 from nova.i18n import _LE
+from nova.network import model as network_model
 from nova.objects import base
 from nova.objects import fields
 
@@ -46,6 +47,11 @@ class InstanceInfoCache(base.NovaPersistentObject, base.NovaObject,
     @staticmethod
     def _from_db_object(context, info_cache, db_obj):
         for field in info_cache.fields:
+            if field == 'network_info':
+                if db_obj[field] and type(db_obj[field]) \
+                   != network_model.NetworkInfo:
+                    db_obj[field] = fields.NetworkModel().from_primitive(
+                        None, None, db_obj[field])
             info_cache[field] = db_obj[field]
         info_cache.obj_reset_changes()
         info_cache._context = context
