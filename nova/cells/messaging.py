@@ -1014,6 +1014,57 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         """Are we the API level?"""
         return not self.state_manager.get_parent_cells()
 
+    def _get_expected_vm_state(self, instance):
+        """To attempt to address out-of-order messages, do some sanity
+        checking on the VM states.  Add some requirements for
+        vm_state to the instance.save() call if necessary.
+        """
+        expected_vm_state_map = {
+            # For updates containing 'vm_state' of 'building',
+            # only allow them to occur if the DB already says
+            # 'building' or if the vm_state is None.  None
+            # really shouldn't be possible as instances always
+            # start out in 'building' anyway.. but just in case.
+            vm_states.BUILDING: [vm_states.BUILDING, None]}
+
+        if instance.obj_attr_is_set('vm_state'):
+            return expected_vm_state_map.get(instance.vm_state)
+
+    def _get_expected_task_state(self, instance):
+        """To attempt to address out-of-order messages, do some sanity
+        checking on the task states.  Add some requirements for
+        task_state to the instance.save() call if necessary.
+        """
+        expected_task_state_map = {
+            # Always allow updates when task_state doesn't change,
+            # but also make sure we don't set resize/rebuild task
+            # states for old messages when we've potentially already
+            # processed the ACTIVE/None messages.  Ie, these checks
+            # will prevent stomping on any ACTIVE/None messages
+            # we already processed.
+            task_states.REBUILD_BLOCK_DEVICE_MAPPING:
+                        [task_states.REBUILD_BLOCK_DEVICE_MAPPING,
+                         task_states.REBUILDING],
+                task_states.REBUILD_SPAWNING:
+                        [task_states.REBUILD_SPAWNING,
+                         task_states.REBUILD_BLOCK_DEVICE_MAPPING,
+                         task_states.REBUILDING],
+                task_states.RESIZE_MIGRATING:
+                        [task_states.RESIZE_MIGRATING,
+                         task_states.RESIZE_PREP],
+                task_states.RESIZE_MIGRATED:
+                        [task_states.RESIZE_MIGRATED,
+                         task_states.RESIZE_MIGRATING,
+                         task_states.RESIZE_PREP],
+                task_states.RESIZE_FINISH:
+                        [task_states.RESIZE_FINISH,
+                         task_states.RESIZE_MIGRATED,
+                         task_states.RESIZE_MIGRATING,
+                         task_states.RESIZE_PREP]}
+
+        if instance.obj_attr_is_set('task_state'):
+            return expected_task_state_map.get(instance.task_state)
+
     def _apply_expected_states(self, instance_info):
         """To attempt to address out-of-order messages, do some sanity
         checking on the VM and task states.  Add some requirements for
@@ -1064,10 +1115,53 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
             if expected is not None:
                 instance_info['expected_task_state'] = expected
 
+    def instance_update_at_top_object(self, message, instance, **kwargs):
+        """Update an instance in the DB if we're a top level cell."""
+        if not self._at_the_top():
+            return
+
+        # Remove things that we can't update in the top level cells.
+        # 'metadata' is only updated in the API cell, so don't overwrite
+        # it based on what child cells say.  Make sure to update
+        # 'cell_name' based on the routing path.
+        items_to_remove = ['id', 'security_groups', 'volumes', 'cell_name',
+                           'name', 'metadata']
+        instance.obj_reset_changes(items_to_remove)
+        instance.cell_name = _reverse_path(message.routing_path)
+
+        LOG.debug("Got update for instance: %(instance)s",
+                  {'instance': instance}, instance_uuid=instance.uuid)
+
+        expected_vm_state = self._get_expected_vm_state(instance)
+        expected_task_state = self._get_expected_task_state(instance)
+
+        # It's possible due to some weird condition that the instance
+        # was already set as deleted... so we'll attempt to update
+        # it with permissions that allows us to read deleted.
+        with utils.temporary_mutation(message.ctxt, read_deleted="yes"):
+            try:
+                with instance.skip_cells_sync():
+                    instance.save(expected_vm_state=expected_vm_state,
+                                  expected_task_state=expected_task_state)
+            except exception.InstanceNotFound:
+                # FIXME(comstud): Strange.  Need to handle quotas here,
+                # if we actually want this code to remain..
+                instance.create()
+            except exception.NotFound:
+                # Can happen if we try to update a deleted instance's
+                # network information, for example.
+                        pass
+
     def instance_update_at_top(self, message, instance, **kwargs):
         """Update an instance in the DB if we're a top level cell."""
         if not self._at_the_top():
             return
+        try:
+            instance_uuid = instance.uuid
+            return self.instance_update_at_top_object(message,
+                                                      instance, **kwargs)
+        except:  # noqa
+            pass
         instance_uuid = instance['uuid']
 
         # Remove things that we can't update in the top level cells.
@@ -1123,10 +1217,41 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
                 # network information.
                 pass
 
+    def instance_destroy_at_top_object(self, message, instance, **kwargs):
+        """Destroy an instance from the DB if we're a top level cell."""
+        if not self._at_the_top():
+            return
+        LOG.debug("Got update to delete instance",
+                  instance_uuid=instance.uuid)
+        try:
+            instance.destroy()
+        except exception.InstanceNotFound:
+            pass
+        except exception.ObjectActionError:
+            # NOTE(alaski): instance_destroy_at_top will sometimes be called
+            # when an instance does not exist in a cell but does in the parent.
+            # In that case instance.id is not set which causes instance.destroy
+            # to fail thinking that the object has already been destroyed.
+            # That's the right assumption for it to make because without cells
+            # that would be true.  But for cells we'll try to pull the actual
+            # instance and try to delete it again.
+            try:
+                instance = objects.Instance.get_by_uuid(message.ctxt,
+                        instance.uuid)
+                instance.destroy()
+            except exception.InstanceNotFound:
+                pass
+
     def instance_destroy_at_top(self, message, instance, **kwargs):
         """Destroy an instance from the DB if we're a top level cell."""
         if not self._at_the_top():
             return
+        try:
+            instance_uuid = instance.uuid
+            return self.instance_destroy_at_top_object(message,
+                                                       instance, **kwargs)
+        except:  # noqa
+            pass
         instance_uuid = instance['uuid']
         LOG.debug("Got update to delete instance",
                   instance_uuid=instance_uuid)

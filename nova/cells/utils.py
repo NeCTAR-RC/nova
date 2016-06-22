@@ -30,6 +30,7 @@ from nova.objects import base as obj_base
 PATH_CELL_SEP = '!'
 # Separator used between cell name and item
 _CELL_ITEM_SEP = '@'
+BLOCK_SYNC_FLAG = '!!'
 
 
 class ProxyObjectSerializer(obj_base.NovaObjectSerializer):
