@@ -14575,7 +14575,8 @@ class LibvirtDriverTestCase(test.NoDBTestCase):
                               disk_mapping, suffix='',
                               disk_images=None, network_info=None,
                               block_device_info=None, inject_files=True,
-                              fallback_from_host=None):
+                              fallback_from_host=None,
+                              ignore_bdi_for_swap=None):
             self.assertFalse(inject_files)
             create_image_called[0] = True
 
