@@ -79,7 +79,11 @@ class CellsScheduler(base.Base):
         # sent in a useful form. Since it was getting ignored for cells
         # before it was part of the Instance, skip it now until cells RPC
         # is sending proper instance objects.
-        instance_values.pop('pci_requests', None)
+        pci_requests = instance_values.pop('pci_requests', None)
+        if pci_requests and pci_requests['requests']:
+            instance_values['pci_requests'] = \
+                objects.InstancePCIRequests.from_request_spec_instance_props(
+                    pci_requests)
 
         # FIXME(danms): Same for ec2_ids
         instance_values.pop('ec2_ids', None)
