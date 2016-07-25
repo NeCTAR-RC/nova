@@ -159,7 +159,6 @@ class CellsSchedulerTestCase(test.TestCase):
             'info_cache': 'bar',
             'security_groups': 'not secure',
             'flavor': 'chocolate',
-            'pci_requests': 'no thanks',
             'ec2_ids': 'prime',
         }
         block_device_mapping = [
