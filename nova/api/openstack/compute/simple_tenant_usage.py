@@ -16,6 +16,7 @@
 import datetime
 
 import iso8601
+from oslo_log import log as logging
 from oslo_utils import timeutils
 import six
 import six.moves.urllib.parse as urlparse
@@ -27,6 +28,7 @@ from nova import exception
 from nova.i18n import _
 from nova import objects
 
+LOG = logging.getLogger(__name__)
 ALIAS = "os-simple-tenant-usage"
 authorize = extensions.os_compute_authorizer(ALIAS)
 
@@ -114,7 +116,15 @@ class SimpleTenantUsageController(wsgi.Controller):
             info['hours'] = self._hours_for(instance,
                                             period_start,
                                             period_stop)
-            flavor = self._get_flavor(context, instance, flavors)
+            flavor = None
+            try:
+                flavor = self._get_flavor(context, instance, flavors)
+            except Exception as e:
+                msg = _('Failed to get flavor for instance %(id)s. '
+                        'Error: %(error)s') % (
+                        {'id': instance.uuid, 'error': e})
+                LOG.exception(msg)
+
             if not flavor:
                 info['flavor'] = ''
             else:
