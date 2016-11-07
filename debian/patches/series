@@ -9,3 +9,4 @@ CVE-2024-40767-pre3.patch
 CVE-2024-40767-pre4.patch
 CVE-2024-40767-pre5.patch
 CVE-2024-40767.patch
+fix-manifest.patch
