@@ -7,3 +7,4 @@ skip-py3.7-tests.patch
 py3.7-get-context-manager-async.patch
 fix-python3-compatibility-of-rbd-get_fsid.patch
 CVE-2019-14433.patch
+fix-manifest.patch
