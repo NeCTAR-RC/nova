@@ -6,3 +6,5 @@ disable-websockify-tests.patch
 neutron-floating-ip-list.patch
 skip-cinder-tests.patch
 ignore-proxies.patch
+
+fix-manifest.patch
