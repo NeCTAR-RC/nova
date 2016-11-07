@@ -3,3 +3,4 @@ drop-sphinxcontrib-rsvgconverter.patch
 drop-sphinx-feature-classification.patch
 arm-console-patch.patch
 add-mysql8-compatibility.patch
+fix-manifest.patch
