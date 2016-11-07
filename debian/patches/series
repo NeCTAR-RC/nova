@@ -13,3 +13,4 @@ libvirt-Wrap-un-proxied-listDevices-and-listAllDevic.patch
 libvirt-Fix-regression-of-listDevices-return-type.patch
 lp2095364-Add-ServersViewBuilderTestV296-unit-test-class.patch
 lp2095364-Use-dict-object-for-request_specs_dict.patch
+fix-manifest.patch
