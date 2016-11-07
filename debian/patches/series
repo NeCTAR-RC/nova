@@ -6,3 +6,4 @@ skip-ssl-tests.patch
 arm-console-patch.patch
 revert-generalize-db-conf-group-copying.patch
 add-mysql8-compatibility.patch
+fix-manifest.patch
