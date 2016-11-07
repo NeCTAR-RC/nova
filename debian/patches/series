@@ -4,3 +4,4 @@ drop-sphinx-feature-classification.patch
 arm-console-patch.patch
 add-mysql8-compatibility.patch
 lp1892361.patch
+fix-manifest.patch
