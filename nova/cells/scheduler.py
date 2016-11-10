@@ -272,6 +272,7 @@ class CellsScheduler(base.Base):
                                             vm_state=vm_states.ERROR)
                 self.msg_runner.instance_update_at_top(ctxt, instance)
                 try:
+                    instance.cell_name = ''
                     instance.vm_state = vm_states.ERROR
                     instance.save()
                 except Exception:
