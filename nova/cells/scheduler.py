@@ -105,6 +105,7 @@ class CellsScheduler(base.Base):
             instance_values['pci_requests'] = \
                 objects.InstancePCIRequests.from_request_spec_instance_props(
                     pci_requests)
+        instance_values.pop('ec2_ids', None)
 
         instances = []
         num_instances = len(instance_uuids)
