@@ -3125,10 +3125,15 @@ class API(base.Base):
         if volume['attach_status'] == 'detached':
             msg = _("Volume must be attached in order to detach.")
             raise exception.InvalidVolume(reason=msg)
-        # The caller likely got the instance from volume['instance_uuid']
-        # in the first place, but let's sanity check.
-        if volume['instance_uuid'] != instance.uuid:
-            raise exception.VolumeUnattached(volume_id=volume['id'])
+        try:
+            vol_instance_uuid = volume['instance_uuid']
+        except:
+            # Mitaka calls don't include instance_uuid
+            pass
+        else:
+            if volume['instance_uuid'] != instance.uuid:
+                raise exception.VolumeUnattached(volume_id=volume['id'])
+
         self._detach_volume(context, instance, volume)
 
     @wrap_check_policy
