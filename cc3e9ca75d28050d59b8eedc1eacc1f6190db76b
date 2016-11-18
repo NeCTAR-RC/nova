@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7adec928_a2a14fab",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 6
+      },
+      "lineNbr": 3129,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2016-11-18T04:48:58Z",
+      "side": 1,
+      "message": "don\u0027t think you need this? dict.get() returns None by default",
+      "range": {
+        "startLine": 3129,
+        "startChar": 54,
+        "endLine": 3129,
+        "endChar": 60
+      },
+      "revId": "cc3e9ca75d28050d59b8eedc1eacc1f6190db76b",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
