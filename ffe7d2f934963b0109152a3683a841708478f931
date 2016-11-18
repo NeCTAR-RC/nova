@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7adec928_626ca79d",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 3129,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2016-11-18T04:00:50Z",
+      "side": 1,
+      "message": "possible to do \n\n vol_instance_uuid \u003d volume.get(\u0027instance_uuid\u0027)\n\nand get rid of the KeyError exception?",
+      "range": {
+        "startLine": 3129,
+        "startChar": 12,
+        "endLine": 3129,
+        "endChar": 55
+      },
+      "revId": "ffe7d2f934963b0109152a3683a841708478f931",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
