@@ -27,4 +27,3 @@ class MetadataManager(manager.Manager):
     def __init__(self, *args, **kwargs):
         super(MetadataManager, self).__init__(*args, **kwargs)
         self.network_driver = driver.load_network_driver()
-        self.network_driver.metadata_accept()
