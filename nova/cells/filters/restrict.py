@@ -50,6 +50,24 @@ class RestrictCellFilter(filters.BaseCellFilter):
         return allowed_cells
 
 
+class DomainRestrictCellFilter(filters.BaseCellFilter):
+
+    def filter_all(self, cells, filter_properties):
+        domain = filter_properties['context'].project_domain
+        if not domain:
+            domain = 'default'
+        LOG.debug("Project Domain is %s", domain)
+        allowed_cells = []
+        for cell in cells:
+            cell_capabilities = cell.capabilities
+            allowed_domains = cell_capabilities.get('allowed_domains',
+                                                    ['default'])
+            LOG.debug("Allowed Domains %s", allowed_domains)
+            if domain in allowed_domains:
+                allowed_cells.append(cell)
+        return allowed_cells
+
+
 class DirectOnlyCellFilter(filters.BaseCellFilter):
 
     def cell_passes(self, cell, filter_properties):
