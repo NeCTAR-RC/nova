@@ -219,6 +219,7 @@ class RequestContext(context.RequestContext):
             quota_class=values.get('quota_class'),
             user_name=values.get('user_name'),
             project_name=values.get('project_name'),
+            project_domain=values.get('project_domain'),
             service_catalog=values.get('service_catalog'),
             instance_lock_checked=values.get('instance_lock_checked', False),
         )

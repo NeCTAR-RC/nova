@@ -79,6 +79,7 @@ class NovaKeystoneContext(wsgi.Middleware):
         project_name = req.headers.get('X_TENANT_NAME')
         user_name = req.headers.get('X_USER_NAME')
         req_id = req.environ.get(request_id.ENV_REQUEST_ID)
+        project_domain = req.headers.get('X_PROJECT_DOMAIN_ID')
 
         # Build a context, including the auth_token...
         remote_address = req.remote_addr
@@ -105,6 +106,7 @@ class NovaKeystoneContext(wsgi.Middleware):
             user_auth_plugin=user_auth_plugin,
             remote_address=remote_address,
             service_catalog=service_catalog,
+            project_domain=project_domain,
             request_id=req_id)
 
         if ctx.user_id is None:
