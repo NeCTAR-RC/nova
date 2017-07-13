@@ -138,6 +138,15 @@ class NovaKeystoneContext(wsgi.Middleware):
         # middleware in newer versions.
         user_auth_plugin = req.environ.get('keystone.token_auth')
 
+        if 'X_USER_DOMAIN_ID' in req.headers:
+            user_domain = req.headers.get('X_USER_DOMAIN_ID')
+        else:
+            user_domain = None
+        if 'X_PROJECT_DOMAIN_ID' in req.headers:
+            project_domain = req.headers.get('X_PROJECT_DOMAIN_ID')
+        else:
+            project_domain = None
+
         ctx = context.RequestContext(user_id,
                                      project_id,
                                      user_name=user_name,
@@ -147,6 +156,8 @@ class NovaKeystoneContext(wsgi.Middleware):
                                      remote_address=remote_address,
                                      service_catalog=service_catalog,
                                      request_id=req_id,
+                                     user_domain=user_domain,
+                                     project_domain=project_domain,
                                      user_auth_plugin=user_auth_plugin)
 
         req.environ['nova.context'] = ctx
