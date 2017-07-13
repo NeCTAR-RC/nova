@@ -27,6 +27,10 @@ from nova import db
 from nova import objects
 from nova import utils
 
+from oslo_log import log as logging
+
+LOG = logging.getLogger(__name__)
+
 
 # NOTE(vish): azs don't change that often, so cache them for an hour to
 #             avoid hitting the db multiple times on every request.
@@ -126,6 +130,8 @@ def get_availability_zones(context, get_only_available=False,
     """
     # Override for cells
     cell_type = cell_opts.get_cell_type()
+    project_domain = context.project_domain
+
     if cell_type == 'api':
         ctxt = context.elevated()
         global_azs = []
@@ -134,9 +140,17 @@ def get_availability_zones(context, get_only_available=False,
         for cell in db.cell_get_all(ctxt):
             last_seen = cell.updated_at
             capabilities = jsonutils.loads(cell.capabilities)
+
             if 'availability_zones' not in capabilities:
                 continue
+
+            allowed_domains = ['default']
+            if 'allowed_domains' in capabilities:
+                allowed_domains = capabilities['allowed_domains']
+
             if last_seen and timeutils.is_older_than(last_seen, secs):
+                mute_azs.extend(capabilities['availability_zones'])
+            elif project_domain not in allowed_domains:
                 mute_azs.extend(capabilities['availability_zones'])
             else:
                 global_azs.extend(capabilities['availability_zones'])
