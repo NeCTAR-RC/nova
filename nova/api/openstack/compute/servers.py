@@ -1212,6 +1212,13 @@ class ServersController(wsgi.Controller):
 
 def remove_invalid_options(context, search_options, allowed_search_options):
     """Remove search options that are not valid for non-admin API/context."""
+
+    try:
+        authorize(context, action="index:get_all_tenants")
+        context = context.elevated()
+    except exception.PolicyNotAuthorized:
+        pass
+
     if context.is_admin:
         # Only remove parameters for sorting and pagination
         for key in ('sort_key', 'sort_dir', 'limit', 'marker'):

@@ -1125,6 +1125,14 @@ class ServersControllerTest(ControllerTest):
             return objects.InstanceList(
                 objects=[fakes.stub_instance_obj(100, uuid=server_uuid)])
 
+        rules = {
+            "os_compute_api:servers:index:get_all_tenants":
+               "project_id:non_fake",
+            "os_compute_api:servers:index": "project_id:fake",
+        }
+
+        policy.set_rules(oslo_policy.Rules.from_dict(rules))
+
         self.stubs.Set(compute_api.API, 'get_all', fake_get_all)
 
         query_str = "name=foo&ip=10.*&status=active&unknown_option=meow"
