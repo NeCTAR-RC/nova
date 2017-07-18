@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1ae5cdf2_569068ec",
+        "filename": "nova/api/auth.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2017-07-18T07:41:06Z",
+      "side": 1,
+      "message": "is req.headers a dict? if so, these lines can be replaced with\n\n user_domain \u003d req.headers.get(\u0027X_USER_DOMAIN_ID\u0027)\n\n(I\u0027m assuming it\u0027s a dict since previous lines do .get() without checking",
+      "range": {
+        "startLine": 141,
+        "startChar": 0,
+        "endLine": 144,
+        "endChar": 30
+      },
+      "revId": "d9d4dd5e16f6d594c8da42bc7ad526f6fb4ac2dd",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
