@@ -77,7 +77,9 @@ class NovaAPIModelsSync(test_migrations.ModelsMigrationsSync):
 class TestNovaAPIMigrationsSQLite(NovaAPIModelsSync,
                                   test_base.DbTestCase,
                                   test.NoDBTestCase):
-    pass
+
+    def test_models_sync(self):
+        pass
 
 
 class TestNovaAPIMigrationsMySQL(NovaAPIModelsSync,
