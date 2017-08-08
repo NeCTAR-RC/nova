@@ -4520,7 +4520,9 @@ class AggregateAPI(base.Base):
                                                     "addhost.start",
                                                     aggregate_payload)
         # validates the host; ComputeHostNotFound is raised if invalid
-        objects.Service.get_by_compute_host(context, host_name)
+        # Disabled for cellsV1
+        if not CONF.cells.enable:
+            objects.Service.get_by_compute_host(context, host_name)
 
         aggregate = objects.Aggregate.get_by_id(context, aggregate_id)
         self.is_safe_to_update_az(context, aggregate.metadata,
@@ -4547,7 +4549,10 @@ class AggregateAPI(base.Base):
                                                     "removehost.start",
                                                     aggregate_payload)
         # validates the host; ComputeHostNotFound is raised if invalid
-        objects.Service.get_by_compute_host(context, host_name)
+        # Disabled for cellsV1
+        if not CONF.cells.enable:
+            objects.Service.get_by_compute_host(context, host_name)
+
         aggregate = objects.Aggregate.get_by_id(context, aggregate_id)
         aggregate.delete_host(host_name)
         self.scheduler_client.update_aggregates(context, [aggregate])
