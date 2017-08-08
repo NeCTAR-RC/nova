@@ -647,7 +647,7 @@ class HostnameTestCase(APIValidationTestCase):
                                     expected_detail=detail)
 
         detail = ("Invalid input for field/attribute foo. Value: my$host."
-                  " 'my$host' does not match '^[a-zA-Z0-9-._]*$'")
+                  " 'my$host' does not match '^[a-zA-Z0-9-._!@]*$'")
         self.check_validation_error(self.post, body={'foo': 'my$host'},
                                     expected_detail=detail)
 

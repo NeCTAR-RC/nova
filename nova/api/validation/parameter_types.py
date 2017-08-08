@@ -201,7 +201,7 @@ hostname = {
     # not allow for underscores in hostnames. However, this
     # schema allows them, because it sometimes occurs in
     # real systems.
-    'pattern': '^[a-zA-Z0-9-._]*$',
+    'pattern': '^[a-zA-Z0-9-._!@]*$',
 }
 
 
