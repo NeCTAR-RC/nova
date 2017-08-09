@@ -1720,11 +1720,11 @@ class CellsBroadcastMethodsTestCase(test.NoDBTestCase):
 
         # Calls are made from grandchild-cell to api-cell
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=None).AndReturn([4, 5])
+            mox.IgnoreArg(), disabled=None, set_zones=True).AndReturn([4, 5])
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=None).AndReturn([3])
+            mox.IgnoreArg(), disabled=None, set_zones=True).AndReturn([3])
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=None).AndReturn([1, 2])
+            mox.IgnoreArg(), disabled=None, set_zones=True).AndReturn([1, 2])
 
         self.mox.ReplayAll()
 
@@ -1749,11 +1749,13 @@ class CellsBroadcastMethodsTestCase(test.NoDBTestCase):
 
         # Calls are made from grandchild-cell to api-cell
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=disabled).AndReturn([4, 5])
+            mox.IgnoreArg(), disabled=disabled, set_zones=True).AndReturn(
+                [4, 5])
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=disabled).AndReturn([3])
+            mox.IgnoreArg(), disabled=disabled, set_zones=True).AndReturn([3])
         objects.ServiceList.get_all(
-            mox.IgnoreArg(), disabled=disabled).AndReturn([1, 2])
+            mox.IgnoreArg(), disabled=disabled, set_zones=True).AndReturn(
+                [1, 2])
 
         self.mox.ReplayAll()
 

@@ -1130,7 +1130,8 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
         if filters is None:
             filters = {}
         disabled = filters.pop('disabled', None)
-        services = objects.ServiceList.get_all(message.ctxt, disabled=disabled)
+        services = objects.ServiceList.get_all(message.ctxt, disabled=disabled,
+                                               set_zones=True)
         ret_services = []
         for service in services:
             for key, val in six.iteritems(filters):

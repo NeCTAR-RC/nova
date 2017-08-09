@@ -19,14 +19,12 @@
 import oslo_messaging as messaging
 from oslo_utils import excutils
 
-from nova import availability_zones
 from nova.cells import rpcapi as cells_rpcapi
 from nova.cells import utils as cells_utils
 from nova.compute import api as compute_api
 from nova.compute import rpcapi as compute_rpcapi
 from nova import exception
 from nova import objects
-from nova.objects import base as obj_base
 from nova import rpc
 
 
@@ -554,38 +552,15 @@ class HostAPI(compute_api.HostAPI):
             filters = {}
         if 'availability_zone' in filters:
             zone_filter = filters.pop('availability_zone')
-            set_zones = True
         else:
             zone_filter = None
+        set_zones = True
         services = self.cells_rpcapi.service_get_all(context,
                                                      filters=filters)
         if set_zones:
-            # TODO(sbauza): set_availability_zones returns flat dicts,
-            # we should rather modify the RPC API to amend service_get_all by
-            # adding a set_zones argument
-            services = availability_zones.set_availability_zones(context,
-                                                                 services)
             if zone_filter is not None:
                 services = [s for s in services
                             if s['availability_zone'] == zone_filter]
-
-            # NOTE(sbauza): As services is a list of flat dicts, we need to
-            # rehydrate the corresponding ServiceProxy objects
-            cell_paths = []
-            for service in services:
-                cell_path, id = cells_utils.split_cell_and_item(service['id'])
-                cell_path, host = cells_utils.split_cell_and_item(
-                    service['host'])
-                service['id'] = id
-                service['host'] = host
-                cell_paths.append(cell_path)
-            services = obj_base.obj_make_list(context,
-                                              objects.ServiceList(),
-                                              objects.Service,
-                                              services)
-            services = [cells_utils.ServiceProxy(s, c)
-                        for s, c in zip(services, cell_paths)]
-
         return services
 
     def service_get_by_id(self, context, service_id):
