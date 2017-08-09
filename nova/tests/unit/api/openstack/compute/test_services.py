@@ -141,6 +141,15 @@ def fake_service_get_all(services):
     return service_get_all
 
 
+def fake_service_get_all_cells(services):
+    def service_get_all(context, filters=None, set_zones=True):
+        if set_zones or 'availability_zone' in filters:
+            return availability_zones.set_availability_zones(context,
+                                                             services)
+        return services
+    return service_get_all
+
+
 def fake_db_api_service_get_all(context, disabled=None):
     return fake_services_list
 
@@ -929,7 +938,7 @@ class ServicesCellsTestV21(test.TestCase):
             services_list.append(service_proxy)
 
         host_api.cells_rpcapi.service_get_all = (
-            mock.Mock(side_effect=fake_service_get_all(services_list)))
+            mock.Mock(side_effect=fake_service_get_all_cells(services_list)))
 
     def _set_up_controller(self):
         self.controller = services_v21.ServiceController()
