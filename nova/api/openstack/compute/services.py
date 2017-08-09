@@ -173,10 +173,11 @@ class ServiceController(wsgi.Controller):
         context = req.environ['nova.context']
         context.can(services_policies.BASE_POLICY_NAME)
 
-        try:
-            utils.validate_integer(id, 'id')
-        except exception.InvalidInput as exc:
-            raise webob.exc.HTTPBadRequest(explanation=exc.format_message())
+        # Don't validate for cellsV1
+        #try:
+        #    utils.validate_integer(id, 'id')
+        #except exception.InvalidInput as exc:
+        #    raise webob.exc.HTTPBadRequest(explanation=exc.format_message())
 
         try:
             service = self.host_api.service_get_by_id(context, id)

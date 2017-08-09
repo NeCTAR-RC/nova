@@ -287,6 +287,14 @@ class CellsAPI(object):
         return cctxt.call(ctxt, 'service_get_by_compute_host',
                           host_name=host_name)
 
+    def service_get_by_id(self, ctxt, service_id):
+        """Get the service entry for a particular cell.  The
+        cell name should be encoded within the service_id.
+        """
+        cctxt = self.client.prepare(version='1.37')
+        return cctxt.call(ctxt, 'service_get_by_id',
+                          service_id=service_id)
+
     def get_host_uptime(self, context, host_name):
         """Gets the host uptime in a particular cell. The cell name should
         be encoded within the host_name
