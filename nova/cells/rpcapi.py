@@ -693,3 +693,14 @@ class CellsAPI(object):
         cctxt.cast(ctxt, 'external_instance_event',
                    instances=instances,
                    events=events)
+
+    def scheduler_update_aggregates(self, ctxt, aggregates):
+        """Broadcast update_aggregates to all cells
+
+        Needed to they update their schedulers
+        """
+        if not CONF.cells.enable:
+                return
+        cctxt = self.client.prepare(version='1.37')
+        cctxt.cast(ctxt, 'scheduler_update_aggregates',
+                   aggregates=aggregates)
