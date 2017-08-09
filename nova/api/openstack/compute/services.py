@@ -20,6 +20,7 @@ from nova.api.openstack import extensions
 from nova.api.openstack import wsgi
 from nova.api import validation
 from nova import compute
+import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova.policies import services as services_policies
@@ -27,6 +28,7 @@ from nova import servicegroup
 from nova import utils
 
 ALIAS = "os-services"
+CONF = nova.conf.CONF
 
 
 class ServiceController(wsgi.Controller):
@@ -173,10 +175,13 @@ class ServiceController(wsgi.Controller):
         context = req.environ['nova.context']
         context.can(services_policies.BASE_POLICY_NAME)
 
-        try:
-            utils.validate_integer(id, 'id')
-        except exception.InvalidInput as exc:
-            raise webob.exc.HTTPBadRequest(explanation=exc.format_message())
+        # Don't validate for cellsV1
+        if not CONF.cells.enable:
+            try:
+                utils.validate_integer(id, 'id')
+            except exception.InvalidInput as exc:
+                raise webob.exc.HTTPBadRequest(
+                    explanation=exc.format_message())
 
         try:
             service = self.host_api.service_get_by_id(context, id)
