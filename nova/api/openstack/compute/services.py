@@ -23,13 +23,16 @@ from nova.api.openstack import wsgi
 from nova.api import validation
 from nova import availability_zones
 from nova import compute
+import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova.policies import services as services_policies
 from nova import servicegroup
 from nova import utils
 
+
 UUID_FOR_ID_MIN_VERSION = '2.53'
+CONF = nova.conf.CONF
 
 
 class ServiceController(wsgi.Controller):
@@ -202,11 +205,13 @@ class ServiceController(wsgi.Controller):
                 msg = _('Invalid uuid %s') % id
                 raise webob.exc.HTTPBadRequest(explanation=msg)
         else:
-            try:
-                utils.validate_integer(id, 'id')
-            except exception.InvalidInput as exc:
-                raise webob.exc.HTTPBadRequest(
-                    explanation=exc.format_message())
+            # Don't validate for cellsV1
+            if not CONF.cells.enable:
+                try:
+                    utils.validate_integer(id, 'id')
+                except exception.InvalidInput as exc:
+                    raise webob.exc.HTTPBadRequest(
+                        explanation=exc.format_message())
 
         try:
             service = self.host_api.service_get_by_id(context, id)
