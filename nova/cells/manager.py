@@ -615,3 +615,6 @@ class CellsManager(manager.Manager):
                         {'name': name, 'cell_names': cell_names})
 
         return keypairs[0]
+
+    def scheduler_update_aggregates(self, ctxt, aggregates):
+        self.msg_runner.scheduler_update_aggregates(ctxt, aggregates)
