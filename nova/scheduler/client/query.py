@@ -14,6 +14,8 @@
 #    under the License.
 
 from nova.scheduler import rpcapi as scheduler_rpcapi
+from nova.cells import opts as cell_opts
+from nova.cells import rpcapi as cells_rpcapi
 
 
 class SchedulerQueryClient(object):
@@ -21,6 +23,7 @@ class SchedulerQueryClient(object):
 
     def __init__(self):
         self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
+        self.cells_rpcapi = cells_rpcapi.CellsAPI()
 
     def select_destinations(self, context, spec_obj):
         """Returns destinations(s) best suited for this request_spec and
@@ -38,7 +41,11 @@ class SchedulerQueryClient(object):
         :type aggregates: :class:`nova.objects.Aggregate`
                           or :class:`nova.objects.AggregateList`
         """
-        self.scheduler_rpcapi.update_aggregates(context, aggregates)
+        cell_type = cell_opts.get_cell_type()
+        if cell_type == 'api': 
+            self.cells_rpcapi.scheduler_update_aggregates(context, aggregates)
+        else:
+            self.scheduler_rpcapi.update_aggregates(context, aggregates)
 
     def delete_aggregate(self, context, aggregate):
         """Deletes HostManager internal information about a specific aggregate.
