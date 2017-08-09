@@ -714,6 +714,10 @@ class _TargetedMessageMethods(_BaseMessageMethods):
         """Return the service entry for a compute host."""
         return objects.Service.get_by_compute_host(message.ctxt, host_name)
 
+    def service_get_by_id(self, message, service_id):
+        """Return the service entry for a service_id."""
+        return objects.Service.get_by_id(message.ctxt, service_id)
+
     def service_update(self, message, host_name, binary, params_to_update):
         """Used to enable/disable a service. For compute services, setting to
         disabled stops new builds arriving on that host.
@@ -1505,6 +1509,14 @@ class MessageRunner(object):
         method_kwargs = dict(host_name=host_name)
         message = _TargetedMessage(self, ctxt,
                                   'service_get_by_compute_host',
+                                  method_kwargs, 'down', cell_name,
+                                  need_response=True)
+        return message.process()
+
+    def service_get_by_id(self, ctxt, cell_name, service_id):
+        method_kwargs = dict(service_id=service_id)
+        message = _TargetedMessage(self, ctxt,
+                                  'service_get_by_id',
                                   method_kwargs, 'down', cell_name,
                                   need_response=True)
         return message.process()
