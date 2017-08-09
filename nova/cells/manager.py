@@ -285,6 +285,17 @@ class CellsManager(manager.Manager):
         service = cells_utils.add_cell_to_service(service, response.cell_name)
         return service
 
+    @oslo_messaging.expected_exceptions(exception.CellRoutingInconsistency)
+    def service_get_by_id(self, ctxt, service_id):
+        """Return a service entry in a certain cell."""
+        cell_name, service_id = cells_utils.split_cell_and_item(service_id)
+        response = self.msg_runner.service_get_by_id(ctxt,
+                                                     cell_name,
+                                                     service_id)
+        service = response.value_or_raise()
+        service = cells_utils.add_cell_to_service(service, response.cell_name)
+        return service
+
     def get_host_uptime(self, ctxt, host_name):
         """Return host uptime for a compute host in a certain cell
 
