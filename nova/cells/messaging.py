@@ -56,6 +56,7 @@ from nova.i18n import _, _LE, _LI, _LW
 from nova import objects
 from nova.objects import base as objects_base
 from nova import rpc
+from nova.scheduler import rpcapi as scheduler_rpcapi
 from nova import utils
 
 CONF = nova.conf.CONF
@@ -606,6 +607,7 @@ class _BaseMessageMethods(base.Base):
         self.compute_rpcapi = compute_rpcapi.ComputeAPI()
         self.consoleauth_rpcapi = consoleauth_rpcapi.ConsoleAuthAPI()
         self.host_api = compute.HostAPI()
+        self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
 
     def task_log_get_all(self, message, task_name, period_beginning,
                          period_ending, host, state):
@@ -1233,6 +1235,9 @@ class _BroadcastMessageMethods(_BaseMessageMethods):
             return objects.KeyPair.get_by_name(message.ctxt, user_id, name)
         except exception.KeypairNotFound:
             pass
+
+    def scheduler_update_aggregates(self, message, aggregates):
+        self.scheduler_rpcapi.update_aggregates(message.ctxt, aggregates)
 
 
 _CELL_MESSAGE_TYPE_TO_MESSAGE_CLS = {'targeted': _TargetedMessage,
@@ -1867,6 +1872,13 @@ class MessageRunner(object):
                                    method_kwargs, 'down',
                                    instances[0].cell_name, need_response=False)
         return message.process()
+
+    def scheduler_update_aggregates(self, ctxt, aggregates):
+        message = _BroadcastMessage(self, ctxt, 'scheduler_update_aggregates',
+                                    dict(aggregates=aggregates),
+                                    'down',
+                                    run_locally=False)
+        message.process()
 
     @staticmethod
     def get_message_types():
