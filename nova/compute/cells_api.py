@@ -588,6 +588,10 @@ class HostAPI(compute_api.HostAPI):
 
         return services
 
+    def service_get_by_id(self, context, service_id):
+        """Get service entry for the given service id."""
+        return self.cells_rpcapi.service_get_by_id(context, service_id)
+
     def service_get_by_compute_host(self, context, host_name):
         try:
             return self.cells_rpcapi.service_get_by_compute_host(context,
