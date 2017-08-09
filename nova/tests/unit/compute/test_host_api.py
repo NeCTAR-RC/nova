@@ -529,6 +529,10 @@ class ComputeHostAPICellsTestCase(ComputeHostAPITestCase):
         pass
 
     @testtools.skip('cellsv1 does not use this')
+    def test_service_get_by_id_using_uuid(self):
+        pass
+
+    @testtools.skip('cellsv1 does not use this')
     def test_service_get_all_cells_with_failures(self):
         pass
 
