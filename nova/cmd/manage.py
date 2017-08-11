@@ -72,6 +72,7 @@ from sqlalchemy.engine import url as sqla_url
 
 from nova.api.ec2 import ec2utils
 from nova import availability_zones
+from nova.cells import opts as cell_opts
 from nova.cmd import common as cmd_common
 import nova.conf
 from nova import config
@@ -783,23 +784,33 @@ class HostCommands(object):
 
 class DbCommands(object):
     """Class for managing the main database."""
-
-    online_migrations = (
-        db.pcidevice_online_data_migration,
-        db.aggregate_uuids_online_data_migration,
-        flavor_obj.migrate_flavors,
-        flavor_obj.migrate_flavor_reset_autoincrement,
-        instance_obj.migrate_instance_keypairs,
-        request_spec.migrate_instances_add_request_spec,
-        keypair_obj.migrate_keypairs_to_api_db,
-        aggregate_obj.migrate_aggregates,
-        aggregate_obj.migrate_aggregate_reset_autoincrement,
-        instance_group_obj.migrate_instance_groups_to_api_db,
-        # Added in Ocata
-        # NOTE(mriedem): This online migration is going to be backported to
-        # Newton also since it's an upgrade issue when upgrading from Mitaka.
-        build_request_obj.delete_build_requests_with_no_instance_uuid,
-    )
+    if cell_opts.get_cell_type() == 'compute':
+        online_migrations = (
+            db.pcidevice_online_data_migration,
+            db.aggregate_uuids_online_data_migration,
+            instance_obj.migrate_instance_keypairs,
+            request_spec.migrate_instances_add_request_spec,
+            keypair_obj.migrate_keypairs_to_api_db,
+            instance_group_obj.migrate_instance_groups_to_api_db,
+            build_request_obj.delete_build_requests_with_no_instance_uuid,
+        )
+    else:
+        online_migrations = (
+            db.pcidevice_online_data_migration,
+            db.aggregate_uuids_online_data_migration,
+            flavor_obj.migrate_flavors,
+            flavor_obj.migrate_flavor_reset_autoincrement,
+            instance_obj.migrate_instance_keypairs,
+            request_spec.migrate_instances_add_request_spec,
+            keypair_obj.migrate_keypairs_to_api_db,
+            aggregate_obj.migrate_aggregates,
+            aggregate_obj.migrate_aggregate_reset_autoincrement,
+            instance_group_obj.migrate_instance_groups_to_api_db,
+            # Added in Ocata
+            # NOTE(mriedem): This online migration is going to be backported to
+            # Newton also since it's an upgrade issue when upgrading from Mitaka.
+            build_request_obj.delete_build_requests_with_no_instance_uuid,
+        )
 
     def __init__(self):
         pass
