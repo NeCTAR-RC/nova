@@ -13,23 +13,27 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_log import log as logging
+
 from nova.cells import filters
 
 
-class RestrictCellFilter(filters.BaseCellFilter):
+LOG = logging.getLogger(__name__)
+
+
+class DomainRestrictCellFilter(filters.BaseCellFilter):
 
     def filter_all(self, cells, filter_properties):
-        roles = filter_properties['context'].roles
+        domain = filter_properties['context'].project_domain
+        if not domain:
+            domain = 'default'
+        LOG.debug("Project Domain is %s", domain)
         allowed_cells = []
         for cell in cells:
             cell_capabilities = cell.capabilities
-            cell_required_roles = cell_capabilities.get('required_roles', [])
-
-            if (not cell_required_roles or
-                    'unrestricted' in cell_required_roles):
-                allowed_cells.append(cell)
-                continue
-            matching_roles = set(cell_required_roles).intersection(set(roles))
-            if matching_roles:
+            allowed_domains = cell_capabilities.get('allowed_domains',
+                                                    ['default'])
+            LOG.debug("Allowed Domains %s", allowed_domains)
+            if domain in allowed_domains:
                 allowed_cells.append(cell)
         return allowed_cells
