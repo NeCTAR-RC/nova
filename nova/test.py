@@ -45,6 +45,7 @@ from oslotest import moxstubout
 import six
 import testtools
 
+from nova import objects
 from nova import context
 from nova import db
 from nova.network import manager as network_manager
@@ -54,6 +55,7 @@ from nova.tests import fixtures as nova_fixtures
 from nova.tests.unit import conf_fixture
 from nova.tests.unit import policy_fixture
 from nova import utils
+from nova.virt import images
 
 
 CONF = cfg.CONF
@@ -239,6 +241,11 @@ class TestCase(testtools.TestCase):
         # nova.utils._IS_NEUTRON.  We set it to None to avoid any
         # caching of that value.
         utils._IS_NEUTRON = None
+
+        # Reset the traits sync flag
+        objects.resource_provider._TRAITS_SYNCED = False
+        # Reset the global QEMU version flag.
+        images.QEMU_VERSION = None
 
         mox_fixture = self.useFixture(moxstubout.MoxStubout())
         self.mox = mox_fixture.mox
