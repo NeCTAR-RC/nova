@@ -54,6 +54,7 @@ from nova.tests import fixtures as nova_fixtures
 from nova.tests.unit import conf_fixture
 from nova.tests.unit import policy_fixture
 from nova import utils
+from nova.virt import images
 
 
 CONF = cfg.CONF
@@ -240,6 +241,14 @@ class TestCase(testtools.TestCase):
         # caching of that value.
         utils._IS_NEUTRON = None
 
+<<<<<<< HEAD
+=======
+        # Reset the traits sync flag
+        objects.resource_provider._TRAITS_SYNCED = False
+        # Reset the global QEMU version flag.
+        images.QEMU_VERSION = None
+
+>>>>>>> 5e9508b77f... Support qemu >= 2.10
         mox_fixture = self.useFixture(moxstubout.MoxStubout())
         self.mox = mox_fixture.mox
         self.stubs = mox_fixture.stubs
