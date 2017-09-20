@@ -487,11 +487,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 _('Nova requires libvirt version %s or greater.') %
                 self._version_to_string(MIN_LIBVIRT_VERSION))
 
-        if (CONF.libvirt.virt_type in ("qemu", "kvm") and
-            not self._host.has_min_version(hv_ver=MIN_QEMU_VERSION)):
-            raise exception.NovaException(
-                _('Nova requires QEMU version %s or greater.') %
-                self._version_to_string(MIN_QEMU_VERSION))
+        if CONF.libvirt.virt_type in ("qemu", "kvm"):
+            if self._host.has_min_version(hv_ver=MIN_QEMU_VERSION):
+                # "qemu-img info" calls are version dependent, so we need to
+                # store the version in the images module.
+                images.QEMU_VERSION = self._host.get_connection().getVersion()
+            else:
+                raise exception.NovaException(
+                    _('Nova requires QEMU version %s or greater.') %
+                    self._version_to_string(MIN_QEMU_VERSION))
 
         if (CONF.libvirt.virt_type == 'parallels' and
             not self._host.has_min_version(MIN_LIBVIRT_PARALLELS_VERSION)):
