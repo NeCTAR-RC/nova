@@ -221,15 +221,12 @@ class TestCellsStateManager(test.NoDBTestCase):
         units = 2  # 2 on host 3
         self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
 
-    @mock.patch.object(db, 'aggregate_host_get_by_metadata_key')
-    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_host):
+    @mock.patch.object(objects.AggregateList, 'get_by_metadata_key')
+    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_list):
         cfg.CONF.set_override('capacity_aggregate_key', 'fakekey', 'cells')
         # Fake an aggregate containing host 1-3
-        mock_aggregate_host.return_value = {
-            'host1': set([True]),
-            'host2': set([True]),
-            'host3': set([True]),
-        }
+        mock_aggregate_list.return_value = [mock.Mock(
+            hosts=['host1', 'host2', 'host3'])]
         fake_computes_with_aggr = FAKE_COMPUTES[:-1]
 
         # utilize entire cell
@@ -293,14 +290,11 @@ class TestCellsStateManagerNToOne(TestCellsStateManager):
         units = 1  # 1 on host 2
         self.assertEqual(units, cap['disk_free']['units_by_mb'][str(sz)])
 
-    @mock.patch.object(db, 'aggregate_host_get_by_metadata_key')
-    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_host):
+    @mock.patch.object(objects.AggregateList, 'get_by_metadata_key')
+    def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_list):
         cfg.CONF.set_override('capacity_aggregate_key', 'fakekey', 'cells')
         # Fake an aggregate containing host 1-3
-        mock_aggregate_host.return_value = {
-            'host1': set([True]),
-            'host2': set([True]),
-        }
+        mock_aggregate_list.return_value = [mock.Mock(hosts=['host1', 'host2'])]
         fake_computes_with_aggr = FAKE_COMPUTES_N_TO_ONE
 
         # utilize entire cell
