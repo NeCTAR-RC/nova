@@ -266,8 +266,11 @@ class CellStateManager(base.Base):
         def _get_compute_hosts():
             aggr_nodes = None
             if CONF.cells.capacity_aggregate_key:
-                aggr_nodes = self.db.aggregate_host_get_by_metadata_key(
-                    ctxt, key=CONF.cells.capacity_aggregate_key).keys()
+                host_aggregates = objects.AggregateList.get_by_metadata_key(
+                    ctxt, CONF.cells.capacity_aggregate_key)
+                aggr_nodes = []
+                for agg in host_aggregates:
+                    aggr_nodes += agg.hosts
 
             service_refs = {service.host: service
                             for service in objects.ServiceList.get_by_binary(
