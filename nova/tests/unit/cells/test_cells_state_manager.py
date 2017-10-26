@@ -26,7 +26,6 @@ from oslo_utils import timeutils
 import six
 
 from nova.cells import state
-from nova import db
 from nova.db.sqlalchemy import models
 from nova import exception
 from nova import objects
@@ -294,7 +293,8 @@ class TestCellsStateManagerNToOne(TestCellsStateManager):
     def test_capacity_no_reserve_with_aggregate(self, mock_aggregate_list):
         cfg.CONF.set_override('capacity_aggregate_key', 'fakekey', 'cells')
         # Fake an aggregate containing host 1-3
-        mock_aggregate_list.return_value = [mock.Mock(hosts=['host1', 'host2'])]
+        mock_aggregate_list.return_value = [
+            mock.Mock(hosts=['host1', 'host2'])]
         fake_computes_with_aggr = FAKE_COMPUTES_N_TO_ONE
 
         # utilize entire cell
