@@ -275,5 +275,11 @@ class CellsScheduler(base.Base):
                     instance.cell_name = ''
                     instance.vm_state = vm_states.ERROR
                     instance.save()
+                    try:
+                        build_req = objects.BuildRequest.get_by_instance_uuid(
+                            ctxt, instance.uuid)
+                        build_req.destroy()
+                    except exception.BuildRequestNotFound:
+                        pass
                 except Exception:
                     pass
