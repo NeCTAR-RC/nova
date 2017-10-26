@@ -813,7 +813,6 @@ Architecture: all
 Depends: nova-common (= ${binary:Version}),
          ${misc:Depends},
          ${python:Depends},
-Conflicts: nova-api,
 Description: OpenStack Compute - placement API frontend
  OpenStack is a reliable cloud infrastructure. Its mission is to produce
  the ubiquitous cloud computing platform that will meet the needs of public
