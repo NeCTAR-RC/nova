@@ -4328,14 +4328,14 @@ class _ComputeAPIUnitTestMixIn(object):
 
             instances = self.compute_api.get_all(
                 self.context, search_opts={'foo': 'bar'},
-                limit=None, marker='fake-marker', sort_keys=['baz'],
+                limit=None, sort_keys=['baz'],
                 sort_dirs=['desc'])
 
             mock_buildreq_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=None, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=None, marker=None,
                 sort_keys=['baz'], sort_dirs=['desc'])
             mock_inst_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=None, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=None, marker=None,
                 expected_attrs=None, sort_keys=['baz'], sort_dirs=['desc'])
             for i, instance in enumerate(build_req_instances + cell_instances):
                 self.assertEqual(instance, instances[i])
@@ -4362,14 +4362,14 @@ class _ComputeAPIUnitTestMixIn(object):
 
             instances = self.compute_api.get_all(
                 self.context, search_opts={'foo': 'bar'},
-                limit=None, marker='fake-marker', sort_keys=['baz'],
+                limit=None, sort_keys=['baz'],
                 sort_dirs=['desc'])
 
             mock_buildreq_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=None, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=None, marker=None,
                 sort_keys=['baz'], sort_dirs=['desc'])
             mock_inst_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=None, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=None, marker=None,
                 expected_attrs=None, sort_keys=['baz'], sort_dirs=['desc'])
             for i, instance in enumerate(build_req_instances + cell_instances):
                 self.assertEqual(instance, instances[i])
@@ -4396,14 +4396,14 @@ class _ComputeAPIUnitTestMixIn(object):
 
             instances = self.compute_api.get_all(
                 self.context, search_opts={'foo': 'bar'},
-                limit=10, marker='fake-marker', sort_keys=['baz'],
+                limit=10, sort_keys=['baz'],
                 sort_dirs=['desc'])
 
             mock_buildreq_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=10, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=10, marker=None,
                 sort_keys=['baz'], sort_dirs=['desc'])
             mock_inst_get.assert_called_once_with(
-                self.context, {'foo': 'bar'}, limit=8, marker='fake-marker',
+                self.context, {'foo': 'bar'}, limit=8, marker=None,
                 expected_attrs=None, sort_keys=['baz'], sort_dirs=['desc'])
             for i, instance in enumerate(build_req_instances + cell_instances):
                 self.assertEqual(instance, instances[i])
@@ -4480,17 +4480,17 @@ class _ComputeAPIUnitTestMixIn(object):
 
             instances = self.compute_api.get_all(
                 self.context, search_opts={'foo': 'bar'},
-                limit=10, marker='fake-marker', sort_keys=['baz'],
+                limit=10, sort_keys=['baz'],
                 sort_dirs=['desc'])
 
             mock_target_cell.assert_called_once_with(self.context,
                                                      cell_mapping)
             inst_get_calls = [mock.call(self.context, {'foo': 'bar'},
-                                        limit=8, marker='fake-marker',
+                                        limit=8, marker=None,
                                         expected_attrs=None, sort_keys=['baz'],
                                         sort_dirs=['desc']),
                               mock.call(self.context, {'foo': 'bar'},
-                                        limit=6, marker='fake-marker',
+                                        limit=6, marker=None,
                                         expected_attrs=None, sort_keys=['baz'],
                                         sort_dirs=['desc'])
                               ]

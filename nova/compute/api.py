@@ -2315,11 +2315,15 @@ class API(base.Base):
         # [sorted instances with no host] + [sorted instances with host].
         # This means BuildRequest and cell0 instances first, then cell
         # instances
-        build_requests = objects.BuildRequestList.get_by_filters(
-            context, filters, limit=limit, marker=marker, sort_keys=sort_keys,
-            sort_dirs=sort_dirs)
-        build_req_instances = objects.InstanceList(
-            objects=[build_req.instance for build_req in build_requests])
+        if marker:
+            build_req_instances = objects.InstanceList(objects=[])
+        else:
+            build_requests = objects.BuildRequestList.get_by_filters(
+                context, filters, limit=limit, marker=marker,
+                sort_keys=sort_keys, sort_dirs=sort_dirs)
+            build_req_instances = objects.InstanceList(
+                objects=[build_req.instance for build_req in build_requests])
+
         # Only subtract from limit if it is not None
         limit = (limit - len(build_req_instances)) if limit else limit
 
