@@ -150,7 +150,8 @@ class PlacementHandler(object):
             # implement that, probably per handler. Also this is
             # just the wrong way to do things, but policy not
             # integrated yet.
-            if 'admin' not in context.to_policy_values()['roles']:
+            roles = [r.lower() for r in context.to_policy_values()['roles']]
+            if 'admin' not in roles:
                 raise webob.exc.HTTPForbidden(
                     _('admin required'),
                     json_formatter=util.json_error_formatter)
