@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import datetime
 import sys
 
 import ddt
@@ -400,7 +401,7 @@ class DBCommandsTestCase(test.NoDBTestCase):
                        return_value=dict(instances=10, consoles=5))
     def _test_archive_deleted_rows(self, mock_db_archive, verbose=False):
         result = self.commands.archive_deleted_rows(20, verbose=verbose)
-        mock_db_archive.assert_called_once_with(20)
+        mock_db_archive.assert_called_once_with(20, before=None)
         output = self.output.getvalue()
         if verbose:
             expected = '''\
@@ -449,9 +450,9 @@ Archiving.....complete
             expected = ''
 
         self.assertEqual(expected, self.output.getvalue())
-        mock_db_archive.assert_has_calls([mock.call(20),
-                                          mock.call(20),
-                                          mock.call(20)])
+        mock_db_archive.assert_has_calls([mock.call(20, before=None),
+                                         mock.call(20, before=None),
+                                         mock.call(20, before=None)])
 
     def test_archive_deleted_rows_until_complete_quiet(self):
         self.test_archive_deleted_rows_until_complete(verbose=False)
@@ -481,9 +482,9 @@ Archiving.....stopped
             expected = ''
 
         self.assertEqual(expected, self.output.getvalue())
-        mock_db_archive.assert_has_calls([mock.call(20),
-                                          mock.call(20),
-                                          mock.call(20)])
+        mock_db_archive.assert_has_calls([mock.call(20, before=None),
+                                             mock.call(20, before=None),
+                                             mock.call(20, before=None)])
 
     def test_archive_deleted_rows_until_stopped_quiet(self):
         self.test_archive_deleted_rows_until_stopped(verbose=False)
@@ -491,10 +492,21 @@ Archiving.....stopped
     @mock.patch.object(db, 'archive_deleted_rows', return_value={})
     def test_archive_deleted_rows_verbose_no_results(self, mock_db_archive):
         result = self.commands.archive_deleted_rows(20, verbose=True)
-        mock_db_archive.assert_called_once_with(20)
+        mock_db_archive.assert_called_once_with(20, before=None)
         output = self.output.getvalue()
         self.assertIn('Nothing was archived.', output)
         self.assertEqual(0, result)
+
+    @mock.patch.object(db, 'archive_deleted_rows')
+    def test_archive_deleted_rows_before(self, mock_db_archive):
+        mock_db_archive.side_effect = [
+            ({'instances': 10, 'instance_extra': 5}),
+            ({'instances': 5, 'instance_faults': 1}),
+            KeyboardInterrupt]
+        result = self.commands.archive_deleted_rows(20, before='2017-01-13')
+        mock_db_archive.assert_called_once_with(20,
+                before=datetime.datetime(2017, 1, 13))
+        self.assertEqual(1, result)
 
     @mock.patch.object(migration, 'db_null_instance_uuid_scan',
                        return_value={'foo': 0})

@@ -59,6 +59,7 @@ import os
 import sys
 import traceback
 
+from dateutil import parser as dateutil_parser
 import decorator
 import netaddr
 from oslo_config import cfg
@@ -660,6 +661,9 @@ Error: %s""") % six.text_type(e))
 
     @args('--max_rows', metavar='<number>', default=1000,
             help='Maximum number of deleted rows to archive')
+    @args('--before', metavar='<date>',
+          help=('Archive rows that have been deleted before this date'
+                '(YYYY-MM-DD)'))
     @args('--verbose', action='store_true', dest='verbose', default=False,
           help='Print how many rows were archived per table.')
     @args('--until-complete', action='store_true', dest='until_complete',
@@ -667,7 +671,7 @@ Error: %s""") % six.text_type(e))
           help=('Run continuously until all deleted rows are archived. Use '
                 'max_rows as a batch size for each iteration.'))
     def archive_deleted_rows(self, max_rows, verbose=False,
-                             until_complete=False):
+                             until_complete=False, before=None):
         """Move deleted rows from production tables to shadow tables.
 
         Returns 0 if nothing was archived, 1 if some number of rows were
@@ -683,12 +687,21 @@ Error: %s""") % six.text_type(e))
                   {'max_value': db.MAX_INT})
             return(2)
 
+        if before:
+            try:
+                before_date = dateutil_parser.parse(before, fuzzy=True)
+            except ValueError as e:
+                print(_('Invalid value for --before: %s') % e)
+                return 4
+        else:
+            before_date = None
+
         table_to_rows_archived = {}
         if until_complete and verbose:
             sys.stdout.write(_('Archiving') + '..')  # noqa
         while True:
             try:
-                run = db.archive_deleted_rows(max_rows)
+                run = db.archive_deleted_rows(max_rows, before=before_date)
             except KeyboardInterrupt:
                 run = {}
                 if until_complete and verbose:
