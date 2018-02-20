@@ -333,6 +333,7 @@ def convert_objects_related_datetimes(values, *datetime_keys):
                     # Try alternate parsing since parse_strtime will fail
                     # with say converting '2015-05-28T19:59:38+00:00'
                     values[key] = timeutils.parse_isotime(values[key])
+
             # NOTE(danms): Strip UTC timezones from datetimes, since they're
             # stored that way in the database
             values[key] = values[key].replace(tzinfo=None)
@@ -6287,7 +6288,7 @@ def task_log_end_task(context, task_name, period_beginning, period_ending,
 
 
 def _archive_if_instance_deleted(table, shadow_table, instances, conn,
-                                 max_rows):
+                                 max_rows, until_deleted_at):
     """Look for records that pertain to deleted instances, but may not be
     deleted themselves. This catches cases where we delete an instance,
     but leave some residue because of a failure in a cleanup path or
@@ -6307,12 +6308,14 @@ def _archive_if_instance_deleted(table, shadow_table, instances, conn,
                 [table],
                 and_(instances.c.deleted != instances.c.deleted.default.arg,
                      instances.c.uuid == table.c.instance_uuid)).
+            where(table.c.deleted_at <= until_deleted_at).
             order_by(table.c.id).limit(max_rows))
 
     query_delete = sql.select(
         [table.c.id],
         and_(instances.c.deleted != instances.c.deleted.default.arg,
              instances.c.uuid == table.c.instance_uuid)).\
+        where(table.c.deleted_at <= until_deleted_at).\
         order_by(table.c.id).limit(max_rows)
     delete_statement = db_utils.DeleteFromSelect(table, query_delete,
                                                  table.c.id)
@@ -6329,7 +6332,8 @@ def _archive_if_instance_deleted(table, shadow_table, instances, conn,
         return 0
 
 
-def _archive_deleted_rows_for_table(tablename, max_rows):
+def _archive_deleted_rows_for_table(tablename, max_rows,
+                                    until_deleted_at):
     """Move up to max_rows rows from one tables to the corresponding
     shadow table.
 
@@ -6343,6 +6347,7 @@ def _archive_deleted_rows_for_table(tablename, max_rows):
     conn = engine.connect()
     metadata = MetaData()
     metadata.bind = engine
+
     # NOTE(tdurakov): table metadata should be received
     # from models, not db tables. Default value specified by SoftDeleteMixin
     # is known only by models, not DB layer.
@@ -6403,9 +6408,11 @@ def _archive_deleted_rows_for_table(tablename, max_rows):
         from_select(columns,
                     sql.select([table],
                                deleted_column != deleted_column.default.arg).
+                    where(table.c.deleted_at <= until_deleted_at).
                     order_by(column).limit(max_rows))
     query_delete = sql.select([column],
                           deleted_column != deleted_column.default.arg).\
+                          where(table.c.deleted_at <= until_deleted_at).\
                           order_by(column).limit(max_rows)
 
     delete_statement = db_utils.DeleteFromSelect(table, query_delete, column)
@@ -6428,13 +6435,13 @@ def _archive_deleted_rows_for_table(tablename, max_rows):
         instances = models.BASE.metadata.tables['instances']
         limit = max_rows - rows_archived if max_rows is not None else None
         extra = _archive_if_instance_deleted(table, shadow_table, instances,
-                                             conn, limit)
+                                             conn, limit, until_deleted_at)
         rows_archived += extra
 
     return rows_archived
 
 
-def archive_deleted_rows(max_rows=None):
+def archive_deleted_rows(max_rows=None, until_deleted_at=None):
     """Move up to max_rows rows from production tables to the corresponding
     shadow tables.
 
@@ -6450,6 +6457,12 @@ def archive_deleted_rows(max_rows=None):
         }
 
     """
+    if until_deleted_at is None:
+        until_deleted_at = timeutils.utcnow()
+    else:
+        until_deleted_at = timeutils.parse_strtime(until_deleted_at,
+                                                    '%Y-%m-%d')
+
     table_to_rows_archived = {}
     total_rows_archived = 0
     meta = MetaData(get_engine(use_slave=True))
@@ -6463,7 +6476,8 @@ def archive_deleted_rows(max_rows=None):
                 tablename.startswith(_SHADOW_TABLE_PREFIX)):
             continue
         rows_archived = _archive_deleted_rows_for_table(
-            tablename, max_rows=max_rows - total_rows_archived)
+            tablename, max_rows=max_rows - total_rows_archived,
+            until_deleted_at=until_deleted_at)
         total_rows_archived += rows_archived
         # Only report results for tables that had updates.
         if rows_archived:
