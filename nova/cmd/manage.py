@@ -845,9 +845,13 @@ class DbCommands(object):
 
     @args('--max_rows', metavar='<number>',
             help='Maximum number of deleted rows to archive')
+    @args('--until_deleted_at', metavar='<date>',
+            help='Archive rows where deleted_at is before this date'
+                '(YYYY-MM-DD)')
     @args('--verbose', action='store_true', dest='verbose', default=False,
           help='Print how many rows were archived per table.')
-    def archive_deleted_rows(self, max_rows, verbose=False):
+    def archive_deleted_rows(self, max_rows, until_deleted_at=None,
+                                verbose=False):
         """Move up to max_rows deleted rows from production tables to shadow
         tables.
         """
@@ -860,7 +864,9 @@ class DbCommands(object):
                 print(_('max rows must be <= %(max_value)d') %
                       {'max_value': db.MAX_INT})
                 return(1)
-        table_to_rows_archived = db.archive_deleted_rows(max_rows)
+        table_to_rows_archived = db.archive_deleted_rows(max_rows,
+                                            until_deleted_at=until_deleted_at)
+
         if verbose:
             if table_to_rows_archived:
                 utils.print_dict(table_to_rows_archived, _('Table'),

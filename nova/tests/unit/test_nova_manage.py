@@ -481,7 +481,7 @@ class DBCommandsTestCase(test.NoDBTestCase):
     def _test_archive_deleted_rows(self, mock_db_archive, verbose=False):
         self.useFixture(fixtures.MonkeyPatch('sys.stdout', StringIO()))
         self.commands.archive_deleted_rows(20, verbose=verbose)
-        mock_db_archive.assert_called_once_with(20)
+        mock_db_archive.assert_called_once_with(20, until_deleted_at=None)
         output = sys.stdout.getvalue()
         if verbose:
             expected = '''\
@@ -508,7 +508,7 @@ class DBCommandsTestCase(test.NoDBTestCase):
     def test_archive_deleted_rows_verbose_no_results(self, mock_db_archive):
         self.useFixture(fixtures.MonkeyPatch('sys.stdout', StringIO()))
         self.commands.archive_deleted_rows(20, verbose=True)
-        mock_db_archive.assert_called_once_with(20)
+        mock_db_archive.assert_called_once_with(20, until_deleted_at=None)
         output = sys.stdout.getvalue()
         self.assertIn('Nothing was archived.', output)
 
