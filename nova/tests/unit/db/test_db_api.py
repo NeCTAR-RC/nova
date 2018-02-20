@@ -9136,7 +9136,7 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         # Set 4 to deleted
         update_statement = self.instance_id_mappings.update().\
                 where(self.instance_id_mappings.c.uuid.in_(self.uuidstrs[:4]))\
-                .values(deleted=1)
+                .values(deleted=1, deleted_at=timeutils.utcnow())
         self.conn.execute(update_statement)
         qiim = sql.select([self.instance_id_mappings]).where(self.
                                 instance_id_mappings.c.uuid.in_(self.uuidstrs))
@@ -9184,6 +9184,55 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         self._assert_shadow_tables_empty_except(
             'shadow_instance_id_mappings')
 
+    def test_archive_deleted_rows_before(self):
+        # Add 6 rows to table
+        for uuidstr in self.uuidstrs:
+            ins_stmt = self.instance_id_mappings.insert().values(uuid=uuidstr)
+            self.conn.execute(ins_stmt)
+        # Set 2 to deleted before 2017-01-01
+        deleted_at = timeutils.parse_strtime('2017-01-01T00:00:00.0')
+        update_statement = self.instance_id_mappings.update().\
+                where(self.instance_id_mappings.c.uuid.in_(self.uuidstrs[:2]))\
+                .values(deleted=1, deleted_at=deleted_at)
+        self.conn.execute(update_statement)
+        # Set 2 to deleted now
+        update_statement = self.instance_id_mappings.update().\
+                where(self.instance_id_mappings.c.uuid.in_(self.uuidstrs[2:4]))\
+                .values(deleted=1, deleted_at=timeutils.utcnow())
+        self.conn.execute(update_statement)
+        qiim = sql.select([self.instance_id_mappings]).where(self.
+                                instance_id_mappings.c.uuid.in_(self.uuidstrs))
+        # Verify we have 6 in main
+        rows = self.conn.execute(qiim).fetchall()
+        self.assertEqual(len(rows), 6)
+        qsiim = sql.select([self.shadow_instance_id_mappings]).\
+                where(self.shadow_instance_id_mappings.c.uuid.in_(
+                                                                self.uuidstrs))
+        # Archive 1 row deleted before 2017-01-02
+        results = db.archive_deleted_rows(max_rows=1, before='2017-01-02')
+        expected = dict(instance_id_mappings=1)
+        self._assertEqualObjects(expected, results)
+        # Archive all other rows (1) deleted before 2017-01-02
+        results = db.archive_deleted_rows(max_rows=1000, before='2017-01-02')
+        expected = dict(instance_id_mappings=1)
+        self._assertEqualObjects(expected, results)
+        # Verify we have 4 left in main
+        rows = self.conn.execute(qiim).fetchall()
+        self.assertEqual(len(rows), 4)
+        # Verify we have 2 in shadow
+        rows = self.conn.execute(qsiim).fetchall()
+        self.assertEqual(len(rows), 2)
+        # Archive everything else
+        results = db.archive_deleted_rows(max_rows=1000)
+        expected = dict(instance_id_mappings=2)
+        self._assertEqualObjects(expected, results)
+        # Verify we have 2 left in main
+        rows = self.conn.execute(qiim).fetchall()
+        self.assertEqual(len(rows), 2)
+        # Verify we have 4 in shadow
+        rows = self.conn.execute(qsiim).fetchall()
+        self.assertEqual(len(rows), 4)
+
     def test_archive_deleted_rows_for_every_uuid_table(self):
         tablenames = []
         for model_class in six.itervalues(models.__dict__):
@@ -9218,7 +9267,7 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         # Set 4 to deleted
         update_statement = main_table.update().\
                 where(main_table.c.uuid.in_(self.uuidstrs[:4]))\
-                .values(deleted=1)
+                .values(deleted=1, deleted_at=timeutils.utcnow())
         self.conn.execute(update_statement)
         qmt = sql.select([main_table]).where(main_table.c.uuid.in_(
                                              self.uuidstrs))
@@ -9231,7 +9280,8 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         # Verify we have 0 in shadow
         self.assertEqual(len(rows), 0)
         # Archive 2 rows
-        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2)
+        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2,
+                                                       before=None)
         # Verify we have 4 left in main
         rows = self.conn.execute(qmt).fetchall()
         self.assertEqual(len(rows), 4)
@@ -9239,7 +9289,8 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         rows = self.conn.execute(qst).fetchall()
         self.assertEqual(len(rows), 2)
         # Archive 2 more rows
-        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2)
+        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2,
+                                                       before=None)
         # Verify we have 2 left in main
         rows = self.conn.execute(qmt).fetchall()
         self.assertEqual(len(rows), 2)
@@ -9247,7 +9298,8 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         rows = self.conn.execute(qst).fetchall()
         self.assertEqual(len(rows), 4)
         # Try to archive more, but there are no deleted rows left.
-        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2)
+        sqlalchemy_api._archive_deleted_rows_for_table(tablename, max_rows=2,
+                                                       before=None)
         # Verify we still have 2 left in main
         rows = self.conn.execute(qmt).fetchall()
         self.assertEqual(len(rows), 2)
@@ -9262,7 +9314,7 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         self.conn.execute(ins_stmt)
         update_statement = self.dns_domains.update().\
                            where(self.dns_domains.c.domain == uuidstr0).\
-                           values(deleted=True)
+                           values(deleted=True, deleted_at=timeutils.utcnow())
         self.conn.execute(update_statement)
         qdd = sql.select([self.dns_domains], self.dns_domains.c.domain ==
                                             uuidstr0)
@@ -9299,24 +9351,29 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
     def test_archive_deleted_rows_fk_constraint(self):
         # consoles.pool_id depends on console_pools.id
         self._check_sqlite_version_less_than_3_7()
-        ins_stmt = self.console_pools.insert().values(deleted=1)
+        ins_stmt = self.console_pools.insert().values(deleted=1,
+                                                deleted_at=timeutils.utcnow())
         result = self.conn.execute(ins_stmt)
         id1 = result.inserted_primary_key[0]
         ins_stmt = self.consoles.insert().values(deleted=1,
-                                                         pool_id=id1)
+                                                deleted_at=timeutils.utcnow(),
+                                                pool_id=id1)
         result = self.conn.execute(ins_stmt)
         result.inserted_primary_key[0]
         # The first try to archive console_pools should fail, due to FK.
         num = sqlalchemy_api._archive_deleted_rows_for_table("console_pools",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(num, 0)
         # Then archiving consoles should work.
         num = sqlalchemy_api._archive_deleted_rows_for_table("consoles",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(num, 1)
         # Then archiving console_pools should work.
         num = sqlalchemy_api._archive_deleted_rows_for_table("console_pools",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(num, 1)
         self._assert_shadow_tables_empty_except(
             'shadow_console_pools',
@@ -9327,23 +9384,28 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         # migrations.instance_uuid depends on instances.uuid
         self._check_sqlite_version_less_than_3_7()
         instance_uuid = uuidsentinel.instance
-        ins_stmt = self.instances.insert().values(uuid=instance_uuid,
-                                                  deleted=1)
+        ins_stmt = self.instances.insert().values(
+                        uuid=instance_uuid,
+                        deleted=1,
+                        deleted_at=timeutils.utcnow())
         self.conn.execute(ins_stmt)
         ins_stmt = self.migrations.insert().values(instance_uuid=instance_uuid,
                                                    deleted=0)
         self.conn.execute(ins_stmt)
         # The first try to archive instances should fail, due to FK.
         num = sqlalchemy_api._archive_deleted_rows_for_table("instances",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(0, num)
         # Then archiving migrations should work.
         num = sqlalchemy_api._archive_deleted_rows_for_table("migrations",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(1, num)
         # Then archiving instances should work.
         num = sqlalchemy_api._archive_deleted_rows_for_table("instances",
-                                                             max_rows=None)
+                                                             max_rows=None,
+                                                             before=None)
         self.assertEqual(1, num)
         self._assert_shadow_tables_empty_except(
             'shadow_instances',
@@ -9360,11 +9422,11 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
         # Set 4 of each to deleted
         update_statement = self.instance_id_mappings.update().\
                 where(self.instance_id_mappings.c.uuid.in_(self.uuidstrs[:4]))\
-                .values(deleted=1)
+                .values(deleted=1, deleted_at=timeutils.utcnow())
         self.conn.execute(update_statement)
         update_statement2 = self.instances.update().\
                 where(self.instances.c.uuid.in_(self.uuidstrs[:4]))\
-                .values(deleted=1)
+                .values(deleted=1, deleted_at=timeutils.utcnow())
         self.conn.execute(update_statement2)
         # Verify we have 6 in each main table
         qiim = sql.select([self.instance_id_mappings]).where(
