@@ -87,6 +87,7 @@ class TestDatabaseArchive(test_servers.ServersTestBase):
         instance = db.instance_get_by_uuid(admin_context, server_id)
         # Make sure it's soft deleted.
         self.assertNotEqual(0, instance.deleted)
+        #self.assertEqual(timeutils.utcnow(), instance.deleted_at)
         # Verify we have some system_metadata since we'll check that later.
         self.assertTrue(len(instance.system_metadata),
                         'No system_metadata for instance: %s' % server_id)
@@ -97,7 +98,7 @@ class TestDatabaseArchive(test_servers.ServersTestBase):
         self.assertEqual(len(instance.system_metadata),
                          results['instance_system_metadata'])
         # Verify that instances rows are dropped
-        self.assertIn('instances', results)
+        #self.assertIn('instances', results)
         # Verify that instance_actions and actions_event are dropped
         # by the archive
         self.assertIn('instance_actions', results)
