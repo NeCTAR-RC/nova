@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c7c5a569_239d66a7",
+        "filename": "nova/virt/libvirt/driver.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 498,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-03-13T03:35:18Z",
+      "side": 1,
+      "message": "this should raise the same exception as before",
+      "range": {
+        "startLine": 496,
+        "startChar": 16,
+        "endLine": 498,
+        "endChar": 62
+      },
+      "revId": "87e68ece5b637b94a5cd12b1eb2b6bc8054d2632",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
