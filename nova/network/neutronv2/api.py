@@ -549,7 +549,10 @@ class API(base_api.NetworkAPI):
         """
 
         default_id = '00000000-0000-0000-0000-000000000000'
-        if requested_networks and CONF.neutron.default_networks:
+        if requested_networks and \
+           CONF.neutron.default_networks and \
+           default_id not in CONF.neutron.default_networks):
+
             for request in requested_networks:
                 if request.network_id == default_id:
                     default_index = requested_networks.index(request)
