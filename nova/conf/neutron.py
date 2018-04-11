@@ -78,6 +78,9 @@ extensions with no wait.
 Provider type to filter by when getting floating IP'
 pools.
 """),
+    cfg.DictOpt('bridge_network_mappings',
+                default={},
+                help="List of <network_id>:<physical_bridge>"),
 ]
 
 metadata_proxy_opts = [
