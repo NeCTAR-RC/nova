@@ -81,6 +81,9 @@ extensions with no wait.
         default=[],
                 help='Default networks to bind an instance too'
 ),
+    cfg.DictOpt('bridge_network_mappings',
+                default={},
+                help="List of <network_id>:<physical_bridge>"),
 ]
 
 metadata_proxy_opts = [

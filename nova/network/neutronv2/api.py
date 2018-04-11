@@ -2173,6 +2173,13 @@ class API(base_api.NetworkAPI):
                              if fixed_ip.is_in_subnet(subnet)]
         return subnets
 
+    def _get_br_name(self, port):
+        mappings = CONF.neutron.bridge_network_mappings
+        port_network = port['network_id']
+        if port_network in mappings:
+            return mappings[port_network]
+        return "brq" + port_network
+
     def _nw_info_build_network(self, port, networks, subnets):
         network_name = None
         network_mtu = None
@@ -2201,8 +2208,9 @@ class API(base_api.NetworkAPI):
                                       CONF.neutron.ovs_bridge)
             ovs_interfaceid = port['id']
         elif vif_type == network_model.VIF_TYPE_BRIDGE:
+            br_name = self._get_br_name(port)
             bridge = port_details.get(network_model.VIF_DETAILS_BRIDGE_NAME,
-                                      "brq" + port['network_id'])
+                                      br_name)
             should_create_bridge = True
         elif vif_type == network_model.VIF_TYPE_DVS:
             # The name of the DVS port group will contain the neutron
