@@ -4074,7 +4074,6 @@ class ComputeManager(manager.Manager):
                                                                  instance,
                                                                  network_id)
         self._inject_network_info(context, instance, network_info)
-        self.reset_network(context, instance)
 
         # NOTE(russellb) We just want to bump updated_at.  See bug 1143466.
         instance.updated_at = timeutils.utcnow()
@@ -4097,7 +4096,6 @@ class ComputeManager(manager.Manager):
                                                                       instance,
                                                                       address)
         self._inject_network_info(context, instance, network_info)
-        self.reset_network(context, instance)
 
         # NOTE(russellb) We just want to bump updated_at.  See bug 1143466.
         instance.updated_at = timeutils.utcnow()
@@ -4517,6 +4515,10 @@ class ComputeManager(manager.Manager):
     def reset_network(self, context, instance):
         """Reset networking on the given instance."""
         LOG.debug('Reset network', instance=instance)
+        network_info = self.network_api.get_instance_nw_info(context, instance)
+        instance.info_cache.network_info = network_info
+        instance.save()
+        self.network_api.get_instance_nw_info(context, instance, update_cells=True)
         self.driver.reset_network(instance)
 
     def _inject_network_info(self, context, instance, network_info):
