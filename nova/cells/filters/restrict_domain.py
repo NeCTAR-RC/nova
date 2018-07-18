@@ -16,6 +16,7 @@
 from oslo_log import log as logging
 
 from nova.cells import filters
+from nova.i18n import _LW
 
 
 LOG = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class DomainRestrictCellFilter(filters.BaseCellFilter):
     def filter_all(self, cells, filter_properties):
         domain = filter_properties['context'].project_domain
         if not domain:
+            LOG.warning(_LW("No domain found in context using default"))
             domain = 'default'
         LOG.debug("Project Domain is %s", domain)
         allowed_cells = []
