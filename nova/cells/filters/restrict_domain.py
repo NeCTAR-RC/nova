@@ -26,6 +26,7 @@ class DomainRestrictCellFilter(filters.BaseCellFilter):
     def filter_all(self, cells, filter_properties):
         domain = filter_properties['context'].project_domain
         if not domain:
+            LOG.warning("No domain found in context using default")
             domain = 'default'
         LOG.debug("Project Domain is %s", domain)
         allowed_cells = []
