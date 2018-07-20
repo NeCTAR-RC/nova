@@ -62,47 +62,55 @@ class CellsScheduler(base.Base):
 
     def _create_instances_here(self, ctxt, instance_uuids, instance_properties,
             instance_type, image, security_groups, block_device_mapping):
-        instance_values = copy.copy(instance_properties)
-        # The parent may pass these metadata values as lists, and the
-        # create call expects it to be a dict.
-        instance_values['metadata'] = utils.instance_meta(instance_values)
-        # Pop out things that will get set properly when re-creating the
-        # instance record.
-        instance_values.pop('id')
-        instance_values.pop('name')
-        instance_values.pop('info_cache')
-        instance_values.pop('security_groups')
-        instance_values.pop('flavor')
-
-        # FIXME(danms): The instance was brutally serialized before being
-        # sent over RPC to us. Thus, the pci_requests value wasn't really
-        # sent in a useful form. Since it was getting ignored for cells
-        # before it was part of the Instance, skip it now until cells RPC
-        # is sending proper instance objects.
-        pci_requests = instance_values.pop('pci_requests', None)
-        if pci_requests and pci_requests['requests']:
-            instance_values['pci_requests'] = \
-                objects.InstancePCIRequests.from_request_spec_instance_props(
-                    pci_requests)
-
-        # FIXME(danms): Same for ec2_ids
-        instance_values.pop('ec2_ids', None)
-
-        # FIXME(danms): Same for keypairs
-        instance_values.pop('keypairs', None)
-
-        instances = []
-        num_instances = len(instance_uuids)
         security_groups = (
             self.compute_api.security_group_api.populate_security_groups(
                 security_groups))
+        instances = []
         for i, instance_uuid in enumerate(instance_uuids):
+            instance_val = copy.copy(instance_properties[i])
+            instance_values = obj_base.obj_to_primitive(instance_val)
+            # The parent may pass these metadata values as lists, and the
+            # create call expects it to be a dict.
+            instance_values['metadata'] = utils.instance_meta(instance_values)
+            # Pop out things that will get set properly when re-creating the
+            # instance record.
+            instance_values.pop('id')
+            instance_values.pop('name')
+            instance_values.pop('info_cache')
+            instance_values.pop('security_groups')
+            instance_values.pop('flavor')
+
+            numa_topology = instance_values.pop('numa_topology')
+
+            # FIXME(danms): The instance was brutally serialized before being
+            # sent over RPC to us. Thus, the pci_requests value wasn't really
+            # sent in a useful form. Since it was getting ignored for cells
+            # before it was part of the Instance, skip it now until cells RPC
+            # is sending proper instance objects.
+            pci_requests = instance_values.pop('pci_requests', None)
+            if pci_requests and pci_requests['requests']:
+                instance_values['pci_requests'] = \
+                    objects.InstancePCIRequests.from_request_spec_instance_props(
+                        pci_requests)
+
+            # FIXME(danms): Same for ec2_ids
+            instance_values.pop('ec2_ids', None)
+
+            # FIXME(danms): Same for keypairs
+            instance_values.pop('keypairs', None)
+
             instance = objects.Instance(context=ctxt)
             instance.update(instance_values)
             instance.uuid = instance_uuid
             instance.flavor = instance_type
             instance.old_flavor = None
             instance.new_flavor = None
+
+            if numa_topology:
+                instance_numa_topology = objects.InstanceNUMATopology()
+                instance_numa_topology.cells = numa_topology['cells']
+                instance.numa_topology = instance_numa_topology
+
             instance = self.compute_api.create_db_entry_for_new_instance(
                     ctxt,
                     instance_type,
@@ -110,7 +118,7 @@ class CellsScheduler(base.Base):
                     instance,
                     security_groups,
                     block_device_mapping,
-                    num_instances, i)
+                    1, i)
             block_device_mapping = (
                 self.compute_api._bdm_validate_set_size_and_instance(
                     ctxt, instance, instance_type, block_device_mapping))
@@ -161,8 +169,7 @@ class CellsScheduler(base.Base):
             build_inst_kwargs):
         """Attempt to build instance(s) or send msg to child cell."""
         ctxt = message.ctxt
-        instance_properties = obj_base.obj_to_primitive(
-            build_inst_kwargs['instances'][0])
+        instance_properties = build_inst_kwargs['instances']
         filter_properties = build_inst_kwargs['filter_properties']
         instance_type = filter_properties['instance_type']
         image = build_inst_kwargs['image']
