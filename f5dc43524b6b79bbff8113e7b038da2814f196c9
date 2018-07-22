@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bbaa88d9_1be264bd",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 113,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-07-22T23:16:02Z",
+      "side": 1,
+      "message": "I think this is the only bit that is needed? Looks like this won\u0027t work if you boot more than one instance at a time but we can prob just ignore this case?",
+      "range": {
+        "startLine": 110,
+        "startChar": 0,
+        "endLine": 113,
+        "endChar": 63
+      },
+      "revId": "f5dc43524b6b79bbff8113e7b038da2814f196c9",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
