@@ -22,6 +22,30 @@
       "revId": "f5dc43524b6b79bbff8113e7b038da2814f196c9",
       "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "93042161_06cf9759",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 113,
+      "author": {
+        "id": 1000082
+      },
+      "writtenOn": "2018-07-24T01:44:00Z",
+      "side": 1,
+      "message": "Well sure, I mean it simplifies the patch a bit, but leaves this functionality subtly broken... So why wouldn\u0027t we do the whole instances loop thing instead? I guess this is what is causing the test failures at present, so it maybe the easiest way out for the moment. Let\u0027s see if Belmiro has any comments...",
+      "parentUuid": "bbaa88d9_1be264bd",
+      "range": {
+        "startLine": 110,
+        "startChar": 0,
+        "endLine": 113,
+        "endChar": 63
+      },
+      "revId": "f5dc43524b6b79bbff8113e7b038da2814f196c9",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
     }
   ]
 }
