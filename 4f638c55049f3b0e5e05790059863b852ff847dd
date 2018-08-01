@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "28bf3665_c5ef4694",
+        "filename": "nova/tests/unit/db/test_db_api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 9395,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-08-01T05:41:39Z",
+      "side": 1,
+      "message": "whoops :-)",
+      "range": {
+        "startLine": 9395,
+        "startChar": 35,
+        "endLine": 9395,
+        "endChar": 53
+      },
+      "revId": "4f638c55049f3b0e5e05790059863b852ff847dd",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
