@@ -73,6 +73,13 @@ class CellsScheduler(base.Base):
         instance_values.pop('info_cache')
         instance_values.pop('security_groups')
         instance_values.pop('flavor')
+        # Shahaan
+        numa_topology = instance_values.pop('numa_topology', None)
+        if numa_topology:
+            numa_topology = \
+                 objects.InstanceNUMATopology.obj_from_primitive(
+                     numa_topology)
+
 
         # FIXME(danms): The instance was brutally serialized before being
         # sent over RPC to us. Thus, the pci_requests value wasn't really
@@ -103,12 +110,14 @@ class CellsScheduler(base.Base):
             instance.flavor = instance_type
             instance.old_flavor = None
             instance.new_flavor = None
+            # Shahaan
             instance = self.compute_api.create_db_entry_for_new_instance(
                     ctxt,
                     instance_type,
                     image,
                     instance,
                     security_groups,
+                    numa_topology,
                     block_device_mapping,
                     num_instances, i)
             block_device_mapping = (
