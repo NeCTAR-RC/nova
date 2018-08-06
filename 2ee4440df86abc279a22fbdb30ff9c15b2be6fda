@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "03ac9228_4559c615",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-08-06T05:43:36Z",
+      "side": 1,
+      "message": "this should be added to instance_values much like pci_requests are below",
+      "range": {
+        "startLine": 79,
+        "startChar": 12,
+        "endLine": 79,
+        "endChar": 29
+      },
+      "revId": "2ee4440df86abc279a22fbdb30ff9c15b2be6fda",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "c07691d8_128ad63b",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-08-06T05:43:36Z",
+      "side": 1,
+      "message": "This isn\u0027t needed",
+      "range": {
+        "startLine": 118,
+        "startChar": 20,
+        "endLine": 118,
+        "endChar": 34
+      },
+      "revId": "2ee4440df86abc279a22fbdb30ff9c15b2be6fda",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
