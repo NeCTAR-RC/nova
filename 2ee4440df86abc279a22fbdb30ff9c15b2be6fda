@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "661bfaa8_2e014a67",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 1000169
+      },
+      "writtenOn": "2018-08-06T06:45:54Z",
+      "side": 1,
+      "message": "That\u0027s correct Sam. Thanks for the input.",
+      "parentUuid": "03ac9228_4559c615",
+      "range": {
+        "startLine": 79,
+        "startChar": 12,
+        "endLine": 79,
+        "endChar": 29
+      },
+      "revId": "2ee4440df86abc279a22fbdb30ff9c15b2be6fda",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "c07691d8_128ad63b",
         "filename": "nova/cells/scheduler.py",
         "patchSetId": 1
