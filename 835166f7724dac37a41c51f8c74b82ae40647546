@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6aa57e23_5ce05708",
+        "filename": "nova/cells/scheduler.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2018-08-06T05:55:53Z",
+      "side": 1,
+      "message": "can drop this comment but all else looks good :-)",
+      "range": {
+        "startLine": 76,
+        "startChar": 8,
+        "endLine": 76,
+        "endChar": 17
+      },
+      "revId": "835166f7724dac37a41c51f8c74b82ae40647546",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": false
+    }
+  ]
+}
