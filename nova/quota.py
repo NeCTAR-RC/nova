@@ -1883,6 +1883,9 @@ def _instances_cores_ram_count(context, project_id, user_id=None):
                           'cores': <count across user>,
                           'ram': <count across user>}}
     """
+    if CONF.cells.enable:
+        return objects.InstanceList.get_counts(context, project_id,
+                                               user_id=user_id)
     # TODO(melwitt): Counting across cells for instances means we will miss
     # counting resources if a cell is down. In the future, we should query
     # placement for cores/ram and InstanceMappings for instances (once we are
