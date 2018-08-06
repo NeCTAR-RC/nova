@@ -4912,16 +4912,17 @@ class AggregateAPI(base.Base):
                                                     aggregate_payload)
         # validates the host; HostMappingNotFound or ComputeHostNotFound
         # is raised if invalid
-        try:
-            mapping = objects.HostMapping.get_by_host(context, host_name)
-            nova_context.set_target_cell(context, mapping.cell_mapping)
-            objects.Service.get_by_compute_host(context, host_name)
-        except exception.HostMappingNotFound:
+        if not CONF.cells.enable:
             try:
-                # NOTE(danms): This targets our cell
-                _find_service_in_cell(context, service_host=host_name)
-            except exception.NotFound:
-                raise exception.ComputeHostNotFound(host=host_name)
+                mapping = objects.HostMapping.get_by_host(context, host_name)
+                nova_context.set_target_cell(context, mapping.cell_mapping)
+                objects.Service.get_by_compute_host(context, host_name)
+            except exception.HostMappingNotFound:
+                try:
+                    # NOTE(danms): This targets our cell
+                    _find_service_in_cell(context, service_host=host_name)
+                except exception.NotFound:
+                    raise exception.ComputeHostNotFound(host=host_name)
 
         aggregate = objects.Aggregate.get_by_id(context, aggregate_id)
         self.is_safe_to_update_az(context, aggregate.metadata,
@@ -4949,9 +4950,10 @@ class AggregateAPI(base.Base):
                                                     aggregate_payload)
         # validates the host; HostMappingNotFound or ComputeHostNotFound
         # is raised if invalid
-        mapping = objects.HostMapping.get_by_host(context, host_name)
-        nova_context.set_target_cell(context, mapping.cell_mapping)
-        objects.Service.get_by_compute_host(context, host_name)
+        if not CONF.cells.enable:
+            mapping = objects.HostMapping.get_by_host(context, host_name)
+            nova_context.set_target_cell(context, mapping.cell_mapping)
+            objects.Service.get_by_compute_host(context, host_name)
         aggregate = objects.Aggregate.get_by_id(context, aggregate_id)
         aggregate.delete_host(host_name)
         self.scheduler_client.update_aggregates(context, [aggregate])
