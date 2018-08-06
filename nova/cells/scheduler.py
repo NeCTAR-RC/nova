@@ -61,7 +61,8 @@ class CellsScheduler(base.Base):
         self.weighers = [cls() for cls in weigher_classes]
 
     def _create_instances_here(self, ctxt, instance_uuids, instance_properties,
-            instance_type, image, security_groups, block_device_mapping):
+                               instance_type, image, security_groups,
+                               block_device_mapping):
         instance_values = copy.copy(instance_properties)
         # The parent may pass these metadata values as lists, and the
         # create call expects it to be a dict.
@@ -73,6 +74,12 @@ class CellsScheduler(base.Base):
         instance_values.pop('info_cache')
         instance_values.pop('security_groups')
         instance_values.pop('flavor')
+        # Shahaan
+        numa_topology = instance_values.pop('numa_topology', None)
+        if numa_topology:
+            numa_topology = \
+                 objects.InstanceNUMATopology.obj_from_primitive(
+                     numa_topology)
 
         # FIXME(danms): The instance was brutally serialized before being
         # sent over RPC to us. Thus, the pci_requests value wasn't really
@@ -103,12 +110,14 @@ class CellsScheduler(base.Base):
             instance.flavor = instance_type
             instance.old_flavor = None
             instance.new_flavor = None
+            # Shahaan
             instance = self.compute_api.create_db_entry_for_new_instance(
                     ctxt,
                     instance_type,
                     image,
                     instance,
                     security_groups,
+                    numa_topology,
                     block_device_mapping,
                     num_instances, i)
             block_device_mapping = (
@@ -158,7 +167,7 @@ class CellsScheduler(base.Base):
         return target_cells
 
     def _build_instances(self, message, target_cells, instance_uuids,
-            build_inst_kwargs):
+                         build_inst_kwargs):
         """Attempt to build instance(s) or send msg to child cell."""
         ctxt = message.ctxt
         instance_properties = obj_base.obj_to_primitive(
@@ -177,17 +186,22 @@ class CellsScheduler(base.Base):
                 if target_cell.is_me:
                     # Need to create instance DB entries as the conductor
                     # expects that the instance(s) already exists.
-                    instances = self._create_instances_here(ctxt,
-                            instance_uuids, instance_properties, instance_type,
-                            image, security_groups, block_device_mapping)
+                    instances = \
+                        self._create_instances_here(
+                                ctxt,
+                                instance_uuids, instance_properties,
+                                instance_type, image, security_groups,
+                                block_device_mapping)
                     build_inst_kwargs['instances'] = instances
                     # Need to record the create action in the db as the
                     # conductor expects it to already exist.
                     self._create_action_here(ctxt, instance_uuids)
-                    self.compute_task_api.build_instances(ctxt,
+                    self.compute_task_api.build_instances(
+                            ctxt,
                             **build_inst_kwargs)
                     return
-                self.msg_runner.build_instances(ctxt, target_cell,
+                self.msg_runner.build_instances(
+                        ctxt, target_cell,
                         build_inst_kwargs)
                 return
             except Exception:
@@ -201,7 +215,7 @@ class CellsScheduler(base.Base):
     def build_instances(self, message, build_inst_kwargs):
         image = build_inst_kwargs['image']
         instance_uuids = [inst['uuid'] for inst in
-                build_inst_kwargs['instances']]
+                          build_inst_kwargs['instances']]
         instances = build_inst_kwargs['instances']
         request_spec = scheduler_utils.build_request_spec(message.ctxt,
                                                           image, instances)
@@ -212,18 +226,19 @@ class CellsScheduler(base.Base):
                                   'host_sched_kwargs': build_inst_kwargs,
                                   'request_spec': request_spec})
 
-        self._schedule_build_to_cells(message, instance_uuids,
+        self._schedule_build_to_cells(
+                message, instance_uuids,
                 filter_properties, self._build_instances, build_inst_kwargs)
 
     def _schedule_build_to_cells(self, message, instance_uuids,
-            filter_properties, method, method_kwargs):
+                                 filter_properties, method, method_kwargs):
         """Pick a cell where we should create a new instance(s)."""
         try:
             for i in range(max(0, CONF.cells.scheduler_retries) + 1):
                 try:
                     instances = method_kwargs.get('instances', [])
                     our_azs = self.state_manager.get_my_state()\
-                                .capabilities.get('availability_zones', [])
+                        .capabilities.get('availability_zones', [])
 
                     parent_cell = bool(self.state_manager.get_child_cells())
                     if not parent_cell \
@@ -253,7 +268,7 @@ class CellsScheduler(base.Base):
                         return
 
                     return method(message, target_cells, instance_uuids,
-                            method_kwargs)
+                                  method_kwargs)
                 except exception.NoCellsAvailable:
                     if i == max(0, CONF.cells.scheduler_retries):
                         raise
