@@ -1,0 +1,26 @@
+Description: Temporarily drop openstackdocstheme sphinx extension
+  until sphinx>=1.6.2 is available.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Forwarded: no
+Last-Update: 2017-07-28
+
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -35,7 +35,7 @@
+ 
+ extensions = ['sphinx.ext.autodoc',
+               'sphinx.ext.todo',
+-              'openstackdocstheme',
++              #'openstackdocstheme',
+               'sphinx.ext.coverage',
+               'sphinx.ext.graphviz',
+               'ext.support_matrix',
+@@ -135,7 +135,7 @@
+ 
+ # The theme to use for HTML and HTML Help pages.  Major themes that come with
+ # Sphinx are currently 'default' and 'sphinxdoc'.
+-html_theme = 'openstackdocs'
++# html_theme = 'openstackdocs'
+ 
+ # Add any paths that contain custom static files (such as style sheets) here,
+ # relative to this directory. They are copied after the builtin static files,

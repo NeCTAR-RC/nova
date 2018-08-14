@@ -1,0 +1,4 @@
+debian/source_nova.py /usr/share/apport/package-hooks/
+usr/bin/nova-api-wsgi
+usr/bin/nova-metadata-wsgi
+usr/lib/python*/dist-packages/*
