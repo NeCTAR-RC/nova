@@ -3116,7 +3116,10 @@ class API(base.Base):
             # Some old instances can still have no RequestSpec object attached
             # to them, we need to support the old way
             request_spec = None
-
+        except Exception:
+            # cellsv1 upgrade only
+            request_spec = None
+            
         self.compute_task_api.rebuild_instance(context, instance=instance,
                 new_pass=admin_password, injected_files=files_to_inject,
                 image_ref=image_href, orig_image_ref=orig_image_ref,
@@ -3326,7 +3329,10 @@ class API(base.Base):
             # Some old instances can still have no RequestSpec object attached
             # to them, we need to support the old way
             request_spec = None
-
+        except Exception:
+            # When in upgrade mode with cellsv1
+            request_spec = None
+            
         scheduler_hint = {'filter_properties': filter_properties}
         self.compute_task_api.resize_instance(context, instance,
                 extra_instance_updates, scheduler_hint=scheduler_hint,
@@ -3860,7 +3866,7 @@ class API(base.Base):
                                     vm_states.STOPPED],
                           task_state=[None])
     def attach_interface(self, context, instance, network_id, port_id,
-                         requested_ip):
+                         requested_ip, tag=None):
         """Use hotplug to add an network adapter to an instance."""
         return self._attach_interface(context, instance=instance,
             network_id=network_id, port_id=port_id, requested_ip=requested_ip)
@@ -3952,6 +3958,8 @@ class API(base.Base):
         except exception.RequestSpecNotFound:
             # Some old instances can still have no RequestSpec object attached
             # to them, we need to support the old way
+            request_spec = None
+        except Exception:
             request_spec = None
 
         # NOTE(sbauza): Force is a boolean by the new related API version
