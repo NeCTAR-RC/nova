@@ -3,5 +3,4 @@ skip-ssl-tests.patch
 drop-openstackdoctheme.patch
 arm-console-patch.patch
 aarch64-libvirt-compat.patch
-mock-utils.execute-in-qemu-img-unit-test.patch
 fix-manifest.patch
