@@ -4,3 +4,4 @@ drop-openstackdoctheme.patch
 arm-console-patch.patch
 aarch64-libvirt-compat.patch
 fix-manifest.patch
+add-testr.patch
