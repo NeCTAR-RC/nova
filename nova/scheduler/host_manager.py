@@ -639,7 +639,14 @@ class HostManager(object):
     def _load_cells(self, context):
         if not self.cells:
             # NOTE(danms): global list of cells cached forever right now
-            self.cells = objects.CellMappingList.get_all(context)
+            all_cells = objects.CellMappingList.get_all(context)
+            if CONF.cell_v2_name:
+                for cell in all_cells:
+                    if cell.name == CONF.cell_v2_name:
+                        self.cells = [cell,]
+                        break
+            else:
+                self.cells = all_cells
             LOG.debug('Found %(count)i cells: %(cells)s',
                       {'count': len(self.cells),
                        'cells': ', '.join([c.uuid for c in self.cells])})
