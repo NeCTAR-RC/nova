@@ -1841,6 +1841,9 @@ def _server_group_count_members_by_user(context, group, user_id):
     # counting resources if a cell is down. In the future, we should query
     # placement for cores/ram and InstanceMappings for instances (once we are
     # deleting InstanceMappings when we delete instances).
+    if CONF.cells.enable:
+        num_instances = group.count_members_by_user(user_id)
+        return {'user': {'server_group_members': num_instances}}
     cell_mappings = objects.CellMappingList.get_all(context)
     greenthreads = []
     filters = {'deleted': False, 'user_id': user_id, 'uuid': group.members}
