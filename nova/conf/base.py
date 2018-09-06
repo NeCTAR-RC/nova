@@ -91,6 +91,10 @@ Related options:
 * ``monkey_patch``: This must be set to ``True`` for this option to
   have any effect
 """),
+    cfg.StrOpt(
+        'cell_v2_name',
+        default=None,
+        help='Cell V2 name of this cell.'),
 ]
 
 
