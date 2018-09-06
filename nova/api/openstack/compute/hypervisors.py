@@ -30,6 +30,7 @@ from nova.api.openstack import wsgi
 from nova.api import validation
 from nova.cells import utils as cells_utils
 from nova import compute
+import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova.policies import hypervisors as hv_policies
@@ -38,7 +39,8 @@ from nova import utils
 
 LOG = logging.getLogger(__name__)
 
-UUID_FOR_ID_MIN_VERSION = '2.53'
+UUID_FOR_ID_MIN_VERSION = '2.54'
+CONF = nova.conf.CONF
 
 
 class HypervisorsController(wsgi.Controller):
@@ -203,7 +205,7 @@ class HypervisorsController(wsgi.Controller):
         limit, marker = common.get_limit_and_marker(req)
         return self._index(req, limit=limit, marker=marker, links=True)
 
-    @wsgi.Controller.api_version("2.33", "2.52")  # noqa
+    @wsgi.Controller.api_version("2.33", "2.53")  # noqa
     @extensions.expected_errors((400))
     def index(self, req):
         limit, marker = common.get_limit_and_marker(req)
@@ -232,7 +234,7 @@ class HypervisorsController(wsgi.Controller):
         limit, marker = common.get_limit_and_marker(req)
         return self._detail(req, limit=limit, marker=marker, links=True)
 
-    @wsgi.Controller.api_version("2.33", "2.52")  # noqa
+    @wsgi.Controller.api_version("2.33", "2.53")  # noqa
     @extensions.expected_errors((400))
     def detail(self, req):
         limit, marker = common.get_limit_and_marker(req)
@@ -293,7 +295,7 @@ class HypervisorsController(wsgi.Controller):
             req.GET.get('with_servers', False), strict=True)
         return self._show(req, id, with_servers)
 
-    @wsgi.Controller.api_version("2.1", "2.52")     # noqa F811
+    @wsgi.Controller.api_version("2.1", "2.53")     # noqa F811
     @extensions.expected_errors(404)
     def show(self, req, id):
         return self._show(req, id)
@@ -351,7 +353,7 @@ class HypervisorsController(wsgi.Controller):
         return dict(hypervisor=self._view_hypervisor(hyp, service, False, req,
                                                      uptime=uptime))
 
-    @wsgi.Controller.api_version('2.1', '2.52')
+    @wsgi.Controller.api_version('2.1', '2.53')
     @extensions.expected_errors(404)
     def search(self, req, id):
         """Prior to microversion 2.53 you could search for hypervisors by a
@@ -374,7 +376,7 @@ class HypervisorsController(wsgi.Controller):
             msg = _("No hypervisor matching '%s' could be found.") % id
             raise webob.exc.HTTPNotFound(explanation=msg)
 
-    @wsgi.Controller.api_version('2.1', '2.52')
+    @wsgi.Controller.api_version('2.1', '2.53')
     @extensions.expected_errors(404)
     def servers(self, req, id):
         """Prior to microversion 2.53 you could search for hypervisors by a
