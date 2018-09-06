@@ -15,9 +15,13 @@
 """The Extended Volumes API extension."""
 from nova.api.openstack import api_version_request
 from nova.api.openstack import wsgi
+import nova.conf
 from nova import context
 from nova import objects
 from nova.policies import extended_volumes as ev_policies
+
+
+CONF = nova.conf.CONF
 
 
 class ExtendedVolumesController(wsgi.Controller):
@@ -73,7 +77,13 @@ class ExtendedVolumesController(wsgi.Controller):
         context = req.environ['nova.context']
         if context.can(ev_policies.BASE_POLICY_NAME, fatal=False):
             servers = list(resp_obj.obj['servers'])
-            bdms = self._get_instance_bdms_in_multiple_cells(context, servers)
+            if CONF.cells.enable:
+                instance_uuids = [server['id'] for server in servers]
+                bdms = objects.BlockDeviceMappingList.bdms_by_instance_uuid(
+                    context, instance_uuids)
+            else:
+                bdms = self._get_instance_bdms_in_multiple_cells(context,
+                                                                 servers)
             for server in servers:
                 instance_bdms = self._get_instance_bdms(bdms, server)
                 self._extend_server(context, server, req, instance_bdms)
