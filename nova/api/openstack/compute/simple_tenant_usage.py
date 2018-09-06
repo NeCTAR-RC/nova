@@ -139,9 +139,15 @@ class SimpleTenantUsageController(wsgi.Controller):
     def _tenant_usages_for_period(self, context, period_start, period_stop,
                                   tenant_id=None, detailed=True, limit=None,
                                   marker=None):
-        instances = self._get_instances_all_cells(context, period_start,
-                                                  period_stop, tenant_id,
-                                                  limit, marker)
+
+        if CONF.cells.enable:
+            instances = objects.InstanceList.get_active_by_window_joined(
+                context, period_start, period_stop, tenant_id,
+                expected_attrs=['flavor'], limit=limit, marker=marker)
+        else:
+            instances = self._get_instances_all_cells(context, period_start,
+                                                      period_stop, tenant_id,
+                                                      limit, marker)
         rval = {}
         flavors = {}
         all_server_usages = []
