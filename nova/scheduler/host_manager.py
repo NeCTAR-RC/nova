@@ -19,6 +19,7 @@ Manage hosts in the current zone.
 
 import collections
 import functools
+import sys
 import time
 try:
     from collections import UserDict as IterableUserDict   # Python 3
@@ -639,7 +640,17 @@ class HostManager(object):
     def _load_cells(self, context):
         if not self.cells:
             # NOTE(danms): global list of cells cached forever right now
-            self.cells = objects.CellMappingList.get_all(context)
+            all_cells = objects.CellMappingList.get_all(context)
+            if CONF.cell_v2_name:
+                for cell in all_cells:
+                    if cell.name == CONF.cell_v2_name:
+                        self.cells = [cell]
+                        break
+            else:
+                self.cells = all_cells
+            if CONF.cells.enable and len(self.cells) != 1:
+                LOG.error('Need cell_v2_name set when running in cellsv1 mode')
+                sys.exit(1)
             LOG.debug('Found %(count)i cells: %(cells)s',
                       {'count': len(self.cells),
                        'cells': ', '.join([c.uuid for c in self.cells])})
