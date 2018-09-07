@@ -153,8 +153,12 @@ def get_availability_zones(context, get_only_available=False,
     from nova import compute
     hostapi = compute.HostAPI()
 
+    all_cells = True
+    if cell_type == 'compute':
+        all_cells = False
+
     enabled_services = hostapi.service_get_all(
-        context, {'disabled': False}, set_zones=True, all_cells=True)
+        context, {'disabled': False}, set_zones=True, all_cells=all_cells)
 
     available_zones = []
     for (zone, host) in [(service['availability_zone'], service['host'])
