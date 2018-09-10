@@ -6439,12 +6439,15 @@ def _archive_deleted_rows_for_table(tablename, max_rows, before):
     # NOTE(takashin): The record in table migrations should be
     # soft deleted when the instance is deleted.
     # This is just for upgrading.
+    instances = models.BASE.metadata.tables["instances"]
+    deleted_instances = sql.select([instances.c.uuid]).\
+        where(instances.c.deleted != instances.c.deleted.default.arg)
+    if before:
+        deleted_instances = \
+                deleted_instances.where(instances.c.deleted_at <= before)
     if tablename in ("instance_actions", "migrations"):
-        instances = models.BASE.metadata.tables["instances"]
-        deleted_instances = sql.select([instances.c.uuid]).\
-            where(instances.c.deleted != instances.c.deleted.default.arg)
         update_statement = table.update().values(deleted=table.c.id,
-                                            deleted_at=timeutils.utcnow()).\
+                                            deleted_at=before).\
             where(table.c.instance_uuid.in_(deleted_instances))
 
         conn.execute(update_statement)
@@ -6453,15 +6456,12 @@ def _archive_deleted_rows_for_table(tablename, max_rows, before):
         # NOTE(clecomte): we have to grab all the relation from
         # instances because instance_actions_events rely on
         # action_id and not uuid
-        instances = models.BASE.metadata.tables["instances"]
         instance_actions = models.BASE.metadata.tables["instance_actions"]
-        deleted_instances = sql.select([instances.c.uuid]).\
-            where(instances.c.deleted != instances.c.deleted.default.arg)
         deleted_actions = sql.select([instance_actions.c.id]).\
             where(instance_actions.c.instance_uuid.in_(deleted_instances))
 
         update_statement = table.update().values(deleted=table.c.id,
-                                            deleted_at=timeutils.utcnow()).\
+                                            deleted_at=before).\
             where(table.c.action_id.in_(deleted_actions))
 
         conn.execute(update_statement)
