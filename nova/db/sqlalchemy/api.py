@@ -6484,7 +6484,7 @@ def _archive_deleted_rows_for_table(tablename, max_rows, before):
         deleted_instances = sql.select([instances.c.uuid]).\
             where(instances.c.deleted != instances.c.deleted.default.arg)
         update_statement = table.update().values(deleted=table.c.id,
-                                            deleted_at=timeutils.utcnow()).\
+                                            deleted_at=before).\
             where(table.c.instance_uuid.in_(deleted_instances))
 
         conn.execute(update_statement)
@@ -6501,7 +6501,7 @@ def _archive_deleted_rows_for_table(tablename, max_rows, before):
             where(instance_actions.c.instance_uuid.in_(deleted_instances))
 
         update_statement = table.update().values(deleted=table.c.id,
-                                            deleted_at=timeutils.utcnow()).\
+                                            deleted_at=before).\
             where(table.c.action_id.in_(deleted_actions))
 
         conn.execute(update_statement)
