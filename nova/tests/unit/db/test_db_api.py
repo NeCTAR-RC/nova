@@ -22,6 +22,7 @@ import copy
 import datetime
 import uuid as stdlib_uuid
 
+from dateutil import parser as dateutil_parser
 import iso8601
 import mock
 import netaddr
@@ -9284,11 +9285,12 @@ class ArchiveTestCase(test.TestCase, ModelsObjectComparatorMixin):
                 where(self.shadow_instance_id_mappings.c.uuid.in_(
                                                                 self.uuidstrs))
         # Archive 1 row deleted before 2017-01-02
-        results = db.archive_deleted_rows(max_rows=1, before='2017-01-02')
+        before_date = dateutil_parser.parse('2017-01-02', fuzzy=True)
+        results = db.archive_deleted_rows(max_rows=1, before=before_date)
         expected = dict(instance_id_mappings=1)
         self._assertEqualObjects(expected, results[0])
         # Archive all other rows (1) deleted before 2017-01-02
-        results = db.archive_deleted_rows(max_rows=1000, before='2017-01-02')
+        results = db.archive_deleted_rows(max_rows=1000, before=before_date)
         expected = dict(instance_id_mappings=1)
         self._assertEqualObjects(expected, results[0])
         # Verify we have 4 left in main
