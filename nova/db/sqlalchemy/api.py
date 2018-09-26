@@ -6484,7 +6484,7 @@ def _archive_deleted_rows_for_table(tablename, max_rows, before):
         where(instances.c.deleted != instances.c.deleted.default.arg)
     if before:
         deleted_instances = \
-                deleted_instances.where(table.c.deleted_at <= before)
+                deleted_instances.where(instances.c.deleted_at <= before)
     if tablename in ("instance_actions", "migrations"):
         update_statement = table.update().values(deleted=table.c.id,
                                             deleted_at=before).\
