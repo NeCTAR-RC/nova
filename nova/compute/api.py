@@ -4339,14 +4339,17 @@ class API(base.Base):
         hosts = set()
         hosts.add(instance.host)
         if instance.migration_context is not None:
-            migration_id = instance.migration_context.migration_id
-            migration = objects.Migration.get_by_id(context, migration_id)
-            hosts.add(migration.dest_compute)
-            hosts.add(migration.source_compute)
-            LOG.debug('Instance %(instance)s is migrating, '
-                      'copying events to all relevant hosts: '
-                      '%(hosts)s', {'instance': instance.uuid,
-                                    'hosts': hosts})
+            try:
+                migration_id = instance.migration_context.migration_id
+                migration = objects.Migration.get_by_id(context, migration_id)
+                hosts.add(migration.dest_compute)
+                hosts.add(migration.source_compute)
+                LOG.debug('Instance %(instance)s is migrating, '
+                          'copying events to all relevant hosts: '
+                          '%(hosts)s', {'instance': instance.uuid,
+                                        'hosts': hosts})
+            except Exception:
+                pass
         return hosts
 
     def get_instance_host_status(self, instance):
