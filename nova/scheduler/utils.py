@@ -764,7 +764,7 @@ def setup_instance_group(context, request_spec):
     # member. The group_hosts passed in are the hosts that contain members of
     # the requested instance group.
     group_info = _get_group_details(context, instance_uuid, group_hosts)
-    if group_info is not None:
+    if group_info is not None and group_hosts:
         request_spec.instance_group.hosts = list(group_info.hosts)
         request_spec.instance_group.policies = group_info.policies
         request_spec.instance_group.members = group_info.members
