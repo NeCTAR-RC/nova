@@ -4555,7 +4555,7 @@ class HostAPI(base.Base):
         # NOTE(danms): Eventually this all_cells nonsense should go away
         # and we should always iterate over the cells. However, certain
         # callers need the legacy behavior for now.
-        if all_cells:
+        if all_cells and not CONF.cells.enable:
             services = []
             service_dict = nova_context.scatter_gather_all_cells(context,
                 objects.ServiceList.get_all, disabled, set_zones=set_zones)
