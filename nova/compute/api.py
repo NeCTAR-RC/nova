@@ -1967,8 +1967,9 @@ class API(base.Base):
                                     'instance mapping', instance=instance)
                         return
 
-                LOG.debug('Doing local delete in cell %s', cell.identity,
-                          instance=instance)
+                if cell:
+                    LOG.debug('Doing local delete in cell %s', cell.identity,
+                              instance=instance)
                 with nova_context.target_cell(context, cell) as cctxt:
                     self._local_delete(cctxt, instance, bdms, delete_type, cb)
 
