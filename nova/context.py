@@ -30,6 +30,7 @@ from oslo_log import log as logging
 from oslo_utils import timeutils
 import six
 
+import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova import objects
@@ -51,6 +52,7 @@ raised_exception_sentinel = object()
 # first time we look. This needs to be refreshed on a timer or
 # trigger.
 CELLS = []
+CONF = nova.conf.CONF
 
 
 class _ContextAuthPlugin(plugin.BaseAuthPlugin):
@@ -354,7 +356,7 @@ def set_target_cell(context, cell_mapping):
     :param cell_mapping: An objects.CellMapping object or None
     """
     global CELL_CACHE
-    if cell_mapping is not None:
+    if cell_mapping is not None and not CONF.cells.enable:
         # avoid circular import
         from nova import db
         from nova import rpc
