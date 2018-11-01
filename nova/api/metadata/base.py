@@ -685,6 +685,11 @@ def get_metadata_by_instance_id(instance_id, address, ctxt=None):
              'metadata', 'system_metadata',
              'security_groups', 'keypairs',
              'device_metadata']
+    if CONF.cells.enable:
+        instance = objects.Instance.get_by_uuid(ctxt, instance_id,
+                                                expected_attrs=attrs)
+        return InstanceMetadata(instance, address)
+
     try:
         im = objects.InstanceMapping.get_by_instance_uuid(ctxt, instance_id)
     except exception.InstanceMappingNotFound:

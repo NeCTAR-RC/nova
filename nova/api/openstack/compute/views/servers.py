@@ -23,6 +23,7 @@ from nova.api.openstack import common
 from nova.api.openstack.compute.views import addresses as views_addresses
 from nova.api.openstack.compute.views import flavors as views_flavors
 from nova.api.openstack.compute.views import images as views_images
+import nova.conf
 from nova import context as nova_context
 from nova import exception
 from nova.i18n import _LW
@@ -31,6 +32,7 @@ from nova.objects import base as obj_base
 from nova import utils
 
 
+CONF = nova.conf.CONF
 LOG = logging.getLogger(__name__)
 
 
@@ -264,15 +266,16 @@ class ViewBuilder(common.ViewBuilder):
         }
 
     def _load_fault(self, request, instance):
-        try:
-            mapping = objects.InstanceMapping.get_by_instance_uuid(
+        if not CONF.cells.enable:
+            try:
+                mapping = objects.InstanceMapping.get_by_instance_uuid(
                 request.environ['nova.context'], instance.uuid)
-            if mapping.cell_mapping is not None:
-                with nova_context.target_cell(instance._context,
-                                              mapping.cell_mapping):
-                    return instance.fault
-        except exception.InstanceMappingNotFound:
-            pass
+                if mapping.cell_mapping is not None:
+                    with nova_context.target_cell(instance._context,
+                                                  mapping.cell_mapping):
+                        return instance.fault
+            except exception.InstanceMappingNotFound:
+                pass
 
         # NOTE(danms): No instance mapping at all, or a mapping with no cell,
         # which means a legacy environment or instance.
