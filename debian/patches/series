@@ -1,0 +1,5 @@
+# Ubuntu specific patches below here. Note these can be dropped eventually.
+skip-ssl-tests.patch
+arm-console-patch.patch
+revert-generalize-db-conf-group-copying.patch
+mock-utils.execute-in-qemu-img-unit-test.patch

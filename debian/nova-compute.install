@@ -1,0 +1,2 @@
+usr/bin/nova-compute
+usr/etc/nova/rootwrap.d/compute.filters etc/nova/rootwrap.d

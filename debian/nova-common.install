@@ -1,0 +1,10 @@
+debian/nova_sudoers etc/sudoers.d
+etc/nova/nova.conf     etc/nova
+etc/nova/policy.yaml.sample usr/share/nova
+usr/bin/nova-manage
+usr/bin/nova-policy
+usr/bin/nova-rootwrap
+usr/bin/nova-rootwrap-daemon
+usr/bin/nova-status
+usr/etc/nova/api-paste.ini etc/nova
+usr/etc/nova/rootwrap.conf etc/nova

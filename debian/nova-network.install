@@ -1,0 +1,3 @@
+usr/bin/nova-dhcpbridge
+usr/bin/nova-network
+usr/etc/nova/rootwrap.d/network.filters etc/nova/rootwrap.d
