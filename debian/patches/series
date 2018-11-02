@@ -2,5 +2,4 @@
 skip-ssl-tests.patch
 arm-console-patch.patch
 revert-generalize-db-conf-group-copying.patch
-mock-utils.execute-in-qemu-img-unit-test.patch
 fix-manifest.patch
