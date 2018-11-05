@@ -123,7 +123,9 @@ class ServerTagsController(wsgi.Controller):
     def update(self, req, server_id, id, body):
         context = req.environ["nova.context"]
         context.can(st_policies.POLICY_ROOT % 'update')
-        im = _get_instance_mapping(context, server_id)
+        im = None
+        if not CONF.cells.enable:
+            im = _get_instance_mapping(context, server_id)
 
         if CONF.cells.enable:
             instance = self._check_instance_in_valid_state(
