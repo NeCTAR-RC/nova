@@ -171,7 +171,10 @@ class InstanceActionEvent(base.NovaPersistentObject, base.NovaObject,
     def event_start(cls, context, instance_uuid, event_name, want_result=True):
         values = cls.pack_action_event_start(context, instance_uuid,
                                              event_name)
-        db_event = db.action_event_start(context, values)
+        try:
+            db_event = db.action_event_start(context, values)
+        except Exception:
+            return
         if want_result:
             return cls._from_db_object(context, cls(), db_event)
 
@@ -182,7 +185,10 @@ class InstanceActionEvent(base.NovaPersistentObject, base.NovaObject,
         values = cls.pack_action_event_finish(context, instance_uuid,
                                               event_name, exc_val=exc_val,
                                               exc_tb=exc_tb)
-        db_event = db.action_event_finish(context, values)
+        try:
+            db_event = db.action_event_finish(context, values)
+        except Exception:
+            return
         if want_result:
             return cls._from_db_object(context, cls(), db_event)
 
