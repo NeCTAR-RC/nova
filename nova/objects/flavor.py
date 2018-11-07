@@ -211,7 +211,7 @@ class Flavor(base.NovaPersistentObject, base.NovaObject,
     # Version 1.0: Initial version
     # Version 1.1: Added save_projects(), save_extra_specs(), removed
     #              remotable from save()
-    VERSION = '1.1'
+    VERSION = '1.2'
 
     fields = {
         'id': fields.IntegerField(),
@@ -235,6 +235,11 @@ class Flavor(base.NovaPersistentObject, base.NovaObject,
         self._orig_extra_specs = {}
         self._orig_projects = []
         self._in_api = False
+
+    def obj_make_compatible(self, primitive, target_version):
+        super(Flavor, self).obj_make_compatible(primitive, target_version)
+        if 'description' in primitive:
+            del primitive['description']
 
     @property
     def in_api(self):
