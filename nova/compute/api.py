@@ -2556,24 +2556,7 @@ class API(base.Base):
                                                            fields,
                                                            sort_keys,
                                                            sort_dirs):
-        try:
-            cell0_mapping = objects.CellMapping.get_by_uuid(context,
-                objects.CellMapping.CELL0_UUID)
-        except exception.CellMappingNotFound:
-            cell0_instances = objects.InstanceList(objects=[])
-        else:
-            with nova_context.target_cell(context, cell0_mapping) as cctxt:
-                try:
-                    cell0_instances = self._get_instances_by_filters(
-                        cctxt, filters, limit=limit, marker=marker,
-                        fields=fields, sort_keys=sort_keys,
-                        sort_dirs=sort_dirs)
-                    # If we found the marker in cell0 we need to set it to None
-                    # so we don't expect to find it in the cells below.
-                    marker = None
-                except exception.MarkerNotFound:
-                    # We can ignore this since we need to look in the cell DB
-                    cell0_instances = objects.InstanceList(objects=[])
+        cell0_instances = objects.InstanceList(objects=[])
         # Only subtract from limit if it is not None
         limit = (limit - len(cell0_instances)) if limit else limit
 
