@@ -5578,6 +5578,15 @@ class ComputeAPIAPICellUnitTestCase(_ComputeAPIUnitTestMixIn,
             self.context, requested_networks, 5)
         self.assertEqual(5, count)
 
+    def test_get_all_includes_cell0(self):
+        pass
+
+    def test_get_all_cell0_marker_not_found(self):
+        pass
+
+    def test_get_all_includes_build_request_cell0(self):
+        pass
+
 
 class ComputeAPIComputeCellUnitTestCase(_ComputeAPIUnitTestMixIn,
                                         test.NoDBTestCase):
@@ -5589,6 +5598,15 @@ class ComputeAPIComputeCellUnitTestCase(_ComputeAPIUnitTestMixIn,
 
     def test_resize_same_flavor_passes(self):
         self._test_resize(same_flavor=True)
+
+    def test_get_all_includes_cell0(self):
+        pass
+
+    def test_get_all_cell0_marker_not_found(self):
+        pass
+
+    def test_get_all_includes_build_request_cell0(self):
+        pass
 
 
 class DiffDictTestCase(test.NoDBTestCase):
