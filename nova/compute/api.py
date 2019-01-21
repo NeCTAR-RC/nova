@@ -4519,6 +4519,8 @@ class API(base.Base):
         load_cells()
 
         migrations = []
+        if CONF.cells.enable:
+            return objects.MigrationList.get_by_filters(context, filters)
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
