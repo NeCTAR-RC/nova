@@ -19,9 +19,13 @@ from nova.api.openstack.compute.views import migrations as migrations_view
 from nova.api.openstack import wsgi
 from nova.api import validation
 from nova import compute
+import nova.conf
 from nova import exception
 from nova.objects import base as obj_base
 from nova.policies import migrations as migrations_policies
+
+
+CONF = nova.conf.CONF
 
 
 class MigrationsController(wsgi.Controller):
@@ -92,7 +96,7 @@ class MigrationsController(wsgi.Controller):
                 # it from search_opts.
                 del search_opts['changes-since']
 
-        if sort_keys:
+        if sort_keys and not CONF.cells.enable:
             try:
                 migrations = self.compute_api.get_migrations_sorted(
                     context, search_opts,
