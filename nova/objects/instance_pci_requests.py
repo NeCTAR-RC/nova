@@ -71,6 +71,13 @@ class InstancePCIRequests(base.NovaObject,
                 request.obj_make_compatible(
                     primitive['requests'][index]['nova_object.data'], '1.0')
                 primitive['requests'][index]['nova_object.version'] = '1.0'
+        # (sorrison): Bug when in upgrade levels so downgrade it to pike
+        #             version always for queens
+        elif target_version < (1, 2):
+            for index, request in enumerate(self.requests):
+                request.obj_make_compatible(
+                    primitive['requests'][index]['nova_object.data'], '1.1')
+                primitive['requests'][index]['nova_object.version'] = '1.1'
 
     @classmethod
     def obj_from_db(cls, context, instance_uuid, db_requests):
