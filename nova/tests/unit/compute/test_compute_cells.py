@@ -528,6 +528,12 @@ class CellsComputeAPITestCase(test_compute.ComputeAPITestCase):
               self).test_multi_instance_display_name_template(
                   cells_enabled=True)
 
+    def test_live_migrate_with_not_forced_host(self):
+        self.skipTest("We can't check hosts in the API cell.")
+
+    def test_fail_live_migrate_with_non_existing_destination(self):
+        self.skipTest("We can't check hosts in the API cell.")
+
 
 class CellsShelveComputeAPITestCase(test_shelve.ShelveComputeAPITestCase):
     def setUp(self):
