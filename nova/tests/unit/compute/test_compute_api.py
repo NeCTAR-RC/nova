@@ -6418,6 +6418,9 @@ class ComputeAPIAPICellUnitTestCase(Cellsv1DeprecatedTestMixIn,
                           self.compute_api.attach_volume, self.context,
                           instance, volume['id'], tag='foo')
 
+    def test_live_migrate_computehost_notfound(self):
+        self.skipTest("We can't check hosts in the API cell.")
+
     def test_create_with_networks_max_count_none(self):
         self.skipTest("This test does not test any rpcapi.")
 
