@@ -1295,7 +1295,7 @@ class CellV2Commands(object):
 
     @args('--cell_uuid', metavar='<cell_uuid>', dest='cell_uuid',
           help='If provided only this cell will be searched for new hosts to '
-               'map.')
+               'map.', required=True)
     @args('--verbose', action='store_true',
           help=_('Provide detailed output when discovering hosts.'))
     @args('--strict', action='store_true',
