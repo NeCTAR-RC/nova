@@ -6467,6 +6467,15 @@ class ComputeAPIAPICellUnitTestCase(Cellsv1DeprecatedTestMixIn,
     def test_get_all_includes_build_request_cell0(self):
         pass
 
+    def test_migrate_with_host_name(self):
+        pass
+
+    def test_migrate_nonexistent_host(self):
+        pass
+
+    def test_migrate_request_spec_not_found_with_target_host(self):
+        pass
+
 
 class ComputeAPIComputeCellUnitTestCase(Cellsv1DeprecatedTestMixIn,
                                         _ComputeAPIUnitTestMixIn,

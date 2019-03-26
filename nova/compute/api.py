@@ -3370,7 +3370,7 @@ class API(base.Base):
             # because it is useless.
             if host_name == instance.host:
                 raise exception.CannotMigrateToSameHost()
-
+        if host_name is not None and self.cell_type != 'api':
             # Check whether host exists or not.
             node = objects.ComputeNode.get_first_node_by_host_for_old_compat(
                 context, host_name, use_slave=True)
@@ -3480,8 +3480,12 @@ class API(base.Base):
                 # the specified host is within the same cell as
                 # the instance or not. If not, raise specific error message
                 # that is clear to the caller.
-                request_spec.requested_destination = objects.Destination(
-                    host=node.host, node=node.hypervisor_hostname)
+                if self.cell_type == 'api':
+                    request_spec.requested_destination = objects.Destination(
+                        host=host_name)
+                else:
+                    request_spec.requested_destination = objects.Destination(
+                        host=node.host, node=node.hypervisor_hostname)
 
         self.compute_task_api.resize_instance(context, instance,
                 extra_instance_updates, scheduler_hint=scheduler_hint,
