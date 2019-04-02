@@ -19,6 +19,8 @@ import collections
 
 import six
 
+from keystoneauth1 import session
+from keystoneclient.v3 import client
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 
@@ -27,6 +29,7 @@ from nova.cells import opts as cell_opts
 import nova.conf
 from nova import db
 from nova import objects
+from nova import service_auth
 
 
 # NOTE(vish): azs don't change that often, so cache them for an hour to
@@ -130,6 +133,7 @@ def get_availability_zones(context, get_only_available=False,
     # Override for cells
     cell_type = cell_opts.get_cell_type()
     if cell_type == 'api':
+        cache = _get_cache()
         ctxt = context.elevated()
         global_azs = []
         mute_azs = []
@@ -143,8 +147,23 @@ def get_availability_zones(context, get_only_available=False,
                 mute_azs.extend(capabilities['availability_zones'])
             else:
                 global_azs.extend(capabilities['availability_zones'])
+        zones = cache.get('%s-az-list' % context.project_id)
+
+        if not zones:
+            auth_plugin = service_auth.get_auth_plugin(context)
+            if not auth_plugin:
+                raise exception.Unauthorized()
+            sess = session.Session(auth=auth_plugin)
+            project = client.Client(session=sess).projects.get(context.project_id)
+            zones = getattr(project, 'compute_az', 'all')
+            cache.set('%s-az-list' % context.project_id, zones)
+
+        if zones:
+            available_zones = zones.split(',')
+        else:
             available_zones = list(set(global_azs))
-            unavailable_zones = list(set(mute_azs))
+        unavailable_zones = list(set(mute_azs))
+
         if get_only_available:
             return available_zones
         return (available_zones, unavailable_zones)
