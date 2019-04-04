@@ -2295,6 +2295,7 @@ class _ComputeAPIUnitTestMixIn(object):
                                           name='foo', root_gb=0)
 
         get_flavor_by_flavor_id.return_value = fake_flavor
+        get_by_inst.return_value = objects.RequestSpec()
 
         @mock.patch.object(compute_utils, 'is_volume_backed_instance',
                            return_value=True)

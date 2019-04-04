@@ -1303,12 +1303,14 @@ class CellsTargetedMethodsTestCase(test.NoDBTestCase):
     def test_unpause_instance(self):
         self._test_instance_action_method('unpause', (), {}, (), {}, False)
 
-    def _test_resize_instance(self, clean_shutdown=True):
+    def _test_resize_instance(self, clean_shutdown=True, request_spec=None):
         kwargs = dict(flavor=dict(id=42, flavorid='orangemocchafrappuccino'),
                       extra_instance_updates=dict(cow='moo'),
-                      clean_shutdown=clean_shutdown)
+                      clean_shutdown=clean_shutdown,
+                      request_spec=request_spec)
         expected_kwargs = dict(flavor_id='orangemocchafrappuccino', cow='moo',
-                               clean_shutdown=clean_shutdown)
+                               clean_shutdown=clean_shutdown,
+                               request_spec=request_spec)
         self._test_instance_action_method('resize', (), kwargs,
                                           (), expected_kwargs,
                                           False)
@@ -1318,6 +1320,9 @@ class CellsTargetedMethodsTestCase(test.NoDBTestCase):
 
     def test_resize_instance_forced_shutdown(self):
         self._test_resize_instance(clean_shutdown=False)
+
+    def test_resize_instance_request_spec(self):
+        self._test_resize_instance(request_spec='fake')
 
     def test_live_migrate_instance(self):
         kwargs = dict(block_migration='fake-block-mig',
@@ -2153,12 +2158,15 @@ class CellsPublicInterfacesTestCase(test.NoDBTestCase):
         flavor = 'fake'
         extra_instance_updates = {'fake': 'fake'}
         clean_shutdown = True
+        request_spec = 'fake-spec'
         self.msg_runner.resize_instance(self.ctxt, instance, flavor,
                                         extra_instance_updates,
-                                        clean_shutdown=clean_shutdown)
+                                        clean_shutdown=clean_shutdown,
+                                        request_spec=request_spec)
         extra_kwargs = dict(flavor=flavor,
                             extra_instance_updates=extra_instance_updates,
-                            clean_shutdown=clean_shutdown)
+                            clean_shutdown=clean_shutdown,
+                            request_spec=request_spec)
         method_kwargs = {'instance': instance}
         method_kwargs.update(extra_kwargs)
         mock_message.assert_called_once_with(self.msg_runner, self.ctxt,

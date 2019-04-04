@@ -123,6 +123,7 @@ class CellsAPI(object):
         1.37.
 
         * 1.38 - Handle uuid parameter in compute_node_get() method.
+        * 1.39 - Handle request_spec in resize_instance
     '''
 
     VERSION_ALIASES = {
@@ -600,11 +601,15 @@ class CellsAPI(object):
         # cell conductor providing a new RequestSpec like the original
         # behaviour
         flavor_p = jsonutils.to_primitive(flavor)
-        version = '1.33'
+        version = '1.39'
         msg_args = {'instance': instance,
                     'flavor': flavor_p,
                     'extra_instance_updates': extra_instance_updates,
-                    'clean_shutdown': clean_shutdown}
+                    'clean_shutdown': clean_shutdown,
+                    'request_spec': request_spec}
+        if not self.client.can_send_version(version):
+            del msg_args['request_spec']
+            version = '1.38'
         if not self.client.can_send_version(version):
             del msg_args['clean_shutdown']
             version = '1.20'

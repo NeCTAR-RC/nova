@@ -887,11 +887,13 @@ class _TargetedMessageMethods(_BaseMessageMethods):
         self._call_compute_api_with_obj(message.ctxt, instance, 'unpause')
 
     def resize_instance(self, message, instance, flavor,
-                        extra_instance_updates, clean_shutdown=True):
+                        extra_instance_updates, clean_shutdown=True,
+                        request_spec=None):
         """Resize an instance via compute_api.resize()."""
         self._call_compute_api_with_obj(message.ctxt, instance, 'resize',
                                         flavor_id=flavor['flavorid'],
                                         clean_shutdown=clean_shutdown,
+                                        request_spec=request_spec,
                                         **extra_instance_updates)
 
     def live_migrate_instance(self, message, instance, block_migration,
@@ -1806,12 +1808,14 @@ class MessageRunner(object):
         self._instance_action(ctxt, instance, 'unpause_instance')
 
     def resize_instance(self, ctxt, instance, flavor,
-                       extra_instance_updates,
-                       clean_shutdown=True):
+                        extra_instance_updates,
+                        clean_shutdown=True,
+                        request_spec=None):
         """Resize an instance in its cell."""
         extra_kwargs = dict(flavor=flavor,
                             extra_instance_updates=extra_instance_updates,
-                            clean_shutdown=clean_shutdown)
+                            clean_shutdown=clean_shutdown,
+                            request_spec=request_spec)
         self._instance_action(ctxt, instance, 'resize_instance',
                               extra_kwargs=extra_kwargs)
 

@@ -686,31 +686,34 @@ class CellsAPITestCase(test.NoDBTestCase):
                                           'fake-hint',
                                           'fake-flavor',
                                           'fake-reservations',
-                                          clean_shutdown=True)
-        expected_args = {'instance': 'fake-instance',
-                         'flavor': 'fake-flavor',
-                         'extra_instance_updates': dict(cow='moo'),
-                         'clean_shutdown': True}
-        self._check_result(call_info, 'resize_instance',
-                           expected_args, version='1.33')
-
-    def test_resize_instance_not_passing_request_spec(self):
-        call_info = self._stub_rpc_method('cast', None)
-
-        self.cells_rpcapi.resize_instance(self.fake_context,
-                                          'fake-instance',
-                                          dict(cow='moo'),
-                                          'fake-hint',
-                                          'fake-flavor',
-                                          'fake-reservations',
                                           clean_shutdown=True,
                                           request_spec='fake-spec')
         expected_args = {'instance': 'fake-instance',
                          'flavor': 'fake-flavor',
                          'extra_instance_updates': dict(cow='moo'),
-                         'clean_shutdown': True}
+                         'clean_shutdown': True,
+                         'request_spec': 'fake-spec'}
         self._check_result(call_info, 'resize_instance',
-                           expected_args, version='1.33')
+                           expected_args, version='1.39')
+
+    def test_resize_instance_old(self):
+        call_info = self._stub_rpc_method('cast', None)
+        with mock.patch.object(self.cells_rpcapi.client, 'can_send_version',
+                               return_value=False):
+
+            self.cells_rpcapi.resize_instance(self.fake_context,
+                                              'fake-instance',
+                                              dict(cow='moo'),
+                                              'fake-hint',
+                                              'fake-flavor',
+                                              'fake-reservations',
+                                              clean_shutdown=True,
+                                              request_spec='fake-spec')
+            expected_args = {'instance': 'fake-instance',
+                             'flavor': 'fake-flavor',
+                             'extra_instance_updates': dict(cow='moo')}
+            self._check_result(call_info, 'resize_instance',
+                               expected_args, version='1.20')
 
     def test_live_migrate_instance(self):
         call_info = self._stub_rpc_method('cast', None)
