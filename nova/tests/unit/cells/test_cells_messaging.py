@@ -1304,13 +1304,20 @@ class CellsTargetedMethodsTestCase(test.NoDBTestCase):
         self._test_instance_action_method('unpause', (), {}, (), {}, False)
 
     def _test_resize_instance(self, clean_shutdown=True, request_spec=None):
+        if (request_spec and 'requested_destination' in request_spec and
+            request_spec.requested_destination and
+            'host' in request_spec.requested_destination):
+            host_name = request_spec.requested_destination.host
+        else:
+            host_name = None
+
         kwargs = dict(flavor=dict(id=42, flavorid='orangemocchafrappuccino'),
                       extra_instance_updates=dict(cow='moo'),
-                      clean_shutdown=clean_shutdown,
-                      request_spec=request_spec)
+                      clean_shutdown=clean_shutdown, request_spec=request_spec)
+
         expected_kwargs = dict(flavor_id='orangemocchafrappuccino', cow='moo',
                                clean_shutdown=clean_shutdown,
-                               request_spec=request_spec)
+                               host_name=host_name)
         self._test_instance_action_method('resize', (), kwargs,
                                           (), expected_kwargs,
                                           False)
@@ -1321,8 +1328,15 @@ class CellsTargetedMethodsTestCase(test.NoDBTestCase):
     def test_resize_instance_forced_shutdown(self):
         self._test_resize_instance(clean_shutdown=False)
 
-    def test_resize_instance_request_spec(self):
-        self._test_resize_instance(request_spec='fake')
+    def test_resize_instance_request_spec_with_host(self):
+        request_spec = objects.RequestSpec()
+        request_spec.requested_destination = objects.Destination(
+            host='my_host')
+        self._test_resize_instance(request_spec=request_spec)
+
+    def test_resize_instance_request_spec_empty(self):
+        request_spec = objects.RequestSpec()
+        self._test_resize_instance(request_spec=request_spec)
 
     def test_live_migrate_instance(self):
         kwargs = dict(block_migration='fake-block-mig',

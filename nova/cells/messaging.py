@@ -890,10 +890,16 @@ class _TargetedMessageMethods(_BaseMessageMethods):
                         extra_instance_updates, clean_shutdown=True,
                         request_spec=None):
         """Resize an instance via compute_api.resize()."""
+        host_name = None
+        if (request_spec and 'requested_destination' in request_spec and
+            request_spec.requested_destination and
+            'host' in request_spec.requested_destination):
+            host_name = request_spec.requested_destination.host
+
         self._call_compute_api_with_obj(message.ctxt, instance, 'resize',
                                         flavor_id=flavor['flavorid'],
                                         clean_shutdown=clean_shutdown,
-                                        request_spec=request_spec,
+                                        host_name=host_name,
                                         **extra_instance_updates)
 
     def live_migrate_instance(self, message, instance, block_migration,
