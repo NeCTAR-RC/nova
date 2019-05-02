@@ -29,7 +29,6 @@ from nova.api.openstack import wsgi
 from nova.api import validation
 from nova.cells import utils as cells_utils
 from nova import compute
-import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova.policies import hypervisors as hv_policies
@@ -37,7 +36,6 @@ from nova import servicegroup
 from nova import utils
 
 LOG = logging.getLogger(__name__)
-CONF = nova.conf.CONF
 
 UUID_FOR_ID_MIN_VERSION = '2.53'
 
@@ -56,11 +54,8 @@ class HypervisorsController(wsgi.Controller):
                          **kwargs):
         alive = self.servicegroup_api.service_is_up(service)
         # The 2.53 microversion returns the compute node uuid rather than id.
-        if CONF.cells.enable:
-            uuid_for_id = False
-        else:
-            uuid_for_id = api_version_request.is_supported(
-                req, min_version=UUID_FOR_ID_MIN_VERSION)
+        uuid_for_id = api_version_request.is_supported(
+            req, min_version=UUID_FOR_ID_MIN_VERSION)
         hyp_dict = {
             'id': hypervisor.uuid if uuid_for_id else hypervisor.id,
             'hypervisor_hostname': hypervisor.hypervisor_hostname,
@@ -127,7 +122,7 @@ class HypervisorsController(wsgi.Controller):
         # The 2.53 microversion moves the search and servers routes into
         # GET /os-hypervisors and GET /os-hypervisors/detail with query
         # parameters.
-        if not CONF.cells.enable and api_version_request.is_supported(
+        if api_version_request.is_supported(
                 req, min_version=UUID_FOR_ID_MIN_VERSION):
             hypervisor_match = req.GET.get('hypervisor_hostname_pattern')
             with_servers = strutils.bool_from_string(
@@ -265,11 +260,8 @@ class HypervisorsController(wsgi.Controller):
         :raises: webob.exc.HTTPNotFound if the requested microversion is
             less than 2.53 and the id is not an integer.
         """
-        if CONF.cells.enable:
-            expect_uuid = False
-        else:
-            expect_uuid = api_version_request.is_supported(
-                req, min_version=UUID_FOR_ID_MIN_VERSION)
+        expect_uuid = api_version_request.is_supported(
+            req, min_version=UUID_FOR_ID_MIN_VERSION)
         if expect_uuid:
             if not uuidutils.is_uuid_like(hypervisor_id):
                 msg = _('Invalid uuid %s') % hypervisor_id
