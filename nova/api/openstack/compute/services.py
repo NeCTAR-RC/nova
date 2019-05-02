@@ -84,11 +84,9 @@ class ServiceController(wsgi.Controller):
             active = 'disabled'
         updated_time = self.servicegroup_api.get_updated_time(svc)
 
-        if CONF.cells.enable:
-            uuid_for_id = False
-        else:
-            uuid_for_id = api_version_request.is_supported(
-                req, min_version=UUID_FOR_ID_MIN_VERSION)
+        uuid_for_id = api_version_request.is_supported(
+            req, min_version=UUID_FOR_ID_MIN_VERSION)
+
         if 'availability_zone' not in svc:
             # The service wasn't loaded with the AZ so we need to do it here.
             # Yes this looks weird, but set_availability_zones makes a copy of
@@ -308,11 +306,10 @@ class ServiceController(wsgi.Controller):
         perform a given update, which is defined in the body of the request.
         """
         service_id = id
-        if not CONF.cells.enable:
-            # Validate that the service ID is a UUID.
-            if not uuidutils.is_uuid_like(service_id):
-                msg = _('Invalid uuid %s') % service_id
-                raise webob.exc.HTTPBadRequest(explanation=msg)
+        # Validate that the service ID is a UUID.
+        if not uuidutils.is_uuid_like(service_id):
+            msg = _('Invalid uuid %s') % service_id
+            raise webob.exc.HTTPBadRequest(explanation=msg)
 
         # Validate the request context against the policy.
         context = req.environ['nova.context']
@@ -342,15 +339,6 @@ class ServiceController(wsgi.Controller):
                    {'binary': service.binary})
             raise webob.exc.HTTPBadRequest(explanation=msg)
 
-        if CONF.cells.enable:
-            if body['status'] == 'disabled':
-                action = 'disable'
-            elif body['status'] == 'enabled':
-                action = 'enable'
-            body['host'] = service.host
-            body['binary'] = service['binary']
-            actions = self.actions
-            return self._perform_action(req, action, body, actions)
         # Now determine the update to perform based on the body. We are
         # intentionally not using _perform_action or the other old-style
         # action functions.
