@@ -5794,7 +5794,7 @@ class ComputeAPIUnitTestCase(_ComputeAPIUnitTestMixIn, test.NoDBTestCase):
         compute_api.CELLS = [mock.sentinel.cell0, mock.sentinel.cell1]
 
         @contextlib.contextmanager
-        def fake_target(context, cell):
+        def fake_target(context, cell, cell_v1_enable=False):
             yield 'context-for-%s' % cell
 
         with mock.patch('nova.context.target_cell') as mock_target:
@@ -6475,6 +6475,30 @@ class ComputeAPIAPICellUnitTestCase(Cellsv1DeprecatedTestMixIn,
         pass
 
     def test_migrate_request_spec_not_found_with_target_host(self):
+        pass
+
+    def test_validate_bdm_with_error_volume_new_flow(self):
+        pass
+
+    def test_validate_bdm_with_error_volume(self):
+        pass
+
+    def test_provision_instances_with_error_volume(self):
+        pass
+
+    def test_provision_instances_with_error_volume_new_flow(self):
+        pass
+
+    def test_validate_bdm_returns_attachment_id(self):
+        pass
+
+    def test_provision_instances_creates_build_request(self):
+        pass
+
+    def test_provision_instances_cleans_up_when_volume_invalid_new_flow(self):
+        pass
+
+    def test_provision_instances_cleans_up_when_volume_invalid(self):
         pass
 
 

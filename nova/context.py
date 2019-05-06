@@ -343,7 +343,7 @@ def authorize_quota_class_context(context, class_name):
             raise exception.Forbidden()
 
 
-def set_target_cell(context, cell_mapping):
+def set_target_cell(context, cell_mapping, cell_v1_enable=CONF.cells.enable):
     """Adds database connection information to the context
     for communicating with the given target_cell.
 
@@ -356,7 +356,10 @@ def set_target_cell(context, cell_mapping):
     :param cell_mapping: An objects.CellMapping object or None
     """
     global CELL_CACHE
-    if cell_mapping is not None and not CONF.cells.enable:
+    compute_cell = False
+    if CONF.cells.enable and CONF.cells.cell_type == 'compute':
+        compute_cell = True
+    if cell_mapping is not None and not cell_v1_enable and not compute_cell:
         # avoid circular import
         from nova import db
         from nova import rpc
@@ -386,7 +389,7 @@ def set_target_cell(context, cell_mapping):
 
 
 @contextmanager
-def target_cell(context, cell_mapping):
+def target_cell(context, cell_mapping, cell_v1_enable=CONF.cells.enable):
     """Yields a new context with connection information for a specific cell.
 
     This function yields a copy of the provided context, which is targeted to
@@ -405,7 +408,7 @@ def target_cell(context, cell_mapping):
     # Specifically, this won't include any oslo_db-set transaction context, or
     # any existing cell targeting.
     cctxt = RequestContext.from_dict(context.to_dict())
-    set_target_cell(cctxt, cell_mapping)
+    set_target_cell(cctxt, cell_mapping, cell_v1_enable=cell_v1_enable)
     yield cctxt
 
 
@@ -432,11 +435,13 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
     greenthreads = []
     queue = eventlet.queue.LightQueue()
     results = {}
+    cell_v1_enable = kwargs.pop('cell_v1_enable', CONF.cells.enable)
 
     def gather_result(cell_mapping, fn, context, *args, **kwargs):
         cell_uuid = cell_mapping.uuid
         try:
-            with target_cell(context, cell_mapping) as cctxt:
+            with target_cell(context, cell_mapping,
+                             cell_v1_enable=cell_v1_enable) as cctxt:
                 result = fn(cctxt, *args, **kwargs)
         except Exception:
             LOG.exception('Error gathering result from cell %s', cell_uuid)
