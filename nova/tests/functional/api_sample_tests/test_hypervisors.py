@@ -120,15 +120,8 @@ class HypervisorsCellsSampleJsonTests(api_sample_base.ApiSampleTestBaseV21):
                                 disabled_reason=None),
                 'cell1')
 
-        self.stub_out(
-            'nova.compute.cells_api.HostAPI.compute_node_get',
-            fake_compute_node_get)
-        self.stub_out(
-            'nova.compute.cells_api.HostAPI.service_get_by_compute_host',
-            fake_service_get_by_compute_host)
-        self.stub_out(
-            'nova.compute.cells_api.HostAPI.get_host_uptime',
-            fake_get_host_uptime)
+        self.stub_out('nova.compute.api.HostAPI.get_host_uptime',
+                      fake_get_host_uptime)
 
         hypervisor_id = fake_hypervisor.id
         response = self._do_get('os-hypervisors/%s/uptime' % hypervisor_id)
