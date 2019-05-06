@@ -1356,8 +1356,8 @@ class API(base.Base):
                     # is not high enough we will just perform the old check as
                     # opposed to reserving the volume here.
                     volume = self.volume_api.get(context, volume_id)
-                    if (min_compute_version >=
-                        BFV_RESERVE_MIN_COMPUTE_VERSION):
+                    if (min_compute_version >= BFV_RESERVE_MIN_COMPUTE_VERSION
+                            and self.cell_type != 'api'):
                         self._check_attach_and_reserve_volume(
                             context, volume, instance, bdm,
                             supports_multiattach)
@@ -4707,7 +4707,8 @@ def target_host_cell(fn):
     @functools.wraps(fn)
     def targeted(self, context, host, *args, **kwargs):
         mapping = objects.HostMapping.get_by_host(context, host)
-        nova_context.set_target_cell(context, mapping.cell_mapping)
+        nova_context.set_target_cell(context, mapping.cell_mapping,
+                                     cell_v1_enable=False)
         return fn(self, context, host, *args, **kwargs)
     return targeted
 
@@ -4750,7 +4751,8 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
     for cell in CELLS:
         # NOTE(danms): Services can be in cell0, so don't skip it here
         try:
-            with nova_context.target_cell(context, cell) as cctxt:
+            with nova_context.target_cell(context, cell,
+                    cell_v1_enable=False) as cctxt:
                 cell_service = lookup_fn(cctxt)
         except exception.NotFound:
             # NOTE(danms): Keep looking in other cells
@@ -4765,7 +4767,8 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
     if service:
         # NOTE(danms): Set the cell on the context so it remains
         # when we return to our caller
-        nova_context.set_target_cell(context, found_in_cell)
+        nova_context.set_target_cell(context, found_in_cell,
+                                     cell_v1_enable=False)
         return service
     else:
         raise exception.NotFound()
@@ -4864,10 +4867,12 @@ class HostAPI(base.Base):
         # NOTE(danms): Eventually this all_cells nonsense should go away
         # and we should always iterate over the cells. However, certain
         # callers need the legacy behavior for now.
-        if all_cells and not CONF.cells.enable:
+        if all_cells:
             services = []
+
             service_dict = nova_context.scatter_gather_all_cells(context,
-                objects.ServiceList.get_all, disabled, set_zones=set_zones)
+                    objects.ServiceList.get_all, disabled, set_zones=set_zones,
+                    cell_v1_enable=False)
             for service in service_dict.values():
                 if service not in (nova_context.did_not_respond_sentinel,
                                    nova_context.raised_exception_sentinel):
@@ -4952,7 +4957,8 @@ class HostAPI(base.Base):
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            with nova_context.target_cell(context, cell) as cctxt:
+            with nova_context.target_cell(context, cell,
+                                          cell_v1_enable=False) as cctxt:
                 try:
                     if is_uuid:
                         return objects.ComputeNode.get_by_uuid(cctxt,
@@ -4973,7 +4979,8 @@ class HostAPI(base.Base):
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            with nova_context.target_cell(context, cell) as cctxt:
+            with nova_context.target_cell(context, cell,
+                                          cell_v1_enable=False) as cctxt:
 
                 # If we have a marker and it's a uuid, see if the compute node
                 # is in this cell.
@@ -5017,7 +5024,8 @@ class HostAPI(base.Base):
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            with nova_context.target_cell(context, cell) as cctxt:
+            with nova_context.target_cell(context, cell,
+                                          cell_v1_enable=False) as cctxt:
                 cell_computes = objects.ComputeNodeList.get_by_hypervisor(
                     cctxt, hypervisor_match)
             computes.extend(cell_computes)
@@ -5030,7 +5038,8 @@ class HostAPI(base.Base):
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            with nova_context.target_cell(context, cell) as cctxt:
+            with nova_context.target_cell(context, cell,
+                                          cell_v1_enable=False) as cctxt:
                 cell_stats.append(self.db.compute_node_statistics(cctxt))
 
         if cell_stats:
