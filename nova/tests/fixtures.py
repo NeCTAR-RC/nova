@@ -311,7 +311,7 @@ class SingleCellSimple(fixtures.Fixture):
             self._fake_target_cell))
         self.useFixture(fixtures.MonkeyPatch(
             'nova.context.set_target_cell',
-            lambda c, m: None))
+            lambda c, m, cell_v1_enable=False: None))
 
     def _fake_hostmapping_get(self, *args):
         return {'id': 1,
@@ -355,7 +355,8 @@ class SingleCellSimple(fixtures.Fixture):
                  'database_connection': 'sqlite:///'}]
 
     @contextmanager
-    def _fake_target_cell(self, context, target_cell):
+    def _fake_target_cell(self, context, target_cell,
+                          cell_v1_enable=CONF.cells.enable):
         # NOTE(danms): Just pass through the context without actually
         # targeting anything.
         yield context
@@ -426,7 +427,7 @@ class CellDatabases(fixtures.Fixture):
             engine.dispose()
 
     @contextmanager
-    def _wrap_target_cell(self, context, cell_mapping):
+    def _wrap_target_cell(self, context, cell_mapping, cell_v1_enable=False):
         with self._cell_lock.write_lock():
             if cell_mapping is None:
                 # NOTE(danms): The real target_cell untargets with a

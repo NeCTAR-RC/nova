@@ -44,6 +44,7 @@ def HostAPI(*args, **kwargs):
     compute api
     """
     compute_api_class_name = _get_compute_api_class_name()
+    compute_api_class_name = 'nova.compute.api.API'
     compute_api_class = importutils.import_class(compute_api_class_name)
     class_name = compute_api_class.__module__ + ".HostAPI"
     return importutils.import_object(class_name, *args, **kwargs)
