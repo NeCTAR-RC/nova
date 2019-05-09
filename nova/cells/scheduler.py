@@ -93,8 +93,15 @@ class CellsScheduler(base.Base):
         # FIXME(danms): Same for ec2_ids
         instance_values.pop('ec2_ids', None)
 
-        # FIXME(danms): Same for keypairs
-        instance_values.pop('keypairs', None)
+        keypairs = instance_values.pop('keypairs', None)
+        if keypairs:
+            keypair_objs = []
+            for keypair in keypairs:
+                keypair_obj = objects.KeyPair._from_db_object(
+                    ctxt, objects.KeyPair(), keypair)
+                keypair_objs.append(keypair_obj)
+            instance_values['keypairs'] = objects.KeyPairList(
+                objects=keypair_objs)
 
         instances = []
         num_instances = len(instance_uuids)
