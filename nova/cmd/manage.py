@@ -414,6 +414,7 @@ class DbCommands(object):
         # Queens and Pike since instance.avz of instances before Pike
         # need to be populated if it was not specified during boot time.
         instance_obj.populate_missing_availability_zones,
+        instance_obj.migrate_instance_keypairs,
     )
 
     def __init__(self):
