@@ -6459,15 +6459,6 @@ class ComputeAPIAPICellUnitTestCase(Cellsv1DeprecatedTestMixIn,
                           self.compute_api._attach_volume, self.context,
                           instance, volume, device, disk_bus, disk_type)
 
-    def test_get_all_includes_cell0(self):
-        pass
-
-    def test_get_all_cell0_marker_not_found(self):
-        pass
-
-    def test_get_all_includes_build_request_cell0(self):
-        pass
-
     def test_migrate_with_host_name(self):
         pass
 
@@ -6489,15 +6480,6 @@ class ComputeAPIComputeCellUnitTestCase(Cellsv1DeprecatedTestMixIn,
 
     def test_resize_same_flavor_passes(self):
         self._test_resize(same_flavor=True)
-
-    def test_get_all_includes_cell0(self):
-        pass
-
-    def test_get_all_cell0_marker_not_found(self):
-        pass
-
-    def test_get_all_includes_build_request_cell0(self):
-        pass
 
 
 class DiffDictTestCase(test.NoDBTestCase):
