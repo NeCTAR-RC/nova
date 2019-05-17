@@ -1771,7 +1771,7 @@ class API(base_api.NetworkAPI):
         with the requested network configuration.
         """
         LOG.debug('validate_networks() for %s', requested_networks)
-
+        return num_instances
         neutron = get_client(context)
         ports_needed_per_instance = self._ports_needed_per_instance(
             context, neutron, requested_networks)
