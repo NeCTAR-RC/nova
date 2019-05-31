@@ -114,6 +114,7 @@ class ContextTestCase(test.NoDBTestCase):
         volume_catalog = [{u'type': u'image', u'name': u'glance'},
                           {u'type': u'volumev3', u'name': u'cinderv3'},
                           {u'type': u'network', u'name': u'neutron'},
+                          {u'type': u'identity', u'name': u'keystone'},
                           {u'type': u'block-storage', u'name': u'cinder'}]
         ctxt = context.RequestContext('111', '222',
                 service_catalog=service_catalog)
