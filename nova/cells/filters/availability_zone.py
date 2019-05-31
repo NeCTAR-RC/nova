@@ -36,5 +36,10 @@ class AvailabilityZoneFilter(filters.BaseCellFilter):
 
         if availability_zone:
             return availability_zone in available_zones
-
+        else:
+            restricted_zones = availability_zones.get_restricted_zones(
+                filter_properties['context'])
+            if restricted_zones and not set(restricted_zones).intersection(
+                    set(available_zones)):
+                return False
         return True

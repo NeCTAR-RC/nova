@@ -126,7 +126,7 @@ class RequestContext(context.RequestContext):
             self.service_catalog = [s for s in service_catalog
                 if s.get('type') in ('image', 'block-storage', 'volumev2',
                                      'volumev3', 'key-manager', 'placement',
-                                     'network')]
+                                     'network', 'identity')]
         else:
             # if list is empty or none
             self.service_catalog = []
