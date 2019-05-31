@@ -56,6 +56,9 @@ Possible values:
 * None, which means that the instance can move from one availability zone to
   another during its lifetime if it is moved from one compute node to another.
 """),
+    cfg.BoolOpt("restrict_zones",
+        default=False,
+        help="If True will restrict available zones from querying keystone"),
 ]
 
 
