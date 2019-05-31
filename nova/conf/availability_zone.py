@@ -60,6 +60,12 @@ Related options:
 
 * ``[cinder]/cross_az_attach``
 """),
+    cfg.BoolOpt("restrict_zones",
+        default=False,
+        help="""
+If True will restrict the available zones a project has based on the
+'compute_zones' property on the keystone.
+"""),
 ]
 
 
