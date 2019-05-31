@@ -19,9 +19,15 @@ import collections
 
 import six
 
+from keystoneauth1 import session
+from keystoneclient.v3 import client
+from oslo_log import log as logging
+
 from nova import cache_utils
 import nova.conf
+from nova import exception
 from nova import objects
+from nova import service_auth
 
 # NOTE(vish): azs don't change that often, so cache them for an hour to
 #             avoid hitting the db multiple times on every request.
@@ -29,6 +35,8 @@ AZ_CACHE_SECONDS = 60 * 60
 MC = None
 
 CONF = nova.conf.CONF
+
+LOG = logging.getLogger(__name__)
 
 
 def _get_cache():
@@ -136,19 +144,23 @@ def get_availability_zones(context, hostapi, get_only_available=False,
         else:
             disabled_services.append(service)
 
+    restricted_zones = get_restricted_zones(context)
     if with_hosts:
-        return _get_availability_zones_with_hosts(
-            enabled_services, disabled_services, get_only_available)
+        return _get_availability_zones_with_hosts(enabled_services,
+            disabled_services, get_only_available, restricted_zones)
     else:
-        return _get_availability_zones(
-            enabled_services, disabled_services, get_only_available)
+        return _get_availability_zones(enabled_services,
+            disabled_services, get_only_available, restricted_zones)
 
 
 def _get_availability_zones(
-        enabled_services, disabled_services, get_only_available=False):
+        enabled_services, disabled_services, get_only_available=False,
+        restricted_zones=None):
 
     available_zones = {
         service['availability_zone'] for service in enabled_services
+        if not restricted_zones or \
+            service['availability_zone'] in restricted_zones
     }
 
     if get_only_available:
@@ -163,11 +175,14 @@ def _get_availability_zones(
 
 
 def _get_availability_zones_with_hosts(
-        enabled_services, disabled_services, get_only_available=False):
+        enabled_services, disabled_services, get_only_available=False,
+        restricted_zones=None):
 
     available_zones = collections.defaultdict(set)
     for service in enabled_services:
-        available_zones[service['availability_zone']].add(service['host'])
+        if not restricted_zones or \
+          service['availability_zone'] in restricted_zones:
+            available_zones[service['availability_zone']].add(service['host'])
 
     if get_only_available:
         return sorted(available_zones.items())
@@ -214,3 +229,29 @@ def get_instance_availability_zone(context, instance):
         az = get_host_availability_zone(elevated, host)
         cache.set(cache_key, az)
     return az
+
+
+def get_restricted_zones(context):
+    if not CONF.restrict_zones:
+        return []
+    ALL_ZONES = 'ALL'
+    project_id = context.project_id
+    cache = _get_cache()
+    cache_key = 'restricted_zones-%s' % project_id
+
+    zones = cache.get(cache_key)
+    LOG.debug("Found cached restricted zones: %s", zones)
+
+    if not zones:
+        auth_plugin = service_auth.get_auth_plugin(context)
+        if not auth_plugin:
+            raise exception.Unauthorized()
+        sess = session.Session(auth=auth_plugin)
+        project = client.Client(session=sess).projects.get(project_id)
+        zones = getattr(project, 'compute_zones', ALL_ZONES)
+        cache.set(cache_key, zones)
+        LOG.debug("Cached restricted zones: %s", zones)
+    if not zones or zones == ALL_ZONES:
+        return []
+
+    return zones.split(',')
