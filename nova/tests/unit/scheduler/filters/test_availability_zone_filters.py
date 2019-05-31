@@ -12,10 +12,14 @@
 
 import mock
 
+import nova.conf
 from nova import objects
 from nova.scheduler.filters import availability_zone_filter
 from nova import test
 from nova.tests.unit.scheduler import fakes
+
+
+CONF = nova.conf.CONF
 
 
 @mock.patch('nova.scheduler.filters.utils.aggregate_metadata_get_by_host')
@@ -46,5 +50,25 @@ class TestAvailabilityZoneFilter(test.NoDBTestCase):
     def test_availability_zone_filter_different(self, agg_mock):
         agg_mock.return_value = {'availability_zone': set(['nova'])}
         request = self._make_zone_request('bad')
+        host = fakes.FakeHostState('host1', 'node1', {})
+        self.assertFalse(self.filt_cls.host_passes(host, request))
+
+    @mock.patch('nova.availability_zones.get_restricted_zones')
+    def test_availability_zone_filter_same_restricted(
+            self, restricted_mock, agg_mock):
+        CONF.set_override('restrict_zones', True)
+        restricted_mock.return_value = ['nova']
+        agg_mock.return_value = {'availability_zone': set(['nova'])}
+        request = self._make_zone_request(None)
+        host = fakes.FakeHostState('host1', 'node1', {})
+        self.assertTrue(self.filt_cls.host_passes(host, request))
+
+    @mock.patch('nova.availability_zones.get_restricted_zones')
+    def test_availability_zone_filter_different_restricted(
+            self, restricted_mock, agg_mock):
+        CONF.set_override('restrict_zones', True)
+        restricted_mock.return_value = ['bad']
+        agg_mock.return_value = {'availability_zone': set(['nova'])}
+        request = self._make_zone_request(None)
         host = fakes.FakeHostState('host1', 'node1', {})
         self.assertFalse(self.filt_cls.host_passes(host, request))
