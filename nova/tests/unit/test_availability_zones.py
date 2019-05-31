@@ -233,6 +233,63 @@ class AvailabilityZoneTestCases(test.TestCase):
                          [(u'nova-test3', set([u'host4'])),
                                  (u'nova', set([u'host5']))])
 
+    @mock.patch.object(az, 'get_restricted_zones',
+                       return_value=['nova-test', 'nova-test3'])
+    def test_get_availability_zones_restricted(self, mock_get_restricted):
+        """Test get_availability_zones."""
+
+        # When the param get_only_available of get_availability_zones is set
+        # to default False, it returns two lists, zones with at least one
+        # enabled services, and zones with no enabled services,
+        # when get_only_available is set to True, only return a list of zones
+        # with at least one enabled services.
+        # Use the following test data:
+        #
+        # zone         host        enabled
+        # nova-test    host1       Yes
+        # nova-test    host2       No
+        # nova-test2   host3       Yes
+        # nova-test3   host4       No
+        # <default>    host5       No
+        CONF.set_override('restrict_zones', True)
+        agg2 = self._create_az('agg-az2', 'nova-test2')
+        agg3 = self._create_az('agg-az3', 'nova-test3')
+
+        service1 = self._create_service_with_topic('compute', 'host1',
+                                                   disabled=False)
+        service2 = self._create_service_with_topic('compute', 'host2',
+                                                   disabled=True)
+        service3 = self._create_service_with_topic('compute', 'host3',
+                                                   disabled=False)
+        service4 = self._create_service_with_topic('compute', 'host4',
+                                                   disabled=True)
+        self._create_service_with_topic('compute', 'host5',
+                                        disabled=True)
+
+        self._add_to_aggregate(service1, self.agg)
+        self._add_to_aggregate(service2, self.agg)
+        self._add_to_aggregate(service3, agg2)
+        self._add_to_aggregate(service4, agg3)
+
+        zones, not_zones = az.get_availability_zones(self.context)
+
+        self.assertEqual(['nova-test'], zones)
+        self.assertEqual(['nova-test2', 'nova-test3', 'nova'], not_zones)
+
+        zones = az.get_availability_zones(self.context, True)
+
+        self.assertEqual(['nova-test'], zones)
+
+        zones, not_zones = az.get_availability_zones(self.context,
+                                                     with_hosts=True)
+
+        self.assertJsonEqual(zones,
+                         [(u'nova-test', set([u'host1']))])
+        self.assertJsonEqual(not_zones,
+                         [(u'nova-test3', set([u'host4'])),
+                          (u'nova', set([u'host5'])),
+                          (u'nova-test2', set([u'host3']))])
+
     def test_get_instance_availability_zone_default_value(self):
         """Test get right availability zone by given an instance."""
         fake_inst = objects.Instance(host=self.host,
@@ -295,3 +352,34 @@ class AvailabilityZoneTestCases(test.TestCase):
 
         result = az.get_instance_availability_zone(self.context, fake_inst)
         self.assertIsNone(result)
+
+    def test_get_restricted_zones_disabled(self):
+        restricted_zones = az.get_restricted_zones(None)
+        self.assertEqual([], restricted_zones)
+
+    @mock.patch.object(az.client, 'Client')
+    def test_get_restricted_zones(self, mock_client):
+        CONF.set_override('restrict_zones', True)
+        keystone = mock_client.return_value
+        keystone.projects.get.return_value = mock.Mock(
+            compute_zones='zone1,zone2')
+        restricted_zones = az.get_restricted_zones(self.context)
+        self.assertEqual(['zone1', 'zone2'], restricted_zones)
+        mock_client.assert_called_once()
+
+        # Check cache works
+        cache_key = 'restricted_zones-%s' % self.context.project_id
+        cache_zones = az._get_cache().get(cache_key)
+        self.assertEqual('zone1,zone2', cache_zones)
+        restricted_zones = az.get_restricted_zones(self.context)
+        self.assertEqual(['zone1', 'zone2'], restricted_zones)
+        mock_client.assert_called_once()
+        az.reset_cache()
+
+    @mock.patch.object(az.client, 'Client')
+    def test_get_restricted_zones_all(self, mock_client):
+        CONF.set_override('restrict_zones', True)
+        keystone = mock_client.return_value
+        keystone.projects.get.return_value = mock.Mock(spec=['name', 'id'])
+        restricted_zones = az.get_restricted_zones(self.context)
+        self.assertEqual([], restricted_zones)

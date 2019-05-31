@@ -18,6 +18,7 @@ from nova import test
 from nova.tests.unit.scheduler import fakes
 
 
+
 @mock.patch('nova.scheduler.filters.utils.aggregate_metadata_get_by_host')
 class TestAvailabilityZoneFilter(test.NoDBTestCase):
 
