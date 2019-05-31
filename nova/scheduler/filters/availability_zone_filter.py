@@ -15,6 +15,7 @@
 
 from oslo_log import log as logging
 
+from nova import availability_zones
 import nova.conf
 from nova.scheduler import filters
 from nova.scheduler.filters import utils
@@ -39,9 +40,15 @@ class AvailabilityZoneFilter(filters.BaseHostFilter):
 
     def host_passes(self, host_state, spec_obj):
         availability_zone = spec_obj.availability_zone
-
+        restricted_zones = []
         if not availability_zone:
-            return True
+            restricted_zones = availability_zones.get_restricted_zones(
+                spec_obj._context)
+
+            if not restricted_zones:
+                return True
+        if restricted_zones:
+            LOG.debug("Restricted Zones: %s", restricted_zones)
 
         metadata = utils.aggregate_metadata_get_by_host(
                 host_state, key='availability_zone')
@@ -51,7 +58,11 @@ class AvailabilityZoneFilter(filters.BaseHostFilter):
             host_az = metadata['availability_zone']
         else:
             hosts_passes = availability_zone == CONF.default_availability_zone
-            host_az = CONF.default_availability_zone
+            host_az = set([CONF.default_availability_zone])
+
+        if restricted_zones and set(restricted_zones).intersection(host_az):
+            LOG.debug("%s in restricted %s", host_az, restricted_zones)
+            return True
 
         if not hosts_passes:
             LOG.debug("Availability Zone '%(az)s' requested. "
