@@ -2,6 +2,29 @@
   "comments": [
     {
       "key": {
+        "uuid": "0dcfb5b7_6f8c1062",
+        "filename": "nova/availability_zones.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-05T04:29:50Z",
+      "side": 1,
+      "message": "might have a bug in this, restricted_zones still might contain zones that are unavailable.\n\nAlso, using sets might make it clearer to the user? Something like:\n\n available_zones \u003d list(set(available_zones) \u0026 set(restricted_zones))\n unavailable_zones \u003d list(set(unavailable_zone) | (set(available_zones) - set(restricted_zones)))",
+      "range": {
+        "startLine": 163,
+        "startChar": 0,
+        "endLine": 166,
+        "endChar": 56
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "7512b1ba_2741075d",
         "filename": "nova/availability_zones.py",
         "patchSetId": 9
@@ -13,6 +36,98 @@
       "writtenOn": "2019-06-05T02:04:26Z",
       "side": 1,
       "message": "brackets not required",
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c3f2dab7_2b3487b9",
+        "filename": "nova/availability_zones.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 189,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-05T04:29:50Z",
+      "side": 1,
+      "message": "I wonder why is this check here? is there a case where there is zone is None?",
+      "range": {
+        "startLine": 189,
+        "startChar": 23,
+        "endLine": 189,
+        "endChar": 32
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3d626573_da5519b8",
+        "filename": "nova/availability_zones.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-05T04:29:50Z",
+      "side": 1,
+      "message": "we should make sure cache_key never conflicts. Maybe something like \u0027az-cache-restricted-zones-%s\u0027? \u0027az-cache\u0027 is unique to this class and \u0027restricted-zones\u0027 is unique to this function.",
+      "range": {
+        "startLine": 264,
+        "startChar": 0,
+        "endLine": 264,
+        "endChar": 41
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "09a4c84b_190515c7",
+        "filename": "nova/cells/filters/availability_zone.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-05T04:29:50Z",
+      "side": 1,
+      "message": "I think it\u0027ll be clearer if this logic is moved up to line 33?\n\n restricted_zones \u003d availability_zones.get_restricted_zones(filter_properties[\u0027context\u0027])\n if restricted_zones:\n   availability_zone \u003d list(set(available_zones) \u0026 set(restricted_zones))",
+      "range": {
+        "startLine": 41,
+        "startChar": 12,
+        "endLine": 45,
+        "endChar": 28
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c380da68_ef191160",
+        "filename": "nova/tests/unit/test_availability_zones.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 237,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-05T04:29:50Z",
+      "side": 1,
+      "message": "might be a good idea to have 2 zones here, one that\u0027s available and one that isn\u0027t",
+      "range": {
+        "startLine": 237,
+        "startChar": 23,
+        "endLine": 237,
+        "endChar": 49
+      },
       "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
       "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
       "unresolved": true
