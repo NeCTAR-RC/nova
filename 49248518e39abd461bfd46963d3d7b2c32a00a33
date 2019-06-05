@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7512b1ba_2741075d",
+        "filename": "nova/availability_zones.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 184,
+      "author": {
+        "id": 1000177
+      },
+      "writtenOn": "2019-06-05T02:04:26Z",
+      "side": 1,
+      "message": "brackets not required",
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
