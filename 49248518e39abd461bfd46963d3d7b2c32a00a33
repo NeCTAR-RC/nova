@@ -111,6 +111,30 @@
     },
     {
       "key": {
+        "uuid": "4672a747_8394e40c",
+        "filename": "nova/cells/filters/availability_zone.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-06-06T01:43:32Z",
+      "side": 1,
+      "message": "availability_zone is the requested availability_zone and is a string specifying one, it\u0027s not a set/list etc.",
+      "parentUuid": "09a4c84b_190515c7",
+      "range": {
+        "startLine": 41,
+        "startChar": 12,
+        "endLine": 45,
+        "endChar": 28
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c380da68_ef191160",
         "filename": "nova/tests/unit/test_availability_zones.py",
         "patchSetId": 9
