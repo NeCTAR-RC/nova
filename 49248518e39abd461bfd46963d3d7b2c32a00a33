@@ -135,6 +135,30 @@
     },
     {
       "key": {
+        "uuid": "4d690185_5ea8e7d3",
+        "filename": "nova/cells/filters/availability_zone.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-07T01:00:13Z",
+      "side": 1,
+      "message": "sorry last line should read\n availabile_zones \u003d list(set(available_zones) \u0026 set(restricted_zones))",
+      "parentUuid": "4672a747_8394e40c",
+      "range": {
+        "startLine": 41,
+        "startChar": 12,
+        "endLine": 45,
+        "endChar": 28
+      },
+      "revId": "49248518e39abd461bfd46963d3d7b2c32a00a33",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c380da68_ef191160",
         "filename": "nova/tests/unit/test_availability_zones.py",
         "patchSetId": 9
