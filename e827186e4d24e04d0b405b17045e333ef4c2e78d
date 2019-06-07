@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a2d58fa8_f4c458de",
+        "filename": "nova/conf/availability_zone.py",
+        "patchSetId": 16
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1000077
+      },
+      "writtenOn": "2019-06-07T05:58:29Z",
+      "side": 1,
+      "message": "WTF?",
+      "range": {
+        "startLine": 61,
+        "startChar": 14,
+        "endLine": 61,
+        "endChar": 75
+      },
+      "revId": "e827186e4d24e04d0b405b17045e333ef4c2e78d",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
