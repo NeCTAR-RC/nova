@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b48e70ec_a612293d",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 14
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-07T01:00:13Z",
+      "side": 1,
+      "message": "should be \u0027compute_zones\u0027 given last PS",
+      "range": {
+        "startLine": 11,
+        "startChar": 14,
+        "endLine": 11,
+        "endChar": 24
+      },
+      "revId": "977a860a7fd4162e55b3dd9752342e0ce7e8acff",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
