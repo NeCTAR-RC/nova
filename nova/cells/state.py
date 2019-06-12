@@ -210,7 +210,8 @@ class CellStateManager(base.Base):
         ctxt = context.get_admin_context()
         cell_type = cell_opts.get_cell_type()
         if cell_type == 'compute':
-            active, disabled = az.get_availability_zones(ctxt)
+            active = az.get_availability_zones(
+                ctxt, get_only_available=True, with_restricted=False)
             # Only send up available AZs
             my_cell_capabs['availability_zones'] = set(active)
         self.my_cell_state.update_capabilities(my_cell_capabs)

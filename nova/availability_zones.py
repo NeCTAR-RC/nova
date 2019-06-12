@@ -124,7 +124,7 @@ def update_host_availability_zone_cache(context, host, availability_zone=None):
 
 
 def get_availability_zones(context, get_only_available=False,
-                           with_hosts=False):
+                           with_hosts=False, with_restricted=True):
     """Return available and unavailable zones on demand.
 
         :param get_only_available: flag to determine whether to return
@@ -134,7 +134,11 @@ def get_availability_zones(context, get_only_available=False,
         :param with_hosts: whether to return hosts part of the AZs
         :type with_hosts: bool
     """
-    restricted_zones = get_restricted_zones(context)
+
+    if with_restricted:
+        restricted_zones = get_restricted_zones(context)
+    else:
+        restricted_zones = []
 
     # Override for cells
     cell_type = cell_opts.get_cell_type()
