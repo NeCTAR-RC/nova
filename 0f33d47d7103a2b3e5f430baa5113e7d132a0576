@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7e4e8e7a_bf212336",
+        "filename": "nova/availability_zones.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 1000104
+      },
+      "writtenOn": "2019-06-13T00:30:53Z",
+      "side": 1,
+      "message": "is it possible to use `cell_type` here to determine if you want to get_restricted_zones()?\n\nsaves 1 change in the other file, and the param too.",
+      "range": {
+        "startLine": 137,
+        "startChar": 0,
+        "endLine": 141,
+        "endChar": 29
+      },
+      "revId": "0f33d47d7103a2b3e5f430baa5113e7d132a0576",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
