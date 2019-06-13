@@ -134,10 +134,13 @@ def get_availability_zones(context, get_only_available=False,
         :param with_hosts: whether to return hosts part of the AZs
         :type with_hosts: bool
     """
-    restricted_zones = get_restricted_zones(context)
+    cell_type = cell_opts.get_cell_type()
+    if cell_type == 'compute':
+        restricted_zones = []
+    else:
+        restricted_zones = get_restricted_zones(context)
 
     # Override for cells
-    cell_type = cell_opts.get_cell_type()
     if cell_type == 'api':
         ctxt = context.elevated()
         global_azs = []
@@ -152,14 +155,14 @@ def get_availability_zones(context, get_only_available=False,
                 mute_azs.extend(capabilities['availability_zones'])
             else:
                 global_azs.extend(capabilities['availability_zones'])
-            available_zones = list(set(global_azs))
-            unavailable_zones = list(set(mute_azs))
+        available_zones = list(set(global_azs))
+        unavailable_zones = list(set(mute_azs))
 
         if restricted_zones:
             for zone in available_zones:
                 if zone not in restricted_zones:
                     unavailable_zones.append(zone)
-                    available_zones.pop(zone)
+                    available_zones.remove(zone)
 
         if get_only_available:
             return available_zones
