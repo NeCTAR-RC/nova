@@ -159,7 +159,8 @@ def get_availability_zones(context, get_only_available=False,
         unavailable_zones = list(set(mute_azs))
 
         if restricted_zones:
-            for zone in available_zones:
+            # Make a copy of the list since we manipulate it
+            for zone in available_zones[:]:
                 if zone not in restricted_zones:
                     unavailable_zones.append(zone)
                     available_zones.remove(zone)
