@@ -24,7 +24,10 @@
 from __future__ import print_function
 
 import argparse
+import datetime
+import dictdiffer
 import functools
+import operator
 import re
 import sys
 import traceback
@@ -38,6 +41,7 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 from oslo_utils import encodeutils
 from oslo_utils import importutils
+from oslo_utils import timeutils
 from oslo_utils import uuidutils
 import prettytable
 import six
@@ -1247,11 +1251,220 @@ class CellV2Commands(object):
         # partial work so 0 is appropriate.
         return 0
 
+    def _compare_instance(self, ctxt, uuid, mapping, fix):
+        # for datetime fields, the amount of difference we tolerate, in secs
+        DATETIME_DIFF_MAX = 60
+
+        # returns whether two instances are equal given special cases
+        def _diff_almost_equals(diff):
+            timedelta_range = datetime.timedelta(seconds=DATETIME_DIFF_MAX)
+            # (1): there is only 1 diff; keypairs is empty array in api but
+            # NULL in compute
+            # e.g.
+            # ('remove', ['nova_object.data'], [
+            #  ('keypairs',
+            #   {'nova_object.version': u'1.3',
+            #    'nova_object.name': 'KeyPairList',
+            #    'nova_object.namespace': 'nova',
+            #    'nova_object.data': {'objects': []}
+            #   }
+            #  )])
+            if diff[0] == 'remove' and \
+                diff[2][0][0] == 'keypairs' and \
+                diff[2][0][1]['nova_object.data'] == {'objects': []}:
+                return True
+            # (2): change in keypair created_at time
+            # e.g.
+            # ('change',
+            #  ['nova_object.data', 'keypairs', 'nova_object.data', 'objects',
+            #   0, 'nova_object.data', 'created_at'],
+            #   ('2014-04-10T04:14:01Z', '2017-10-24T02:53:16Z'))
+            elif diff[0] == 'change' and \
+                diff[1][1] == 'keypairs' and \
+                diff[1][6] == 'created_at':
+                return True
+            # (3): flavor or migration_context object version different
+            # e.g.
+            # ('change',
+            #  ['nova_object.data', 'flavor', 'nova_object.version'],
+            #  (u'1.2', u'1.1')
+            # )
+            elif diff[0] == 'change' and \
+                len(diff[1]) == 3 and \
+                (diff[1][1] == 'flavor' or
+                 diff[1][1] == 'old_flavor' or
+                 diff[1][1] == 'new_flavor' or
+                 diff[1][1] == 'migration_context') and \
+                diff[1][2] == 'nova_object.version':
+                return True
+            # (4): hostname is None in api but set in compute
+            # e.g.
+            # ('change', ['nova_object.data', 'hostname'],
+            #  (None,
+            #   u'server-579a7944-5436-4451-88fa-57832640fe91')
+            # )
+            elif diff[0] == 'change' and \
+                diff[1][1] == 'hostname' and \
+                diff[2][0] is None and \
+                diff[2][1] is not None:
+                return True
+            # (4): created_at is close enough
+            # e.g.
+            # ('change', ['nova_object.data', 'created_at'],
+            #  ('2019-08-04T23:43:52Z', '2019-08-04T23:43:51Z'))
+            elif diff[0] == 'change' and \
+                diff[1][1] == 'created_at':
+                created = timeutils.parse_isotime(diff[2][0])
+                ccreated = timeutils.parse_isotime(diff[2][0])
+                timedelta = abs(created - ccreated)
+                return timedelta_range > timedelta
+            # (5): set password metadata seems to be only in compute level
+            # e.g.
+            # ('add', ['nova_object.data', 'system_metadata'],
+            #  [(u'password_0', u'<TRIMMED>'), ... ])
+            elif diff[0] == 'add' and \
+                diff[1][1] == 'system_metadata' and \
+                'password_0' in diff[2][0]:
+                return True
+            # (6): change in keypair, ignore it and respect what compute has
+            # e.g.
+            # ('change',
+            #  ['nova_object.data', 'keypairs', 'nova_object.data', 'objects',
+            #   0, 'nova_object.data', 'public_key'], (u'<KEY1>', u'<KEY2''))
+            elif diff[0] == 'change' and \
+                diff[1][1] == 'keypairs':
+                return True
+
+            return False
+
+        # NOTE(jake): this is copied from objects.base.obj_equal_prims
+        def _strip(prim, keys):
+            if isinstance(prim, dict):
+                for k in keys:
+                    prim.pop(k, None)
+                for v in prim.values():
+                    _strip(v, keys)
+            if isinstance(prim, list):
+                for v in prim:
+                    _strip(v, keys)
+            return prim
+
+        # Tries to fix diff
+        def _fix_instance(inst, cinst, diff):
+            # figures out how to fix them
+            # (1): display_name is different, sync from api to compute
+            # e.g.
+            # ('change', ['nova_object.data', 'display_name'],
+            #  (u'small', u'Server 579a7944-5436-4451-88fa-57832640fe91')
+            if diff[0] == 'change' and \
+                diff[1][1] == 'display_name':
+                cinst.display_name = inst.display_name
+                cinst.save()
+                print("Fixed display_name")
+            # (2): keypairs removed in compute, sync from api to compute
+            # e.g.
+            # ('remove',
+            #  ['nova_object.data', 'keypairs', 'nova_object.data', 'objects'],
+            #  [<KEYPAIRS>]
+            # )
+            elif diff[0] == 'remove' and \
+                diff[1][1] == 'keypairs':
+                cinst.keypairs = inst.keypairs
+                cinst.save()
+                print("Fixed keypairs")
+            # (3): some system_metadata not in compute, sync
+            # e.g.
+            # ('remove', ['nova_object.data', 'system_metadata'],
+            #  [(u'network_allocated', u'True')])
+            elif diff[0] == 'remove' and \
+                diff[1][1] == 'system_metadata':
+                cinst.system_metadata = inst.system_metadata
+                cinst.save()
+                print("Fixed system_metadata")
+            # (4): some_metadata not in compute, sync
+            # e.g.
+            # ('remove', ['nova_object.data', 'metadata'],
+            #  [(u'role', u'master')])
+            elif diff[0] == 'remove' and \
+                diff[1][1] == 'metadata':
+                cinst.metadata = inst.metadata
+                cinst.save()
+                print("Fixed system_metadata")
+
+            else:
+                print("Can't fix anything.")
+
+        def _sort_bdm():
+            pass
+
+        # NOTE(jake): we get all attributes in one go because we want the
+        # obj_to_primitive() call to cast them; it doesn't cast lazy loaded
+        # attrs
+        attrs = instance_obj.INSTANCE_OPTIONAL_ATTRS
+
+        # NOTE(jake): fault is sometimes blank, ignore it
+        # services is found only in cell
+        ignore_attrs = ['fault', 'services', 'pci_devices',
+                        'migration_context']
+        attrs = [i for i in attrs if i not in ignore_attrs]
+
+        inst = objects.Instance.get_by_uuid(ctxt, uuid, attrs)
+
+        with context.target_cell(ctxt, mapping.cell_mapping) as cctxt:
+            cinst = objects.Instance.get_by_uuid(cctxt, uuid, attrs)
+
+        # NOTE(jake): update this to ignore specific keys
+        ignore_keys = ['nova_object.changes', 'id', 'cell_name', 'updated_at',
+                       'info_cache', 'instance_name', 'availability_zone',
+                       'task_state', 'hostname']
+
+        instdict = _strip(inst.obj_to_primitive(), ignore_keys)
+        cinstdict = _strip(cinst.obj_to_primitive(), ignore_keys)
+
+        if objects.base.obj_equal_prims(inst, cinst, ignore_keys):
+            print("Instance {} attrs equal in api and compute".format(uuid))
+        else:
+            # diff the two objects and prints out the diffs
+            diff = dictdiffer.diff(instdict, cinstdict)
+            listdiff = list(diff)
+
+            # handles some special cases
+            for l in listdiff:
+                # if any returns False stop dealing with it
+                if not _diff_almost_equals(l):
+                    print("Instance {} attrs differ".format(uuid))
+                    print(l)
+                    if fix:
+                        _fix_instance(inst, cinst, l)
+                    return False
+
+            print("Instance {} attrs almost equal in api and compute".format(
+                uuid))
+
+        # Test related tables that are not part of attributes
+        # Test block device mappings
+        instbdms = inst.get_bdms()
+        cinstbdms = cinst.get_bdms()
+        instbdms.sort(key=operator.attrgetter('device_name'))
+        cinstbdms.sort(key=operator.attrgetter('device_name'))
+        ignore_keys = ['id', 'uuid', 'updated_at']
+        if objects.base.obj_equal_prims(instbdms, cinstbdms, ignore_keys):
+            print("Instance {} BDMs equal in api and compute".format(uuid))
+        else:
+            print("Instance {} BDMs differ in api and compute".format(uuid))
+            print(list(dictdiffer.diff(instbdms.obj_to_primitive(), cinstbdms.obj_to_primitive())))
+            return False
+
+
     @args('--uuid', metavar='<instance_uuid>', dest='uuid', required=True,
           help=_('The instance UUID to verify'))
+    @args('--compare', action='store_true',
+          help=_('Compare instances between ours and cell DBs'))
+    @args('--fix', action='store_true',
+          help=_('Tries to fix differences if any. Requires --compare.'))
     @args('--quiet', action='store_true', dest='quiet',
           help=_('Do not print anything'))
-    def verify_instance(self, uuid, quiet=False):
+    def verify_instance(self, uuid, compare=False, fix=False, quiet=False):
         """Verify instance mapping to a cell.
 
         This command is useful to determine if the cellsv2 environment is
@@ -1307,6 +1520,10 @@ class CellV2Commands(object):
                 uuid,
                 mapping.cell_mapping.name,
                 mapping.cell_mapping.uuid))
+
+            if compare:
+                self._compare_instance(ctxt, uuid, mapping, fix)
+
             return 0
 
     @args('--cell_uuid', metavar='<cell_uuid>', dest='cell_uuid',
@@ -1621,6 +1838,37 @@ class CellV2Commands(object):
 
         host_mapping.destroy()
         return 0
+
+
+    @args('--fix', action='store_true',
+          help=_('Tries to fix differences if any.'))
+    def verify_cell_instances(self, fix=False):
+        """Verify instances at cell level
+
+        Currently this does only one check, which is to check that instances
+        that exists at cell level too exists in api level too.
+        """
+        ctxt = context.get_admin_context()
+
+        cell_mappings = objects.CellMappingList.get_all(ctxt)
+
+        for cell_mapping in cell_mappings:
+            if cell_mapping.uuid == '00000000-0000-0000-0000-000000000000':
+                continue
+            if cell_mapping.uuid == '495db866-c64f-48e8-8d9f-003ff27c778a':
+                continue
+            with context.target_cell(ctxt, cell_mapping) as cctxt:
+                instances = objects.InstanceList.get_all(cctxt)
+                # look up api level for instance
+                for instance in instances:
+                    print("Instance {} is in cell: {}".format(instance.uuid, cell_mapping.name))
+                    try:
+                        instance = objects.Instance.get_by_uuid(ctxt, instance.uuid)
+                    except exception.InstanceNotFound:
+                        print("Instance {} not found at api level".format(instance.uuid))
+                        if fix:
+                            instance.destroy()
+                            print("Deleted instance {}".format(instance.uuid))
 
 
 CATEGORIES = {
