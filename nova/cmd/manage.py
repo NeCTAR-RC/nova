@@ -24,6 +24,7 @@
 from __future__ import print_function
 
 import argparse
+import dictdiffer
 import functools
 import re
 import sys
@@ -1247,11 +1248,73 @@ class CellV2Commands(object):
         # partial work so 0 is appropriate.
         return 0
 
+    def _compare_instance(self, ctxt, uuid, mapping):
+
+        # NOTE(jake): this is copied from objects.base.obj_equal_prims
+        def _strip(prim, keys):
+            if isinstance(prim, dict):
+                for k in keys:
+                    prim.pop(k, None)
+                for v in prim.values():
+                    _strip(v, keys)
+            if isinstance(prim, list):
+                for v in prim:
+                    _strip(v, keys)
+            return prim
+
+        # NOTE(jake): we get all attributes in one go because we want the
+        # obj_to_primitive() call to cast them; it doesn't cast lazy loaded
+        # attrs
+        attrs = instance_obj.INSTANCE_OPTIONAL_ATTRS
+
+        # NOTE(jake): fault is sometimes blank, ignore it
+        # services is found only in cell
+        ignore_attrs = ['fault', 'services']
+        attrs = [i for i in attrs if i not in ignore_attrs]
+
+        inst = objects.Instance.get_by_uuid(ctxt, uuid, attrs)
+
+        with context.target_cell(ctxt, mapping.cell_mapping) as cctxt:
+            cinst = objects.Instance.get_by_uuid(cctxt, uuid, attrs)
+
+        # NOTE(jake): update this to ignore specific keys
+        ignore_keys = ['nova_object.changes', 'id', 'cell_name', 'updated_at',
+                       'info_cache', 'instance_name']
+
+        instdict = _strip(inst.obj_to_primitive(), ignore_keys)
+        cinstdict = _strip(cinst.obj_to_primitive(), ignore_keys)
+
+        if objects.base.obj_equal_prims(inst, cinst, ignore_keys):
+            print("Instance {} attrs equal in api and compute".format(uuid))
+            return True
+        else:
+            diff = dictdiffer.diff(instdict, cinstdict)
+            listdiff = list(diff)
+
+            # handles some special cases
+
+            # (1): there is only 1 diff; keypairs is empty array in api but
+            # NULL in compute
+            # e.g. [('remove', ['nova_object.data'], [('keypairs', {'nova_object.version': u'1.3', 'nova_object.name': 'KeyPairList', 'nova_object.namespace': 'nova', 'nova_object.data': {'objects': []}})])]
+            if len(listdiff) == 1 and \
+                listdiff[0][0] == 'remove' and \
+                listdiff[0][2][0][0] == 'keypairs' and \
+                listdiff[0][2][0][1]['nova_object.data'] == {'objects': []}:
+
+                print("Instance {} attrs about equal in api and compute".format(uuid))
+                return True
+
+            print(list(diff))
+            print("Instance {} attrs differ".format(uuid))
+            return False
+
     @args('--uuid', metavar='<instance_uuid>', dest='uuid', required=True,
           help=_('The instance UUID to verify'))
+    @args('--compare', action='store_true',
+          help=_('Compare instances between ours and cell DBs'))
     @args('--quiet', action='store_true', dest='quiet',
           help=_('Do not print anything'))
-    def verify_instance(self, uuid, quiet=False):
+    def verify_instance(self, uuid, compare=False, quiet=False):
         """Verify instance mapping to a cell.
 
         This command is useful to determine if the cellsv2 environment is
@@ -1307,6 +1370,10 @@ class CellV2Commands(object):
                 uuid,
                 mapping.cell_mapping.name,
                 mapping.cell_mapping.uuid))
+
+            if compare:
+                self._compare_instance(ctxt, uuid, mapping)
+
             return 0
 
     @args('--cell_uuid', metavar='<cell_uuid>', dest='cell_uuid',
