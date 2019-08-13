@@ -696,10 +696,6 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
         # NOTE(hanlind): Read-only so no need to save this.
         pass
 
-    def _save_keypairs(self, context):
-        # NOTE(danms): Read-only so no need to save this.
-        pass
-
     def _save_extra_generic(self, field):
         if field in self.obj_what_changed():
             obj = getattr(self, field)
