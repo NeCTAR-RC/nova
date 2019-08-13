@@ -1246,11 +1246,45 @@ class CellV2Commands(object):
         # partial work so 0 is appropriate.
         return 0
 
+    def _compare_instance(self, ctxt, uuid, mapping):
+        # NOTE(jake): we get all attributes in one go because we want the
+        # obj_to_primitive() call to cast them; it doesn't cast lazy loaded
+        # attrs
+        attrs = instance_obj.INSTANCE_OPTIONAL_ATTRS
+
+        # NOTE(jake): fault is sometimes blank, ignore it
+        ignore_attrs = ['fault']
+        attrs = [i for i in attrs if i not in ignore_attrs]
+
+        inst = objects.Instance.get_by_uuid(ctxt, uuid, attrs)
+
+        with context.target_cell(ctxt, mapping.cell_mapping) as cctxt:
+            cinst = objects.Instance.get_by_uuid(cctxt, uuid, attrs)
+
+        instdict = inst.obj_to_primitive()['nova_object.data']
+        cinstdict = cinst.obj_to_primitive()['nova_object.data']
+
+        ignore_keys = ['id', 'cell_name', 'updated_at', 'info_cache']
+
+        if objects.base.obj_equal_prims(inst, cinst, ignore_keys):
+            print("Instance {} attrs equal in cell0 and cell".format(uuid))
+        else:
+            print("Instance {} attrs differ".format(uuid))
+            for k in instdict.keys():
+                if k in ignore_keys:
+                    continue
+                if instdict[k] != cinstdict[k]:
+                    print("No match for {} - 0: {} C: {}".format(k,
+                                                                 instdict[k],
+                                                                 cinstdict[k]))
+
     @args('--uuid', metavar='<instance_uuid>', dest='uuid', required=True,
           help=_('The instance UUID to verify'))
+    @args('--compare', action='store_true',
+          help=_('Compare instances between ours and cell DBs'))
     @args('--quiet', action='store_true', dest='quiet',
           help=_('Do not print anything'))
-    def verify_instance(self, uuid, quiet=False):
+    def verify_instance(self, uuid, compare=False, quiet=False):
         """Verify instance mapping to a cell.
 
         This command is useful to determine if the cellsv2 environment is
@@ -1306,6 +1340,10 @@ class CellV2Commands(object):
                 uuid,
                 mapping.cell_mapping.name,
                 mapping.cell_mapping.uuid))
+
+            if compare:
+                self._compare_instance(ctxt, uuid, mapping)
+
             return 0
 
     @args('--cell_uuid', metavar='<cell_uuid>', dest='cell_uuid',
