@@ -72,7 +72,9 @@ class ConsoleAuthAPI(object):
         target = messaging.Target(topic=RPC_TOPIC, version='2.1')
         version_cap = self.VERSION_ALIASES.get(CONF.upgrade_levels.consoleauth,
                                                CONF.upgrade_levels.consoleauth)
-        self.client = rpc.get_client(target, version_cap=version_cap)
+        default_client = rpc.get_client(target, version_cap=version_cap)
+        self.router = rpc.ClientRouter(default_client)
+        self.client = default_client
 
     def authorize_console(self, ctxt, token, console_type, host, port,
                           internal_access_path, instance_uuid,
@@ -84,12 +86,14 @@ class ConsoleAuthAPI(object):
                         internal_access_path=internal_access_path,
                         instance_uuid=instance_uuid,
                         access_url=access_url)
+
+        client = self.router.client(ctxt)
         version = '2.1'
         if not self.client.can_send_version('2.1'):
             version = '2.0'
             del msg_args['access_url']
 
-        cctxt = self.client.prepare(version=version)
+        cctxt = client.prepare(version=version)
         return cctxt.call(ctxt, 'authorize_console', **msg_args)
 
     def check_token(self, ctxt, token):
