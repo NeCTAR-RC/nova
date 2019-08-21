@@ -10094,10 +10094,13 @@ class ComputeAPITestCase(BaseTestCase):
                 self.compute_api.rescue, self.context, instance)
 
     @ddt.data(True, False)
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceMapping.get_by_instance_uuid')
     @mock.patch.object(compute_rpcapi.ComputeAPI, 'get_vnc_console')
     @mock.patch.object(compute_api.consoleauth_rpcapi.ConsoleAuthAPI,
                        'authorize_console')
-    def test_vnc_console(self, enable_consoleauth, mock_auth, mock_get):
+    def test_vnc_console(self, enable_consoleauth, mock_auth, mock_get,
+                         mock_get_mapping, mock_target_cell):
         self.flags(enable_consoleauth=enable_consoleauth, group='workarounds')
         # Make sure we can a vnc console for an instance.
 
@@ -10113,9 +10116,10 @@ class ComputeAPITestCase(BaseTestCase):
                              'instance_uuid': fake_instance.uuid,
                              'access_url': 'fake_console_url'}
         mock_get.return_value = fake_connect_info
+        mock_target_cell.return_value.__enter__.return_value = self.context
 
         console = self.compute_api.get_vnc_console(self.context,
-                fake_instance, fake_console_type)
+                        fake_instance, fake_console_type)
 
         self.assertEqual(console, {'url': 'fake_console_url'})
         mock_get.assert_called_once_with(

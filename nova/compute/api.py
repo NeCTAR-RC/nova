@@ -3800,7 +3800,12 @@ class API(base.Base):
         # The following will be removed when everything has been
         # converted to use the database, in Stein.
         if CONF.workarounds.enable_consoleauth:
-            self.consoleauth_rpcapi.authorize_console(context,
+            inst_map = objects.InstanceMapping.get_by_instance_uuid(
+                context, instance.uuid)
+            cell = inst_map.cell_mapping
+            with nova_context.target_cell(context, cell) as cctxt:
+                self.consoleauth_rpcapi.authorize_console(
+                    cctxt,
                     connect_info['token'], console_type,
                     connect_info['host'], connect_info['port'],
                     connect_info['internal_access_path'], instance.uuid,
