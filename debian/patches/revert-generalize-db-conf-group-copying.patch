@@ -1,0 +1,37 @@
+Description: Revert upstream commit due to 'nova-manage api_db sync' error.
+  This reverts commit 910008e2ef5dae1698ff7db791f4816c728c8bd0.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1746530
+
+---
+ nova/db/sqlalchemy/api.py | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+--- a/nova/db/sqlalchemy/api.py
++++ b/nova/db/sqlalchemy/api.py
+@@ -82,9 +82,22 @@ api_context_manager = enginefacade.trans
+ 
+ 
+ def _get_db_conf(conf_group, connection=None):
+-    kw = dict(conf_group.items())
+-    if connection is not None:
+-        kw['connection'] = connection
++    kw = dict(
++        connection=connection or conf_group.connection,
++        slave_connection=conf_group.slave_connection,
++        sqlite_fk=False,
++        __autocommit=True,
++        expire_on_commit=False,
++        mysql_sql_mode=conf_group.mysql_sql_mode,
++        connection_recycle_time=conf_group.connection_recycle_time,
++        connection_debug=conf_group.connection_debug,
++        max_pool_size=conf_group.max_pool_size,
++        max_overflow=conf_group.max_overflow,
++        pool_timeout=conf_group.pool_timeout,
++        sqlite_synchronous=conf_group.sqlite_synchronous,
++        connection_trace=conf_group.connection_trace,
++        max_retries=conf_group.max_retries,
++        retry_interval=conf_group.retry_interval)
+     return kw
+ 
+ 

@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+	update-alternatives --install /usr/bin/nova-api-metadata nova-api-metadata /usr/bin/python2-nova-api-metadata 300
+	update-alternatives --install /usr/bin/nova-api-os-compute nova-api-os-compute /usr/bin/python2-nova-api-os-compute 300
+	update-alternatives --install /usr/bin/nova-api nova-api /usr/bin/python2-nova-api 300
+	update-alternatives --install /usr/bin/nova-cells nova-cells /usr/bin/python2-nova-cells 300
+	update-alternatives --install /usr/bin/nova-manage nova-manage /usr/bin/python2-nova-manage 300
+	update-alternatives --install /usr/bin/nova-policy nova-policy /usr/bin/python2-nova-policy 300
+	update-alternatives --install /usr/bin/nova-rootwrap nova-rootwrap /usr/bin/python2-nova-rootwrap 300
+	update-alternatives --install /usr/bin/nova-rootwrap-daemon nova-rootwrap-daemon /usr/bin/python2-nova-rootwrap-daemon 300
+	update-alternatives --install /usr/bin/nova-status nova-status /usr/bin/python2-nova-status 300
+	update-alternatives --install /usr/bin/nova-compute nova-compute /usr/bin/python2-nova-compute 300
+	update-alternatives --install /usr/bin/nova-conductor nova-conductor /usr/bin/python2-nova-conductor 300
+	update-alternatives --install /usr/bin/nova-console nova-console /usr/bin/python2-nova-console 300
+	update-alternatives --install /usr/bin/nova-consoleauth nova-consoleauth /usr/bin/python2-nova-consoleauth 300
+	update-alternatives --install /usr/bin/nova-dhcpbridge nova-dhcpbridge /usr/bin/python2-nova-dhcpbridge 300
+	update-alternatives --install /usr/bin/nova-network nova-network /usr/bin/python2-nova-network 300
+	update-alternatives --install /usr/bin/nova-novncproxy nova-novncproxy /usr/bin/python2-nova-novncproxy 300
+	update-alternatives --install /usr/bin/nova-placement-api nova-placement-api /usr/bin/python2-nova-placement-api 300
+	update-alternatives --install /usr/bin/nova-scheduler nova-scheduler /usr/bin/python2-nova-scheduler 300
+	update-alternatives --install /usr/bin/nova-serialproxy nova-serialproxy /usr/bin/python2-nova-serialproxy 300
+	update-alternatives --install /usr/bin/nova-spicehtml5proxy nova-spicehtml5proxy /usr/bin/python2-nova-spicehtml5proxy 300
+	update-alternatives --install /usr/bin/nova-xvpvncproxy nova-xvpvncproxy /usr/bin/python2-nova-xvpvncproxy 300
+	update-alternatives --install /usr/bin/nova-api-wsgi nova-api-wsgi /usr/bin/python2-nova-api-wsgi 300
+	update-alternatives --install /usr/bin/nova-metadata-wsgi nova-metadata-wsgi /usr/bin/python2-nova-metadata-wsgi 300
+fi
+
+#DEBHELPER#
+
+exit 0

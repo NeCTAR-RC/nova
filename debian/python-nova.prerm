@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "remove" ] ; then
+	update-alternatives --remove nova-api-metadata /usr/bin/python2-nova-api-metadata
+	update-alternatives --remove nova-api-os-compute /usr/bin/python2-nova-api-os-compute
+	update-alternatives --remove nova-api /usr/bin/python2-nova-api
+	update-alternatives --remove nova-cells /usr/bin/python2-nova-cells
+	update-alternatives --remove nova-manage /usr/bin/python2-nova-manage
+	update-alternatives --remove nova-policy /usr/bin/python2-nova-policy
+	update-alternatives --remove nova-rootwrap /usr/bin/python2-nova-rootwrap
+	update-alternatives --remove nova-rootwrap-daemon /usr/bin/python2-nova-rootwrap-daemon
+	update-alternatives --remove nova-status /usr/bin/python2-nova-status
+	update-alternatives --remove nova-compute /usr/bin/python2-nova-compute
+	update-alternatives --remove nova-conductor /usr/bin/python2-nova-conductor
+	update-alternatives --remove nova-console /usr/bin/python2-nova-console
+	update-alternatives --remove nova-consoleauth /usr/bin/python2-nova-consoleauth
+	update-alternatives --remove nova-dhcpbridge /usr/bin/python2-nova-dhcpbridge
+	update-alternatives --remove nova-network /usr/bin/python2-nova-network
+	update-alternatives --remove nova-novncproxy /usr/bin/python2-nova-novncproxy
+	update-alternatives --remove nova-placement-api /usr/bin/python2-nova-placement-api
+	update-alternatives --remove nova-scheduler /usr/bin/python2-nova-scheduler
+	update-alternatives --remove nova-serialproxy /usr/bin/python2-nova-serialproxy
+	update-alternatives --remove nova-spicehtml5proxy /usr/bin/python2-nova-spicehtml5proxy
+	update-alternatives --remove nova-xvpvncproxy /usr/bin/python2-nova-xvpvncproxy
+	update-alternatives --remove nova-api-wsgi /usr/bin/python2-nova-api-wsgi
+	update-alternatives --remove nova-metadata-wsgi /usr/bin/python2-nova-metadata-wsgi
+fi
+
+#DEBHELPER#
+
+exit 0

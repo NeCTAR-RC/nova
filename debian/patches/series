@@ -1,0 +1,9 @@
+# Ubuntu specific patches below here. Note these can be dropped eventually.
+drop-sphinx-feature-classification.patch
+skip-ssl-tests.patch
+arm-console-patch.patch
+revert-generalize-db-conf-group-copying.patch
+skip-py3.7-tests.patch
+py3.7-get-context-manager-async.patch
+fix-python3-compatibility-of-rbd-get_fsid.patch
+CVE-2019-14433.patch

@@ -1,0 +1,59 @@
+From 0c52cf3a59442475fa836ece837607912a0b10c9 Mon Sep 17 00:00:00 2001
+From: Stephen Finucane <sfinucan@redhat.com>
+Date: Tue, 28 Aug 2018 17:15:24 +0100
+Subject: [PATCH] Revert "Don't use '_TransactionContextManager._async'"
+
+This reverts commit bd7d991309ea2bea5d175cb1f2710519936fd0c2 and bumps
+the minimum version of oslo.db to 4.40.0, as that is the first version
+of the library to include the renamed attribute.
+
+Change-Id: Ic9e7864be3af7ef362cad5648dfc7bdecd104465
+Related-Bug: #1788833
+---
+ lower-constraints.txt     | 2 +-
+ nova/db/sqlalchemy/api.py | 2 +-
+ requirements.txt          | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/lower-constraints.txt b/lower-constraints.txt
+index c2a27a41dd..6860ddc092 100644
+--- a/lower-constraints.txt
++++ b/lower-constraints.txt
+@@ -79,7 +79,7 @@ oslo.cache==1.26.0
+ oslo.concurrency==3.26.0
+ oslo.config==6.1.0
+ oslo.context==2.19.2
+-oslo.db==4.27.0
++oslo.db==4.40.0
+ oslo.i18n==3.15.3
+ oslo.log==3.36.0
+ oslo.messaging==6.3.0
+diff --git a/nova/db/sqlalchemy/api.py b/nova/db/sqlalchemy/api.py
+index 5273045f82..20481d5e1c 100644
+--- a/nova/db/sqlalchemy/api.py
++++ b/nova/db/sqlalchemy/api.py
+@@ -202,7 +202,7 @@ def select_db_reader_mode(f):
+         use_slave = keyed_args.get('use_slave', False)
+ 
+         if use_slave:
+-            reader_mode = get_context_manager(context).async
++            reader_mode = get_context_manager(context).async_
+         else:
+             reader_mode = get_context_manager(context).reader
+ 
+diff --git a/requirements.txt b/requirements.txt
+index 8e31a31d09..ce3fb57187 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -43,7 +43,7 @@ oslo.log>=3.36.0 # Apache-2.0
+ oslo.reports>=1.18.0 # Apache-2.0
+ oslo.serialization!=2.19.1,>=2.18.0 # Apache-2.0
+ oslo.utils>=3.33.0 # Apache-2.0
+-oslo.db>=4.27.0 # Apache-2.0
++oslo.db>=4.40.0 # Apache-2.0
+ oslo.rootwrap>=5.8.0 # Apache-2.0
+ oslo.messaging>=6.3.0 # Apache-2.0
+ oslo.policy>=1.35.0 # Apache-2.0
+-- 
+2.17.1
+

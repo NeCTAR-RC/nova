@@ -1,0 +1,7 @@
+debian/nova_sudoers etc/sudoers.d
+debian/source_nova.py /usr/share/apport/package-hooks/
+etc/nova/api-paste.ini
+etc/nova/nova.conf
+etc/nova/policy.yaml.sample usr/share/nova
+etc/nova/rootwrap.conf
+etc/nova/rootwrap.d/*

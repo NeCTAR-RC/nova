@@ -1,0 +1,12 @@
+Tests: nova-compute-daemons nova-daemons nova-api nova-shebangs-py3
+Depends: python3-nova, libapache2-mod-wsgi-py3,
+ nova-conductor, nova-scheduler, nova-novncproxy,
+ nova-xvpvncproxy, nova-api, nova-placement-api, nova-console,
+ nova-consoleauth, rabbitmq-server, nova-compute
+Restrictions: needs-root, allow-stderr
+
+Tests: nova-compute-daemons nova-daemons nova-api nova-shebangs-py2
+Depends: nova-conductor, nova-scheduler, nova-novncproxy,
+ nova-xvpvncproxy, nova-api, nova-placement-api, nova-console,
+ nova-consoleauth, rabbitmq-server, nova-compute
+Restrictions: needs-root, allow-stderr
