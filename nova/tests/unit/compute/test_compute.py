@@ -9896,10 +9896,13 @@ class ComputeAPITestCase(BaseTestCase):
         self.assertRaises(exception.InvalidVolume,
                 self.compute_api.rescue, self.context, instance)
 
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceMapping.get_by_instance_uuid')
     @mock.patch.object(compute_rpcapi.ComputeAPI, 'get_vnc_console')
     @mock.patch.object(compute_api.consoleauth_rpcapi.ConsoleAuthAPI,
                        'authorize_console')
-    def test_vnc_console(self, mock_auth, mock_get):
+    def test_vnc_console(self, mock_auth, mock_get, mock_get_mapping,
+                         mock_target_cell):
         # Make sure we can a vnc console for an instance.
 
         fake_instance = self._fake_instance(
@@ -9914,6 +9917,7 @@ class ComputeAPITestCase(BaseTestCase):
                              'instance_uuid': fake_instance.uuid,
                              'access_url': 'fake_console_url'}
         mock_get.return_value = fake_connect_info
+        mock_target_cell.return_value.__enter__.return_value = self.context
 
         console = self.compute_api.get_vnc_console(self.context,
                 fake_instance, fake_console_type)
