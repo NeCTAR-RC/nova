@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a30538a9_b0f6a863",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000077
+      },
+      "writtenOn": "2019-09-13T01:48:18Z",
+      "side": 1,
+      "message": "Nectar ;)",
+      "range": {
+        "startLine": 7,
+        "startChar": 4,
+        "endLine": 7,
+        "endChar": 5
+      },
+      "revId": "9be671d6e79dfddbe451ea15227a2f4ea25860cc",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
