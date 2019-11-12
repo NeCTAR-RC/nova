@@ -1,0 +1,17 @@
+Description: Skip SSL tests that are timing out.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1482633
+Forwarded: no
+Last-Update: 2017-08-23
+
+--- a/nova/tests/unit/test_wsgi.py
++++ b/nova/tests/unit/test_wsgi.py
+@@ -226,7 +226,7 @@ class TestWSGIServer(test.NoDBTestCase):
+             server.stop()
+ 
+ 
+-@testtools.skipIf(six.PY3, "bug/1482633: test hangs on Python 3")
++@testtools.skip("bug/1482633: test hangs on Python 3 and Python 2.7 for Ubuntu package builds")
+ class TestWSGIServerWithSSL(test.NoDBTestCase):
+     """WSGI server with SSL tests."""
+ 
