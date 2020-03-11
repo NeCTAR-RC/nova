@@ -113,10 +113,25 @@ Related options:
 * ``[neutron_physnet_$PHYSNET] numa_nodes`` must be configured for each value
   of ``$PHYSNET`` specified by this option
 """),
+
     cfg.ListOpt('default_networks',
         default=[],
                 help='Default networks to bind an instance too'
 ),
+    cfg.IntOpt('http_retries',
+               default=3,
+               min=0,
+               help="""
+Number of times neutronclient should retry on any failed http call.
+
+0 means connection is attempted only once. Setting it to any positive integer
+means that on failure connection is retried that many times e.g. setting it
+to 3 means total attempts to connect will be 4.
+
+Possible values:
+
+* Any integer value. 0 means connection is attempted only once
+"""),
 ]
 
 metadata_proxy_opts = [
