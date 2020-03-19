@@ -13,9 +13,13 @@
 from oslo_serialization import jsonutils
 from oslo_utils import versionutils
 
+import nova.conf
 from nova.db import api as db
 from nova.objects import base
 from nova.objects import fields
+
+
+CONF = nova.conf.CONF
 
 
 # TODO(berrange): Remove NovaObjectDictCompat
@@ -70,6 +74,12 @@ class InstancePCIRequests(base.NovaObject,
 
     def obj_make_compatible(self, primitive, target_version):
         target_version = versionutils.convert_version_to_tuple(target_version)
+        if CONF.upgrade_levels.compute == 'rocky':
+            for index, request in enumerate(self.requests):
+                request.obj_make_compatible(
+                    primitive['requests'][index]['nova_object.data'], '1.2')
+                primitive['requests'][index]['nova_object.version'] = '1.2'
+
         if target_version < (1, 1) and 'requests' in primitive:
             for index, request in enumerate(self.requests):
                 request.obj_make_compatible(
