@@ -399,7 +399,6 @@ Placement
     * 5: Compute node records not found for one or more hosts
     * 6: Resource provider not found by uuid for a given host
 
-
 ``nova-manage placement audit [--verbose] [--delete] [--resource_provider <uuid>]``
     Iterates over all the Resource Providers (or just one if you provide the
     UUID) and then verifies if the compute allocations are either related to
