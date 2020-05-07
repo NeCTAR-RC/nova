@@ -6123,8 +6123,10 @@ class AggregateAPI(base.Base):
         aggregate.add_host(host_name)
         self.query_client.update_aggregates(context, [aggregate])
         try:
+            nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+            node_name = nodes[0].hypervisor_hostname
             self.placement_client.aggregate_add_host(
-                context, aggregate.uuid, host_name=host_name)
+                context, aggregate.uuid, host_name=node_name)
         except (exception.ResourceProviderNotFound,
                 exception.ResourceProviderAggregateRetrievalFailed,
                 exception.ResourceProviderUpdateFailed,
@@ -6179,8 +6181,10 @@ class AggregateAPI(base.Base):
         try:
             # Anything else this raises is handled in the route handler as
             # either a 409 (ResourceProviderUpdateConflict) or 500.
+            nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+            node_name = nodes[0].hypervisor_hostname
             self.placement_client.aggregate_remove_host(
-                context, aggregate.uuid, host_name)
+                context, aggregate.uuid, node_name)
         except exception.ResourceProviderNotFound as err:
             # If the resource provider is not found then it's likely not part
             # of the aggregate anymore anyway since provider aggregates are
