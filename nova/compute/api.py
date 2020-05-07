@@ -5749,9 +5749,11 @@ class AggregateAPI(base.Base):
 
         aggregate.add_host(host_name)
         self.query_client.update_aggregates(context, [aggregate])
+        nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+        node_name = nodes[0].hypervisor_hostname
         try:
             self.placement_client.aggregate_add_host(
-                context, aggregate.uuid, host_name)
+                context, aggregate.uuid, node_name)
         except exception.PlacementAPIConnectFailure:
             # NOTE(jaypipes): Rocky should be able to tolerate the nova-api
             # service not communicating with the Placement API, so just log a
@@ -5761,7 +5763,7 @@ class AggregateAPI(base.Base):
             LOG.warning("Failed to associate %s with a placement "
                         "aggregate: %s. There was a failure to communicate "
                         "with the placement service.",
-                        host_name, aggregate.uuid)
+                        node_name, aggregate.uuid)
         except (exception.ResourceProviderNotFound,
                 exception.ResourceProviderAggregateRetrievalFailed,
                 exception.ResourceProviderUpdateFailed,
@@ -5775,7 +5777,7 @@ class AggregateAPI(base.Base):
             LOG.warning("Failed to associate %s with a placement "
                         "aggregate: %s. This may be corrected after running "
                         "nova-manage placement sync_aggregates.",
-                        host_name, err)
+                        node_name, err)
         self._update_az_cache_for_host(context, host_name, aggregate.metadata)
         # NOTE(jogo): Send message to host to support resource pools
         self.compute_rpcapi.add_aggregate_host(context,
@@ -5815,9 +5817,11 @@ class AggregateAPI(base.Base):
 
         aggregate.delete_host(host_name)
         self.query_client.update_aggregates(context, [aggregate])
+        nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+        node_name = nodes[0].hypervisor_hostname
         try:
             self.placement_client.aggregate_remove_host(
-                context, aggregate.uuid, host_name)
+                context, aggregate.uuid, node_name)
         except exception.PlacementAPIConnectFailure:
             # NOTE(jaypipes): Rocky should be able to tolerate the nova-api
             # service not communicating with the Placement API, so just log a
@@ -5827,7 +5831,7 @@ class AggregateAPI(base.Base):
             LOG.warning("Failed to remove association of %s with a placement "
                         "aggregate: %s. There was a failure to communicate "
                         "with the placement service.",
-                        host_name, aggregate.uuid)
+                        node_name, aggregate.uuid)
         except (exception.ResourceProviderNotFound,
                 exception.ResourceProviderAggregateRetrievalFailed,
                 exception.ResourceProviderUpdateFailed,
@@ -5841,7 +5845,7 @@ class AggregateAPI(base.Base):
             LOG.warning("Failed to remove association of %s with a placement "
                         "aggregate: %s. This may be corrected after running "
                         "nova-manage placement sync_aggregates.",
-                        host_name, err)
+                        node_name, err)
         self._update_az_cache_for_host(context, host_name, aggregate.metadata)
         self.compute_rpcapi.remove_aggregate_host(context,
                 aggregate=aggregate, host_param=host_name, host=host_name)
