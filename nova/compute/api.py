@@ -5750,6 +5750,8 @@ class AggregateAPI(base.Base):
         aggregate.add_host(host_name)
         self.query_client.update_aggregates(context, [aggregate])
         try:
+            nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+            host_name = nodes[0].hypervisor_hostname
             self.placement_client.aggregate_add_host(
                 context, aggregate.uuid, host_name)
         except exception.PlacementAPIConnectFailure:
@@ -5816,6 +5818,8 @@ class AggregateAPI(base.Base):
         aggregate.delete_host(host_name)
         self.query_client.update_aggregates(context, [aggregate])
         try:
+            nodes = objects.ComputeNodeList.get_all_by_host(context, host_name)
+            host_name = nodes[0].hypervisor_hostname
             self.placement_client.aggregate_remove_host(
                 context, aggregate.uuid, host_name)
         except exception.PlacementAPIConnectFailure:
