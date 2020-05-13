@@ -34,7 +34,7 @@ gabbi==1.35.0
 gitdb2==2.0.3
 GitPython==2.1.8
 greenlet==0.4.10
-hacking==3.0.1
+hacking==3.1.0
 idna==2.6
 iso8601==0.1.11
 Jinja2==2.10
