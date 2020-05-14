@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a2fc5ab_32d5ecea",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 5753,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-14T05:34:05Z",
+      "side": 1,
+      "message": "I think this needs to be in a try catch and log a warning if can\u0027t be found, same for below too\n\nEg. nodes could be an empty list",
+      "range": {
+        "startLine": 5753,
+        "startChar": 8,
+        "endLine": 5753,
+        "endChar": 48
+      },
+      "revId": "a94f3aa969b2c8db87d1d36e0f0f47905e09966a",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
