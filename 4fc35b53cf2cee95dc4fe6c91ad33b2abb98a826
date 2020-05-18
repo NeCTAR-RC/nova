@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "27d0d6d6_c239514d",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 5757,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-18T23:29:12Z",
+      "side": 1,
+      "message": "I don\u0027t think this is the exception that will be thrown. It would be an IndexError when trying to access the first entry in an empty list (nodes) ?",
+      "range": {
+        "startLine": 5757,
+        "startChar": 25,
+        "endLine": 5757,
+        "endChar": 44
+      },
+      "revId": "4fc35b53cf2cee95dc4fe6c91ad33b2abb98a826",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
