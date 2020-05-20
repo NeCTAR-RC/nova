@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c26a00ce_c4b43e31",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 5758,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-20T22:12:54Z",
+      "side": 1,
+      "message": "\"Failed to find ComputeNode for hostname %s\"",
+      "range": {
+        "startLine": 5758,
+        "startChar": 25,
+        "endLine": 5758,
+        "endChar": 62
+      },
+      "revId": "5e002aa82fbe6cbbfd4f4b9f64be078676c74d93",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "942b8519_31b51f2f",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 5782,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-20T22:12:54Z",
+      "side": 1,
+      "message": "can\u0027t use node_name here as it\u0027s in the try block. Best to stick with host_name",
+      "range": {
+        "startLine": 5782,
+        "startChar": 24,
+        "endLine": 5782,
+        "endChar": 33
+      },
+      "revId": "5e002aa82fbe6cbbfd4f4b9f64be078676c74d93",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "196350af_cf0b9108",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 5838,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-20T22:12:54Z",
+      "side": 1,
+      "message": "same here",
+      "range": {
+        "startLine": 5838,
+        "startChar": 24,
+        "endLine": 5838,
+        "endChar": 28
+      },
+      "revId": "5e002aa82fbe6cbbfd4f4b9f64be078676c74d93",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a8f1e67b_88c43606",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 5852,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-20T22:12:54Z",
+      "side": 1,
+      "message": "here too",
+      "range": {
+        "startLine": 5852,
+        "startChar": 24,
+        "endLine": 5852,
+        "endChar": 33
+      },
+      "revId": "5e002aa82fbe6cbbfd4f4b9f64be078676c74d93",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
