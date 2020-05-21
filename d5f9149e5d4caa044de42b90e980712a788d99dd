@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "87f06465_26296782",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 5737,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-05-21T07:02:19Z",
+      "side": 1,
+      "message": "I removed the following exception capture statements as I think they will be captured at this part.",
+      "range": {
+        "startLine": 5723,
+        "startChar": 0,
+        "endLine": 5737,
+        "endChar": 63
+      },
+      "revId": "d5f9149e5d4caa044de42b90e980712a788d99dd",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
