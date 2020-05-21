@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "46874917_4984bc1c",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 6
+      },
+      "lineNbr": 5766,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-05-21T22:25:55Z",
+      "side": 1,
+      "message": "needs to be host_name, same as below",
+      "range": {
+        "startLine": 5766,
+        "startChar": 24,
+        "endLine": 5766,
+        "endChar": 33
+      },
+      "revId": "2cec61db780a5e78693504633064bfaa1b311d64",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
