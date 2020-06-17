@@ -1,0 +1,22 @@
+Description: This test needs pythnon3-mock 3.0.0. Skip until it's available.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Forwarded: not-needed
+
+--- a/nova/tests/unit/test_versions.py
++++ b/nova/tests/unit/test_versions.py
+@@ -12,6 +12,7 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+ 
++import testtools
+ from oslo_config import cfg
+ 
+ from nova import test
+@@ -30,6 +31,7 @@
+         self.assertEqual("5.5.5.5-g9ec3421",
+                          version.version_string_with_package())
+ 
++    @testtools.skip('Skipped by Ubuntu - needs python3-mock 3.0.0')
+     @test.patch_open("/etc/nova/release", read_data=
+                      "[Nova]\n"
+                      "vendor = ACME Corporation\n"
