@@ -4804,6 +4804,23 @@ class API(base.Base):
             )
             request_spec.requested_destination = destination
 
+        cell_mapping = None
+
+        try:
+            cell_mapping = objects.InstanceMapping.get_by_instance_uuid(
+                context, instance.uuid).cell_mapping
+        except exception.InstanceMappingNotFound:
+            raise exception.MigrationPreCheckError(
+                reason=(_('Unable to determine in which cell '
+                          'instance %s lives.') % instance.uuid))
+
+        if ('requested_destination' in request_spec and
+                request_spec.requested_destination):
+            request_spec.requested_destination.cell = cell_mapping
+        else:
+            request_spec.requested_destination = objects.Destination(
+                cell=cell_mapping)
+
         return self.compute_task_api.rebuild_instance(context,
                        instance=instance,
                        new_pass=admin_password,
