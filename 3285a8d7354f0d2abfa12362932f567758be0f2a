@@ -1,0 +1,84 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2eeec5a2_b6aad8bf",
+        "filename": "nova/filters.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-11-11T21:38:12Z",
+      "side": 1,
+      "message": "we probably only need host here, having both is a bit redundant and will lead to bigger log lines which makes it a bit harder",
+      "range": {
+        "startLine": 85,
+        "startChar": 0,
+        "endLine": 86,
+        "endChar": 58
+      },
+      "revId": "3285a8d7354f0d2abfa12362932f567758be0f2a",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5c187d0c_c75fa48e",
+        "filename": "nova/filters.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-11-11T21:38:12Z",
+      "side": 1,
+      "message": "I think adding a\n\nLOG.info(\"Starting hosts %s\", hosts) here would be enough",
+      "revId": "3285a8d7354f0d2abfa12362932f567758be0f2a",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5f463cca_7ed5efad",
+        "filename": "nova/filters.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-11-11T21:38:12Z",
+      "side": 1,
+      "message": "And then add a \nLOG.info(\"Filtered hosts %s\", hosts) \n\nhere to end",
+      "revId": "3285a8d7354f0d2abfa12362932f567758be0f2a",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d728c481_bfa76a46",
+        "filename": "nova/filters.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 113,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2020-11-11T21:38:12Z",
+      "side": 1,
+      "message": "I think we should keep these log lines the same and create new log calls as above, this will make it easier to maintain going forward",
+      "range": {
+        "startLine": 102,
+        "startChar": 0,
+        "endLine": 113,
+        "endChar": 77
+      },
+      "revId": "3285a8d7354f0d2abfa12362932f567758be0f2a",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
