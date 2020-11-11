@@ -82,6 +82,9 @@ class BaseFilterHandler(loadables.BaseLoader):
             if filter_.run_filter_for_index(index):
                 cls_name = filter_.__class__.__name__
                 start_count = len(list_objs)
+                starting = [(getattr(obj, "host", obj),
+                             getattr(obj, "nodename", ""))
+                            for obj in list_objs]
                 objs = filter_.filter_all(list_objs, spec_obj)
                 if objs is None:
                     LOG.debug("Filter %s says to stop filtering", cls_name)
@@ -96,12 +99,16 @@ class BaseFilterHandler(loadables.BaseLoader):
                                  for obj in list_objs]
                     full_filter_results.append((cls_name, remaining))
                 else:
-                    LOG.info(_LI("Filter %s returned 0 hosts"), cls_name)
+                    LOG.info(_LI("Filter %s returned 0 hosts from %d "
+                                 "starting hosts %s"), cls_name, start_count,
+                                 starting)
                     full_filter_results.append((cls_name, None))
                     break
                 LOG.debug("Filter %(cls_name)s returned "
-                          "%(obj_len)d host(s)",
-                          {'cls_name': cls_name, 'obj_len': len(list_objs)})
+                          "%(end_count)d host(s) from %(start_count)d "
+                          "starting hosts %(starting)s",
+                          {'cls_name': cls_name, 'end_count': end_count,
+                           'start_count': start_count, 'starting': starting})
         if not list_objs:
             # Log the filtration history
             msg_dict = {
