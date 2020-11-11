@@ -94,7 +94,8 @@ class FiltersTestCase(test.NoDBTestCase):
         filter_objs_initial = ['initial', 'filter1', 'objects1']
         filter_objs_second = ['second', 'filter2', 'objects2']
         filter_objs_last = ['last', 'filter3', 'objects3']
-        spec_obj = objects.RequestSpec()
+        fake_uuid = uuids.instance
+        spec_obj = objects.RequestSpec(instance_uuid=fake_uuid)
 
         def _fake_base_loader_init(*args, **kwargs):
             pass
@@ -126,7 +127,8 @@ class FiltersTestCase(test.NoDBTestCase):
         """
         filter_objs_initial = ['initial', 'filter1', 'objects1']
         filter_objs_second = ['second', 'filter2', 'objects2']
-        spec_obj = objects.RequestSpec()
+        fake_uuid = uuids.instance
+        spec_obj = objects.RequestSpec(instance_uuid=fake_uuid)
 
         def _fake_base_loader_init(*args, **kwargs):
             pass
@@ -152,7 +154,8 @@ class FiltersTestCase(test.NoDBTestCase):
 
     def test_get_filtered_objects_none_response(self):
         filter_objs_initial = ['initial', 'filter1', 'objects1']
-        spec_obj = objects.RequestSpec()
+        fake_uuid = uuids.instance
+        spec_obj = objects.RequestSpec(instance_uuid=fake_uuid)
 
         def _fake_base_loader_init(*args, **kwargs):
             pass
