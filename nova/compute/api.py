@@ -115,6 +115,8 @@ MIN_COMPUTE_VOLUME_TYPE = 36
 # trigger.
 CELLS = []
 
+UOM_NO_RESIZE_HOSTS = re.compile('^qh2-rcc(8[6-9]|9[0-9]|1[0,1][0-9])')
+
 
 def check_instance_state(vm_state=None, task_state=(None,),
                          must_have_launched=True):
@@ -3713,6 +3715,10 @@ class API(base.Base):
         host_name is always None in the resize case.
         host_name can be set in the cold migration case only.
         """
+        if UOM_NO_RESIZE_HOSTS.match(instance.host):
+            reason = _('Resize on this instance is temporarily not allowed')
+            raise exception.CannotResizeDisk(reason=reason)
+
         if host_name is not None:
             # Cannot migrate to the host where the instance exists
             # because it is useless.
