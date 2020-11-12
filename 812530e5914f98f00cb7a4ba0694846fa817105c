@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a5e85548_812ef86d",
+        "filename": "nova/compute/api.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 1000114
+      },
+      "writtenOn": "2020-11-12T00:20:42Z",
+      "side": 1,
+      "message": "regex missing qh2-rcc90 \u0026 qh2-rcc100\nShould be?:\nqh2-rcc(8[6-9]|9[0-9]|1[0,1][0-9])",
+      "range": {
+        "startLine": 118,
+        "startChar": 35,
+        "endLine": 118,
+        "endChar": 69
+      },
+      "revId": "812530e5914f98f00cb7a4ba0694846fa817105c",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
