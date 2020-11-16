@@ -398,7 +398,7 @@ class HostManagerTestCase(test.NoDBTestCase):
 
     def test_get_filtered_hosts_with_ignore_case_insensitive(self):
         fake_properties = objects.RequestSpec(
-            instance_uuids=uuids.fakehost,
+            instance_uuid=uuids.fakehost,
             ignore_hosts=['FAKE_HOST1', 'FaKe_HoSt3', 'Fake_Multihost'],
             force_hosts=[],
             force_nodes=[])

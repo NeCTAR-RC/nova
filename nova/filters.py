@@ -83,8 +83,9 @@ class BaseFilterHandler(loadables.BaseLoader):
                 cls_name = filter_.__class__.__name__
                 start_count = len(list_objs)
                 starting = [getattr(obj, "host", obj) for obj in list_objs]
-                LOG.info("Filter %s starting %d hosts %s",
-                         cls_name, start_count, starting)
+                LOG.info("Filter %s starting %d hosts %s for instance ID '%s'",
+                         cls_name, start_count, starting,
+                         spec_obj.instance_uuid)
                 objs = filter_.filter_all(list_objs, spec_obj)
                 if objs is None:
                     LOG.debug("Filter %s says to stop filtering", cls_name)
@@ -98,8 +99,9 @@ class BaseFilterHandler(loadables.BaseLoader):
                                   getattr(obj, "nodename", ""))
                                  for obj in list_objs]
                     full_filter_results.append((cls_name, remaining))
-                    LOG.info("Filter %s returned %d hosts %s",
-                             cls_name, end_count, [r[0] for r in remaining])
+                    LOG.info("Filter %s returned %d hosts %s for instance ID "
+                             "'%s'", cls_name, end_count,
+                             [r[0] for r in remaining], spec_obj.instance_uuid)
                 else:
                     LOG.info(_LI("Filter %s returned 0 hosts"), cls_name)
                     full_filter_results.append((cls_name, None))
