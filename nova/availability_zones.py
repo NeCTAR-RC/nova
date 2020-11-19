@@ -19,15 +19,12 @@ import collections
 
 import six
 
-from keystoneauth1 import session
-from keystoneclient.v3 import client
 from oslo_log import log as logging
 
 from nova import cache_utils
 import nova.conf
-from nova import exception
+from nova import nectar_utils
 from nova import objects
-from nova import service_auth
 
 # NOTE(vish): azs don't change that often, so cache them for an hour to
 #             avoid hitting the db multiple times on every request.
@@ -237,11 +234,7 @@ def get_restricted_zones(context):
     LOG.debug("Found cached restricted zones: %s", zones)
 
     if not zones:
-        auth_plugin = service_auth.get_auth_plugin(context)
-        if not auth_plugin:
-            raise exception.Unauthorized()
-        sess = session.Session(auth=auth_plugin)
-        project = client.Client(session=sess).projects.get(project_id)
+        project = nectar_utils.get_project(context)
         zones = getattr(project, 'compute_zones', ALL_ZONES)
         cache.set(cache_key, zones)
         LOG.debug("Cached restricted zones: %s", zones)
