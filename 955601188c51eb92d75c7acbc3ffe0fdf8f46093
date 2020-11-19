@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1daeec07_273db5e1",
+        "filename": "nova/tests/unit/scheduler/filters/test_project_tags_filters.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-11-19T05:34:19Z",
+      "side": 1,
+      "message": "not used?",
+      "range": {
+        "startLine": 15,
+        "startChar": 0,
+        "endLine": 15,
+        "endChar": 16
+      },
+      "revId": "955601188c51eb92d75c7acbc3ffe0fdf8f46093",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5d955e85_739e519e",
+        "filename": "nova/tests/unit/scheduler/filters/test_project_tags_filters.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-11-19T05:34:19Z",
+      "side": 1,
+      "message": "ditto",
+      "range": {
+        "startLine": 22,
+        "startChar": 0,
+        "endLine": 22,
+        "endChar": 21
+      },
+      "revId": "955601188c51eb92d75c7acbc3ffe0fdf8f46093",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
