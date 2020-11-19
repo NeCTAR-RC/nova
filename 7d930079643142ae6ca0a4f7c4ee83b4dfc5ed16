@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "22fab08b_34db3d80",
+        "filename": "nova/nectar_utils.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-11-19T05:24:52Z",
+      "side": 1,
+      "message": "not sure about this, but is the cache key correct?",
+      "range": {
+        "startLine": 38,
+        "startChar": 17,
+        "endLine": 38,
+        "endChar": 26
+      },
+      "revId": "7d930079643142ae6ca0a4f7c4ee83b4dfc5ed16",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ac0e3386_0d7b7035",
+        "filename": "nova/scheduler/filters/project_tags_filter.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-11-19T05:24:52Z",
+      "side": 1,
+      "message": "is for restrict zone filter?",
+      "range": {
+        "startLine": 27,
+        "startChar": 0,
+        "endLine": 28,
+        "endChar": 54
+      },
+      "revId": "7d930079643142ae6ca0a4f7c4ee83b4dfc5ed16",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e3e055d6_11ed4b4a",
+        "filename": "nova/scheduler/filters/project_tags_filter.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 1000190
+      },
+      "writtenOn": "2020-11-19T05:24:52Z",
+      "side": 1,
+      "message": "so does that mean non-aardvark projects will also be allowed on the hosts?",
+      "range": {
+        "startLine": 56,
+        "startChar": 8,
+        "endLine": 56,
+        "endChar": 19
+      },
+      "revId": "7d930079643142ae6ca0a4f7c4ee83b4dfc5ed16",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
