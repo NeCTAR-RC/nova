@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1f46abdf_dd72b7ab",
+        "filename": "nova/scheduler/filters/project_tags_filter.py",
+        "patchSetId": 6
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2020-11-23T23:45:10Z",
+      "side": 1,
+      "message": "A few comments would help in understanding the logic here",
+      "revId": "b5aded63642421a38f35ee6072ac984d4d774804",
+      "serverId": "f182a8af-62ca-4ceb-ab81-14f8fec9c6c5",
+      "unresolved": true
+    }
+  ]
+}
