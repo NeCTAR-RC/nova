@@ -1,0 +1,10 @@
+Tests: nova-compute-daemons nova-daemons nova-api
+Depends:
+ mysql-server,
+ nova-api,
+ nova-compute,
+ nova-conductor,
+ nova-spiceproxy,
+ nova-scheduler,
+ rabbitmq-server,
+Restrictions: needs-root, allow-stderr

@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenStack Compute
+After=libvirtd.service postgresql.service mysql.service keystone.service rabbitmq-server.service ntp.service neutron-ovs-cleanup.service
+
+[Service]
+User=nova
+Group=nova
+Type=simple
+WorkingDirectory=~
+RuntimeDirectory=nova lock/nova
+CacheDirectory=nova
+ExecStart=/etc/init.d/nova-compute systemd-start
+Restart=on-failure
+LimitNOFILE=65535
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

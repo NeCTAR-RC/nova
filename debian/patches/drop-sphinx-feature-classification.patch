@@ -1,0 +1,15 @@
+Description: Drop sphinx_feature_classification.support_matrix until
+ package is available.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Forwarded: no
+
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -34,7 +34,6 @@ extensions = [
+     'sphinx.ext.todo',
+     'sphinx.ext.graphviz',
+     'openstackdocstheme',
+-    'sphinx_feature_classification.support_matrix',
+     'oslo_config.sphinxconfiggen',
+     'oslo_config.sphinxext',
+     'oslo_policy.sphinxpolicygen',
