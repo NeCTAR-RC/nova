@@ -126,6 +126,7 @@ Build-Depends-Indep:
  python3-wsgi-intercept (>= 1.7.0),
  python3-yaml (>= 3.13),
  python3-zvmcloudconnector (>= 1.3.0),
+ systemd,
 Build-Conflicts:
  python-cjson,
  python3-cjson,
