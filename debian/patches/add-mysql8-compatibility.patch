@@ -1,0 +1,21 @@
+Description: Avoid the use of IDENTIFIED BY on GRANT
+ Per [1] this isn't allowed anymore.
+ It shall only be used on ALTER or CREATE. In this case a user is created
+ so we add a create call.
+ [1]: https://dev.mysql.com/doc/refman/8.0/en/mysql-nutshell.html
+Forwarded: no
+Author: Christian Ehrhardt <christian.ehrhardt@canonical.com>
+Last-Update: 2019-08-01
+--- a/tools/test-setup.sh
++++ b/tools/test-setup.sh
+@@ -23,8 +23,9 @@ sudo -H mysqladmin -u root password $DB_
+ sudo -H mysql -u root -p$DB_ROOT_PW -h localhost -e "
+     DELETE FROM mysql.user WHERE User='';
+     FLUSH PRIVILEGES;
++    CREATE USER '$DB_USER'@'%' identified by '$DB_PW';
+     GRANT ALL PRIVILEGES ON *.*
+-        TO '$DB_USER'@'%' identified by '$DB_PW' WITH GRANT OPTION;"
++        TO '$DB_USER'@'%' WITH GRANT OPTION;"
+ 
+ # Now create our database.
+ mysql -u $DB_USER -p$DB_PW -h 127.0.0.1 -e "

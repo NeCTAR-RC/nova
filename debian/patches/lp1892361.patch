@@ -1,0 +1,500 @@
+From f58399cf496566e39d11f82a61e0b47900f2eafa Mon Sep 17 00:00:00 2001
+From: Hemanth Nakkina <hemanth.nakkina@canonical.com>
+Date: Tue, 01 Sep 2020 09:36:51 +0530
+Subject: [PATCH] Update pci stat pools based on PCI device changes
+
+At start up of nova-compute service, the PCI stat pools are
+populated based on information in pci_devices table in Nova
+database. The pools are updated only when new device is added
+or removed but not on any device changes like device type.
+
+If an existing device is configured as SRIOV and nova-compute
+is restarted, the pci_devices table gets updated but the device
+is still listed under the old pool in pci_tracker.stats.pool
+(in-memory object).
+
+This patch looks for device type updates in existing devices
+and updates the pools accordingly.
+
+Conflicts:
+      nova/tests/functional/libvirt/test_pci_sriov_servers.py
+      nova/tests/unit/virt/libvirt/fakelibvirt.py
+
+To avoid the conflicts and make the new functional test execute,
+following changes are performed
+- Modified the Neutron fixture to use LibvirtNeutron fixture.
+- nova/tests/functional/libvirt/base.py is modified to include
+tenant_id in the port body.
+
+Change-Id: Id4ebb06e634a612c8be4be6c678d8265e0b99730
+Closes-Bug: #1892361
+(cherry picked from commit b8695de6da56db42b83b9d9d4c330148766644be)
+(cherry picked from commit d8b8a8193b6b8228f6e7d6bde68b5ea6bb53dd8b)
+---
+
+diff --git a/nova/pci/manager.py b/nova/pci/manager.py
+index 3084643..05930b0 100644
+--- a/nova/pci/manager.py
++++ b/nova/pci/manager.py
+@@ -225,6 +225,7 @@
+                     self.stale[new_value['address']] = new_value
+                 else:
+                     existed.update_device(new_value)
++                    self.stats.update_device(existed)
+ 
+         # Track newly discovered devices.
+         for dev in [dev for dev in devices if
+diff --git a/nova/pci/stats.py b/nova/pci/stats.py
+index dcf26d3..0a80ece 100644
+--- a/nova/pci/stats.py
++++ b/nova/pci/stats.py
+@@ -105,6 +105,32 @@
+             pool['parent_ifname'] = dev.extra_info['parent_ifname']
+         return pool
+ 
++    def _get_pool_with_device_type_mismatch(self, dev):
++        """Check for device type mismatch in the pools for a given device.
++
++        Return (pool, device) if device type does not match or a single None
++        if the device type matches.
++        """
++        for pool in self.pools:
++            for device in pool['devices']:
++                if device.address == dev.address:
++                    if dev.dev_type != pool["dev_type"]:
++                        return pool, device
++                    return None
++
++        return None
++
++    def update_device(self, dev):
++        """Update a device to its matching pool."""
++        pool_device_info = self._get_pool_with_device_type_mismatch(dev)
++        if pool_device_info is None:
++            return
++
++        pool, device = pool_device_info
++        pool['devices'].remove(device)
++        self._decrease_pool_count(self.pools, pool)
++        self.add_device(dev)
++
+     def add_device(self, dev):
+         """Add a device to its matching pool."""
+         dev_pool = self._create_pool_keys_from_dev(dev)
+diff --git a/nova/tests/functional/libvirt/base.py b/nova/tests/functional/libvirt/base.py
+index 5ef3efb..b4cbaf5 100644
+--- a/nova/tests/functional/libvirt/base.py
++++ b/nova/tests/functional/libvirt/base.py
+@@ -342,6 +342,15 @@
+         # network_2_port_1 below at the update call
+         port = copy.deepcopy(port)
+         port.update(body['port'])
++
++        # the tenant ID is normally extracted from credentials in the request
++        # and is not present in the body
++        if 'tenant_id' not in port:
++            port['tenant_id'] = nova_fixtures.NeutronFixture.tenant_id
++
++        # similarly, these attributes are set by neutron itself
++        port['admin_state_up'] = True
++
+         self._ports[port['id']] = port
+         # this copy is here as nova sometimes modifies the returned port
+         # locally and we want to avoid that nova modifies the fixture internals
+diff --git a/nova/tests/functional/libvirt/test_pci_sriov_servers.py b/nova/tests/functional/libvirt/test_pci_sriov_servers.py
+index a86cd28..900e593 100644
+--- a/nova/tests/functional/libvirt/test_pci_sriov_servers.py
++++ b/nova/tests/functional/libvirt/test_pci_sriov_servers.py
+@@ -13,6 +13,7 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+ 
++import copy
+ import ddt
+ import fixtures
+ import mock
+@@ -20,6 +21,8 @@
+ from oslo_log import log as logging
+ from oslo_serialization import jsonutils
+ 
++from nova import context
++from nova import objects
+ from nova.objects import fields
+ from nova.tests.functional.libvirt import base
+ from nova.tests.unit.virt.libvirt import fakelibvirt
+@@ -94,10 +97,12 @@
+         {
+             'vendor_id': fakelibvirt.PCI_VEND_ID,
+             'product_id': fakelibvirt.PF_PROD_ID,
++            'physical_network': 'physnet4',
+         },
+         {
+             'vendor_id': fakelibvirt.PCI_VEND_ID,
+             'product_id': fakelibvirt.VF_PROD_ID,
++            'physical_network': 'physnet4',
+         },
+     )]
+     # PFs will be removed from pools unless they are specifically
+@@ -117,6 +122,29 @@
+         },
+     )]
+ 
++    def setUp(self):
++        super().setUp()
++
++        # The ultimate base class _IntegratedTestBase uses NeutronFixture but
++        # we need a bit more intelligent neutron for these tests. Applying the
++        # new fixture here means that we re-stub what the previous neutron
++        # fixture already stubbed.
++        self.neutron = self.useFixture(base.LibvirtNeutronFixture(self))
++
++    def _disable_sriov_in_pf(self, pci_info):
++        # Check for PF and change the capability from virt_functions
++        # Delete all the VFs
++        vfs_to_delete = []
++
++        for device_name, device in pci_info.devices.items():
++            if 'virt_functions' in device.pci_device:
++                device.generate_xml(skip_capability=True)
++            elif 'phys_function' in device.pci_device:
++                vfs_to_delete.append(device_name)
++
++        for device in vfs_to_delete:
++            del pci_info.devices[device]
++
+     def test_create_server_with_VF(self):
+ 
+         host_info = fakelibvirt.HostInfo(cpu_nodes=2, cpu_sockets=1,
+@@ -187,6 +215,74 @@
+         self._run_build_test(flavor_id_vfs)
+         self._run_build_test(flavor_id_pfs, end_status='ERROR')
+ 
++    def test_create_server_after_change_in_nonsriov_pf_to_sriov_pf(self):
++        # Starts a compute with PF not configured with SRIOV capabilities
++        # Updates the PF with SRIOV capability and restart the compute service
++        # Then starts a VM with the sriov port. The VM should be in active
++        # state with sriov port attached.
++
++        # To emulate the device type changing, we first create a
++        # HostPCIDevicesInfo object with PFs and VFs. Then we make a copy
++        # and remove the VFs and the virt_function capability. This is
++        # done to ensure the physical function product id is same in both
++        # the versions.
++        host_info = fakelibvirt.HostInfo(cpu_nodes=2, cpu_sockets=1,
++                                         cpu_cores=2, cpu_threads=2,
++                                         kB_mem=15740000)
++        pci_info = fakelibvirt.HostPCIDevicesInfo(num_pfs=1, num_vfs=1)
++        pci_info_no_sriov = copy.deepcopy(pci_info)
++
++        # Disable SRIOV capabilties in PF and delete the VFs
++        self._disable_sriov_in_pf(pci_info_no_sriov)
++
++        fake_connection = self._get_connection(host_info,
++                                               pci_info=pci_info_no_sriov,
++                                               hostname='test_compute0')
++        self.mock_conn.return_value = fake_connection
++
++        self.compute = self.start_service('compute', host='test_compute0')
++
++        ctxt = context.get_admin_context()
++        pci_devices = objects.PciDeviceList.get_by_compute_node(
++            ctxt,
++            objects.ComputeNode.get_by_nodename(
++                ctxt, 'test_compute0',
++            ).id,
++        )
++        self.assertEqual(1, len(pci_devices))
++        self.assertEqual('type-PCI', pci_devices[0].dev_type)
++
++        # Update connection with original pci info with sriov PFs
++        fake_connection = self._get_connection(host_info,
++                                               pci_info=pci_info,
++                                               hostname='test_compute0')
++        self.mock_conn.return_value = fake_connection
++
++        # Restart the compute service
++        self.restart_compute_service(self.compute)
++
++        # Verify if PCI devices are of type type-PF or type-VF
++        pci_devices = objects.PciDeviceList.get_by_compute_node(
++            ctxt,
++            objects.ComputeNode.get_by_nodename(
++                ctxt, 'test_compute0',
++            ).id,
++        )
++        for pci_device in pci_devices:
++            self.assertIn(pci_device.dev_type, ['type-PF', 'type-VF'])
++
++        # create the port
++        self.neutron.create_port({'port': self.neutron.network_4_port_1})
++
++        # create a server using the VF via neutron
++        flavor_id = self._create_flavor()
++        self._create_server(
++            flavor_id=flavor_id,
++            networks=[
++                {'port': base.LibvirtNeutronFixture.network_4_port_1['id']},
++            ],
++        )
++
+ 
+ class GetServerDiagnosticsServerWithVfTestV21(_PCIServersTestBase):
+ 
+diff --git a/nova/tests/unit/pci/test_stats.py b/nova/tests/unit/pci/test_stats.py
+index be86778..0375ccc 100644
+--- a/nova/tests/unit/pci/test_stats.py
++++ b/nova/tests/unit/pci/test_stats.py
+@@ -533,6 +533,30 @@
+         self.pci_stats.remove_device(dev2)
+         self._assertPools()
+ 
++    def test_update_device(self):
++        # Update device type of one of the device from type-PCI to
++        # type-PF. Verify if the existing pool is updated and a new
++        # pool is created with dev_type type-PF.
++        self._create_pci_devices()
++        dev1 = self.pci_tagged_devices.pop()
++        dev1.dev_type = 'type-PF'
++        self.pci_stats.update_device(dev1)
++        self.assertEqual(3, len(self.pci_stats.pools))
++        self._assertPoolContent(self.pci_stats.pools[0], '1137', '0072',
++                                len(self.pci_untagged_devices))
++        self.assertEqual(self.pci_untagged_devices,
++                         self.pci_stats.pools[0]['devices'])
++        self._assertPoolContent(self.pci_stats.pools[1], '1137', '0071',
++                                len(self.pci_tagged_devices),
++                                physical_network='physnet1')
++        self.assertEqual(self.pci_tagged_devices,
++                         self.pci_stats.pools[1]['devices'])
++        self._assertPoolContent(self.pci_stats.pools[2], '1137', '0071',
++                                1,
++                                physical_network='physnet1')
++        self.assertEqual(dev1,
++                         self.pci_stats.pools[2]['devices'][0])
++
+ 
+ class PciDeviceVFPFStatsTestCase(test.NoDBTestCase):
+ 
+diff --git a/nova/tests/unit/virt/libvirt/fakelibvirt.py b/nova/tests/unit/virt/libvirt/fakelibvirt.py
+index 46d3361..9499761 100644
+--- a/nova/tests/unit/virt/libvirt/fakelibvirt.py
++++ b/nova/tests/unit/virt/libvirt/fakelibvirt.py
+@@ -271,49 +271,61 @@
+         :param multiple_gpu_types: (bool) Supports different vGPU types
+         """
+ 
++        self.dev_type = dev_type
++        self.slot = slot
++        self.function = function
++        self.iommu_group = iommu_group
++        self.numa_node = numa_node
++        self.vf_ratio = vf_ratio
++        self.multiple_gpu_types = multiple_gpu_types
++        self.generate_xml()
++
++    def generate_xml(self, skip_capability=False):
+         vend_id = PCI_VEND_ID
+         vend_name = PCI_VEND_NAME
+-        if dev_type == 'PCI':
+-            if vf_ratio:
++        capability = ''
++        if self.dev_type == 'PCI':
++            if self.vf_ratio:
+                 raise ValueError('vf_ratio does not apply for PCI devices')
+ 
+             prod_id = PCI_PROD_ID
+             prod_name = PCI_PROD_NAME
+             driver = PCI_DRIVER_NAME
+-            capability = ''
+-        elif dev_type == 'PF':
++        elif self.dev_type == 'PF':
+             prod_id = PF_PROD_ID
+             prod_name = PF_PROD_NAME
+             driver = PF_DRIVER_NAME
+-            capability = self.cap_templ % {
+-                'cap_type': PF_CAP_TYPE,
+-                'addresses': '\n'.join([
+-                    self.addr_templ % {
+-                        # these are the slot, function values of the child VFs
+-                        # we can only assign 8 functions to a slot (0-7) so
+-                        # bump the slot each time we exceed this
+-                        'slot': slot + (x // 8),
+-                        # ...and wrap the function value
+-                        'function': x % 8,
+-                    # the offset is because the PF is occupying function 0
+-                    } for x in range(1, vf_ratio + 1)])
+-            }
+-        elif dev_type == 'VF':
++            if not skip_capability:
++                capability = self.cap_templ % {
++                    'cap_type': PF_CAP_TYPE,
++                    'addresses': '\n'.join([
++                        self.addr_templ % {
++                            # these are the slot, function values of the child
++                            # VFs, we can only assign 8 functions to a slot
++                            # (0-7) so bump the slot each time we exceed this
++                            'slot': self.slot + (x // 8),
++                            # ...and wrap the function value
++                            'function': x % 8,
++                        # the offset is because the PF is occupying function 0
++                        } for x in range(1, self.vf_ratio + 1)])
++                }
++        elif self.dev_type == 'VF':
+             prod_id = VF_PROD_ID
+             prod_name = VF_PROD_NAME
+             driver = VF_DRIVER_NAME
+-            capability = self.cap_templ % {
+-                'cap_type': VF_CAP_TYPE,
+-                'addresses': self.addr_templ % {
+-                    # this is the slot, function value of the parent PF
+-                    # if we're e.g. device 8, we'll have a different slot
+-                    # to our parent so reverse this
+-                    'slot': slot - ((vf_ratio + 1) // 8),
+-                    # the parent PF is always function 0
+-                    'function': 0,
++            if not skip_capability:
++                capability = self.cap_templ % {
++                    'cap_type': VF_CAP_TYPE,
++                    'addresses': self.addr_templ % {
++                        # this is the slot, function value of the parent PF
++                        # if we're e.g. device 8, we'll have a different slot
++                        # to our parent so reverse this
++                        'slot': self.slot - ((self.vf_ratio + 1) // 8),
++                        # the parent PF is always function 0
++                        'function': 0,
++                    }
+                 }
+-            }
+-        elif dev_type == 'MDEV_TYPES':
++        elif self.dev_type == 'MDEV_TYPES':
+             prod_id = MDEV_CAPABLE_PROD_ID
+             prod_name = MDEV_CAPABLE_PROD_NAME
+             driver = MDEV_CAPABLE_DRIVER_NAME
+@@ -323,35 +335,36 @@
+                 'type_id': NVIDIA_11_VGPU_TYPE,
+                 'instances': 16,
+             }]
+-            if multiple_gpu_types:
++            if self.multiple_gpu_types:
+                 types.append(self.mdevtypes_templ % {
+                     'type_id': NVIDIA_12_VGPU_TYPE,
+                     'instances': 8,
+                 })
+-            capability = self.cap_templ % {
+-                'cap_type': MDEV_CAPABLE_CAP_TYPE,
+-                'addresses': '\n'.join(types)
+-            }
++            if not skip_capability:
++                capability = self.cap_templ % {
++                    'cap_type': MDEV_CAPABLE_CAP_TYPE,
++                    'addresses': '\n'.join(types)
++                }
+             self.is_capable_of_mdevs = True
+         else:
+             raise ValueError('Expected one of: PCI, VF, PCI')
+ 
+         self.pci_device = self.pci_device_template % {
+-            'slot': slot,
+-            'function': function,
++            'slot': self.slot,
++            'function': self.function,
+             'vend_id': vend_id,
+             'vend_name': vend_name,
+             'prod_id': prod_id,
+             'prod_name': prod_name,
+             'driver': driver,
+             'capability': capability,
+-            'iommu_group': iommu_group,
+-            'numa_node': numa_node,
++            'iommu_group': self.iommu_group,
++            'numa_node': self.numa_node,
+         }
+         # -1 is the sentinel set in /sys/bus/pci/devices/*/numa_node
+         # for no NUMA affinity. When the numa_node is set to -1 on a device
+         # Libvirt omits the NUMA element so we remove it.
+-        if numa_node == -1:
++        if self.numa_node == -1:
+             self.pci_device = self.pci_device.replace("<numa node='-1'/>", "")
+ 
+     def XMLDesc(self, flags):
+@@ -911,6 +924,20 @@
+                         nic_info['source'] = source.get('network')
+                     elif nic_info['type'] == 'bridge':
+                         nic_info['source'] = source.get('bridge')
++                    elif nic_info['type'] == 'hostdev':
++                        # <interface type='hostdev'> is for VF when vnic_type
++                        # is direct. Add sriov vf pci information in nic_info
++                        address = source.find('./address')
++                        pci_type = address.get('type')
++                        pci_domain = address.get('domain').replace('0x', '')
++                        pci_bus = address.get('bus').replace('0x', '')
++                        pci_slot = address.get('slot').replace('0x', '')
++                        pci_function = address.get('function').replace(
++                            '0x', '')
++                        pci_device = "%s_%s_%s_%s_%s" % (pci_type, pci_domain,
++                                                         pci_bus, pci_slot,
++                                                         pci_function)
++                        nic_info['source'] = pci_device
+ 
+                 nics_info += [nic_info]
+ 
+@@ -952,11 +979,32 @@
+ 
+         return definition
+ 
++    def verify_hostdevs_interface_are_vfs(self):
++        """Verify for interface type hostdev if the pci device is VF or not.
++        """
++
++        error_message = ("Interface type hostdev is currently supported on "
++                         "SR-IOV Virtual Functions only")
++
++        nics = self._def['devices'].get('nics', [])
++        for nic in nics:
++            if nic['type'] == 'hostdev':
++                pci_device = nic['source']
++                pci_info_from_connection = self._connection.pci_info.devices[
++                    pci_device]
++                if 'phys_function' not in pci_info_from_connection.pci_device:
++                    raise make_libvirtError(
++                        libvirtError,
++                        error_message,
++                        error_code=VIR_ERR_CONFIG_UNSUPPORTED,
++                        error_domain=VIR_FROM_DOMAIN)
++
+     def create(self):
+         self.createWithFlags(0)
+ 
+     def createWithFlags(self, flags):
+         # FIXME: Not handling flags at the moment
++        self.verify_hostdevs_interface_are_vfs()
+         self._state = VIR_DOMAIN_RUNNING
+         self._connection._mark_running(self)
+         self._has_saved_state = False
+@@ -1080,7 +1128,7 @@
+ 
+         nics = ''
+         for nic in self._def['devices']['nics']:
+-            if 'source' in nic:
++            if 'source' in nic and nic['type'] != 'hostdev':
+                 nics += '''<interface type='%(type)s'>
+           <mac address='%(mac)s'/>
+           <source %(type)s='%(source)s'/>
+diff --git a/releasenotes/notes/bug-1892361-pci-deivce-type-update-c407a66fd37f6405.yaml b/releasenotes/notes/bug-1892361-pci-deivce-type-update-c407a66fd37f6405.yaml
+new file mode 100644
+index 0000000..ba35c25
+--- /dev/null
++++ b/releasenotes/notes/bug-1892361-pci-deivce-type-update-c407a66fd37f6405.yaml
+@@ -0,0 +1,12 @@
++---
++fixes:
++  - |
++    Fixes `bug 1892361`_ in which the pci stat pools are not updated when an
++    existing device is enabled with SRIOV capability. Restart of nova-compute
++    service updates the pci device type from type-PCI to type-PF but the pools
++    still maintain the device type as type-PCI. And so the PF is considered for
++    allocation to instance that requests vnic_type=direct. With this fix, the
++    pci device type updates are detected and the pci stat pools are updated
++    properly.
++
++    .. _bug 1892361: https://bugs.launchpad.net/nova/+bug/1892361
