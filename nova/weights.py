@@ -17,11 +17,17 @@
 Pluggable Weighing support
 """
 
+from oslo_log import log as logging
+
+
 import abc
 
 import six
 
 from nova import loadables
+
+
+LOG = logging.getLogger(__name__)
 
 
 def normalize(weight_list, minval=None, maxval=None):
@@ -144,5 +150,6 @@ class BaseWeightHandler(loadables.BaseLoader):
             for i, weight in enumerate(weights):
                 obj = weighed_objs[i]
                 obj.weight += weigher.weight_multiplier(obj.obj) * weight
-
+            LOG.info("Nectar %s: %s", weigher.__class__,
+                     [(obj.obj.host, obj.weight) for obj in weighed_objs])
         return sorted(weighed_objs, key=lambda x: x.weight, reverse=True)
