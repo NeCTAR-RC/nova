@@ -25,7 +25,10 @@ class ProjectTagsFilter(filters.BaseHostFilter):
     """Filters Hosts by project tags
 
     Restricts projects with certain tags to certain hosts.
-    Projects without tag will be allowed.
+    By default, Projects without tag will be allowed.
+    Setting nectar:project-tags-required to a value
+    that evaluates to true will force the project
+    to have a tag.
 
     If the project has one of the `allowed_tags` then it
     will ensure that the project can only use hosts that
@@ -39,6 +42,8 @@ class ProjectTagsFilter(filters.BaseHostFilter):
     # Project tags do not change within a request
     run_filter_once_per_request = True
     host_key = 'nectar:project-tags'
+    # Optional key to force the project to have the tag
+    restrict_key = 'nectar:project-tags-required'
 
     # Allowed tags to filter on
     allowed_tags = ['preemptible']
@@ -49,9 +54,15 @@ class ProjectTagsFilter(filters.BaseHostFilter):
         project_tags = set(project.tags)
         allowed_tags = set(self.allowed_tags)
 
+        restrict_metadata = utils.aggregate_metadata_get_by_host(
+            host_state, key=self.restrict_key)
+        is_restrictive = restrict_metadata.get(self.restrict_key, False)
+
         if not project_tags.intersection(allowed_tags):
             # Project has no allowed tags
-            return True
+            # Filter out host if project-tags-required exists and set true
+            # otherwise host passes filter
+            return not bool(is_restrictive)
 
         metadata = utils.aggregate_metadata_get_by_host(
             host_state, key=self.host_key)
