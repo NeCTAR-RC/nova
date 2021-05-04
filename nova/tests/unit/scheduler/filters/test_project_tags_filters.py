@@ -66,3 +66,12 @@ class TestProjectTagsFilter(test.NoDBTestCase):
         request = self._get_spec()
         host = fakes.FakeHostState('host1', 'node1', {})
         self.assertTrue(self.filt_cls.host_passes(host, request))
+
+    def test_project_tags_filter_no_tags_restrict(self, agg_mock,
+                                                  get_project_mock):
+        get_project_mock.return_value = mock.Mock(tags=[])
+        agg_mock.return_value = {'nectar:project-tags': set(['preemptible']),
+                                 'nectar:project-tags-required': set([True])}
+        request = self._get_spec()
+        host = fakes.FakeHostState('host1', 'node1', {})
+        self.assertFalse(self.filt_cls.host_passes(host, request))
