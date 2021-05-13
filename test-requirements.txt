@@ -24,3 +24,6 @@ wsgi-intercept>=1.7.0 # MIT License
 
 # vmwareapi driver specific dependencies
 oslo.vmware>=2.17.0 # Apache-2.0
+
+# fix the placement version mismatch with oslo.log
+placement==3.0.0
