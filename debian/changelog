@@ -1,3 +1,101 @@
+nova (2:21.2.1-0ubuntu1) focal; urgency=medium
+
+  * New stable point release for OpenStack Ussuri (LP: #1935030).
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Thu, 08 Jul 2021 13:46:31 +0000
+
+nova (2:21.2.0-0ubuntu1) focal; urgency=medium
+
+  * New stable point release for OpenStack Ussuri (LP: #1923036).
+  * d/p/lp1888395-*: Removed after patch landed upstream.
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Mon, 12 Apr 2021 12:14:07 +0000
+
+nova (2:21.1.2-0ubuntu2) focal; urgency=medium
+
+  * Fix live migration for SDNs that do not support port binding extensions (LP: #1888395)
+    - d/p/lp1888395-functest.patch: Add functional test to validate live
+      migration failure with multiport bindings
+    - d/p/lp1888395-migration.patch: Validate the SDN supports port binding extensions
+      before populating migrate_data with vifs
+
+ -- Billy Olsen <billy.olsen@canonical.com>  Fri, 12 Feb 2021 16:42:10 -0700
+
+nova (2:21.1.2-0ubuntu1) focal; urgency=medium
+
+  * New stable point release for OpenStack Ussuri (LP: #1915786).
+  * d/p/lp1892361.patch: Removed after patch landed upstream.
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Tue, 16 Feb 2021 16:10:28 +0000
+
+nova (2:21.1.1-0ubuntu2) focal; urgency=medium
+
+  * d/p/lp1892361.patch: Update pci stat pools based on PCI device changes (LP: #1892361).
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Mon, 18 Jan 2021 15:25:16 +0000
+
+nova (2:21.1.1-0ubuntu1) focal; urgency=medium
+
+  * New stable point release for OpenStack Ussuri (LP: #1906271).
+  * d/p/lp1893263.patch: Removed as this fix landed in this point release.
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Tue, 01 Dec 2020 09:27:11 +0000
+
+nova (2:21.1.0-0ubuntu2) focal; urgency=medium
+
+  [ Rodrigo Barbieri ]
+  * d/p/lp1893263.patch: Allow tap interface with multiqueue (LP: #1893263).
+
+  [ Chris MacNaughton ]
+  * d/control: Update VCS paths for move to lp:~ubuntu-openstack-dev.
+  * d/control: Add systemd to build-depends (LP: #1903724).
+
+ -- Chris MacNaughton <chris.macnaughton@ubuntu.com>  Fri, 13 Nov 2020 07:38:21 +0000
+
+nova (2:21.1.0-0ubuntu1) focal; urgency=medium
+
+  * New stable point release for OpenStack Ussuri (LP: #1896476).
+
+ -- Chris MacNaughton <chris.macnaughton@canonical.com>  Mon, 21 Sep 2020 12:53:36 +0000
+
+nova (2:21.0.0-0ubuntu0.20.04.4) focal; urgency=medium
+
+  * d/nova-compute-libvirt.postinst: Ensure libvirt-qemu user is removed
+    from nova group on package upgrade (LP: #1896617).
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Wed, 30 Sep 2020 09:13:56 -0400
+
+nova (2:21.0.0-0ubuntu0.20.04.3) focal; urgency=medium
+
+  * d/nova-compute-libvirt.postinst: Drop libvirt-qemu user from nova group.
+    This is no longer needed with recent /var/lib/nova permission changes and
+    causes live snapshots to fail (LP: #1896617).
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Thu, 24 Sep 2020 16:08:42 -0400
+
+nova (2:21.0.0-0ubuntu0.20.04.2) focal; urgency=medium
+
+  * Correct file and directory permissions to ensure that instances
+    can be stopped and started correctly (LP: #1885269):
+    - d/nova-common.postinst: Reset file permissions under /var/lib/nova
+      to 0644 and directory permissions to 0755 to ensure that instances
+      can be stopped and started correctly with the workflow of ownership
+      changes that occur between nova and libvirt/qemu.
+    - d/nova-common.postinst: Don't force ownership to nova:nova.
+    - d/nova-common.postinst: Reset ownership and permissions on
+      console.log files to root:root and 0600.
+
+ -- James Page <james.page@ubuntu.com>  Mon, 29 Jun 2020 13:54:40 +0100
+
+nova (2:21.0.0-0ubuntu0.20.04.1) focal; urgency=medium
+
+  * d/watch: Scope to 21.x series and get tarballs from opendev.org.
+  * d/control: Align (Build-)Depends with upstream.
+  * New upstream release for OpenStack Ussuri (LP: #1877642).
+  * d/gbp.conf: Create stable/ussuri branch.
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Wed, 13 May 2020 14:00:09 -0400
+
 nova (2:21.0.0~b3~git2020041013.57ff308d6d-0ubuntu2) focal; urgency=medium
 
   * d/tests/nova-daemons: Skip validation that nova-scheduler is

@@ -16,10 +16,8 @@ if [ "$1" = "configure" ]; then
             adduser nova libvirtd
         fi
     fi
-    if [ "$libvirt_qemu_user" ]; then
-        if ! echo $nova_group | grep -qE '\<libvirt-qemu\>'; then
-            adduser libvirt-qemu nova
-        fi
+    if echo $nova_group | grep -qE '\<libvirt-qemu\>'; then
+        deluser libvirt-qemu nova
     fi
 fi
 
