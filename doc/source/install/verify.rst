@@ -127,7 +127,3 @@ Verify operation of the Compute service.
       | Result: Success                                                    |
       | Details: None                                                      |
       +--------------------------------------------------------------------+
-      | Check: Older than N-1 computes                                     |
-      | Result: Success                                                    |
-      | Details: None                                                      |
-      +--------------------------------------------------------------------+
