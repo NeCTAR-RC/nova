@@ -710,6 +710,7 @@ def _create_test_instance():
         'migration_context': None,
         'info_cache': None,
         'cleaned': False,
+        'metadata': {},
     }
 
 
