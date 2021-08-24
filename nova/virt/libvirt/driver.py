@@ -6649,6 +6649,10 @@ class LibvirtDriver(driver.ComputeDriver):
                 guest, root_device_name, rescue, instance, inst_path,
                 image_meta, disk_info)
 
+        if (CONF.libvirt.virt_type in ['qemu', 'kvm'] and
+                instance.metadata.get('libvirt:pxe-first')):
+            guest.os_boot_dev = ['network'] + guest.os_boot_dev
+
         self._set_features(guest, instance.os_type, image_meta, flavor)
         self._set_clock(guest, instance.os_type, image_meta)
 

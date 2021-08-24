@@ -711,6 +711,7 @@ def _create_test_instance():
         'trusted_certs': None,
         'resources': None,
         'migration_context': None,
+        'metadata': {},
     }
 
 
