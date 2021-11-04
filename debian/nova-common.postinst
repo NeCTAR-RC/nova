@@ -1,0 +1,45 @@
+#!/bin/sh -e
+
+NOVA_UID=64060
+NOVA_GID=64060
+
+if [ "$1" = "configure" ]; then
+    if ! getent group nova > /dev/null 2>&1; then
+        addgroup --quiet --system \
+            --gid $NOVA_GID nova 2>/dev/null
+    fi
+
+    if ! getent passwd nova > /dev/null 2>&1; then
+        adduser --quiet --system \
+            --home /var/lib/nova \
+            --no-create-home \
+            --uid $NOVA_UID \
+            --gid $NOVA_GID \
+            --shell /bin/false nova 2>/dev/null
+    fi
+
+    if [ -z "$2" ]; then
+        # New install - blanket permissions
+        chown -R nova:nova /var/lib/nova/
+    fi
+
+    chown nova:adm /var/log/nova
+    chmod 0750 /var/log/nova
+
+    find /etc/nova -exec chown root:nova "{}" +
+    find /etc/nova -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+
+    # Optional rootwrap.d configuration files.
+    find /etc/nova/rootwrap.d -exec chown root:root "{}" +
+    find /etc/nova/rootwrap.d -type f -exec chmod 0644 "{}" + -o -type d -exec chmod 0755 "{}" +
+
+    # NOTE: file ownership changes from nova -> libvirt-qemu -> root
+    #       as part of VM lifecycle so 0750 and 0640 are not suitable.
+    find /var/lib/nova -type f -exec chmod 0644 "{}" + -o -type d -exec chmod 0755 "{}" +
+    # NOTE: console.log files are always owned by root due to the way
+    #       they get written to disk with limited permissions
+    find /var/lib/nova -name "console.log" -exec chmod 0600 "{}" +
+    find /var/lib/nova -name "console.log" -exec chown root:root "{}" +
+fi
+
+#DEBHELPER#
