@@ -1,0 +1,8 @@
+#!/bin/sh -e
+
+if [ "$1" = "configure" ]; then
+  chown root:nova /etc/nova/nova-compute.conf
+  chmod 0640 /etc/nova/nova-compute.conf
+fi
+
+#DEBHELPER#
