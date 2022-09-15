@@ -7861,7 +7861,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # Make sure we register all the types as the compute service could
         # be calling this method before init_host()
-        if len(CONF.devices.enabled_mdev_types) > 1:
+        if len(CONF.devices.enabled_mdev_types) > 0:
             nova.conf.devices.register_dynamic_opts(CONF)
 
         for vgpu_type in CONF.devices.enabled_mdev_types:
@@ -7941,14 +7941,29 @@ class LibvirtDriver(driver.ComputeDriver):
         if not self.supported_vgpu_types:
             return
 
-        if len(self.supported_vgpu_types) == 1:
-            # The operator wanted to only support one single type so we can
-            # blindly return it for every single pGPU
-            return self.supported_vgpu_types[0]
         device_address = self._get_pci_id_from_libvirt_name(device_address)
         if not device_address:
             return
-        return self.pgpu_type_mapping.get(device_address)
+        try:
+            vgpu_type = self.pgpu_type_mapping.get(device_address)
+            if vgpu_type:
+                return vgpu_type
+        except KeyError:
+            LOG.warning("No mdev type was configured for PCI address: %s",
+                        device_address)
+            # We accept to return None instead of raising an exception
+            # because we prefer the callers to return the existing exceptions
+            # in case we can't find a specific pGPU
+            return
+        # The operator wanted to only support one single type and did not
+        # specify any device addresses then return that type for every single
+        # pGPU
+        if len(self.supported_vgpu_types) == 1:
+            group = getattr(CONF, 'mdev_%s' % self.supported_vgpu_types[0],
+                            None)
+            if group is None or not group.device_addresses:
+                return self.supported_vgpu_types[0]
+        return
 
     def _get_resource_class_for_device(self, device_address):
         """Returns the resource class for the inventory of this device.
