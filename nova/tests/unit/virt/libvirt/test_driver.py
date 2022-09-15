@@ -25520,6 +25520,13 @@ class LibvirtDriverTestCase(test.NoDBTestCase, TraitsComparisonMixin):
                                      'deviceAPI': 'vfio-pci'},
                        }
              },
+            {"dev_id": "pci_0000_08_00_0",
+             "vendor_id": 0x10de,
+             "types": {'nvidia-11': {'availableInstances': 5,
+                                     'name': 'GRID M60-0B',
+                                     'deviceAPI': 'vfio-pci'},
+                       }
+             },
         ]
         get_mediated_devices.return_value = [{'dev_id': 'mdev_some_uuid1',
                                               'uuid': uuids.mdev1,
@@ -25529,6 +25536,11 @@ class LibvirtDriverTestCase(test.NoDBTestCase, TraitsComparisonMixin):
                                              {'dev_id': 'mdev_some_uuid2',
                                               'uuid': uuids.mdev2,
                                               'parent': "pci_0000_07_00_0",
+                                              'type': 'nvidia-11',
+                                              'iommu_group': 1},
+                                             {'dev_id': 'mdev_some_uuid3',
+                                              'uuid': uuids.mdev3,
+                                              'parent': "pci_0000_08_00_0",
                                               'type': 'nvidia-11',
                                               'iommu_group': 1}]
 
@@ -25543,6 +25555,41 @@ class LibvirtDriverTestCase(test.NoDBTestCase, TraitsComparisonMixin):
 
         # Now, set a specific GPU type and restart the driver
         self.flags(enabled_mdev_types=['nvidia-11'], group='devices')
+        drvr = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
+        expected = {
+            # the first GPU also has one mdev allocated against it
+            'pci_0000_06_00_0': {'total': 15 + 1,
+                                 'max_unit': 15 + 1,
+                                 'min_unit': 1,
+                                 'step_size': 1,
+                                 'reserved': 0,
+                                 'allocation_ratio': 1.0,
+                                 },
+            # the second GPU also has another mdev
+            'pci_0000_07_00_0': {'total': 7 + 1,
+                                 'max_unit': 7 + 1,
+                                 'min_unit': 1,
+                                 'step_size': 1,
+                                 'reserved': 0,
+                                 'allocation_ratio': 1.0,
+                                 },
+            # the third GPU
+            'pci_0000_08_00_0': {'total': 5 + 1,
+                                 'max_unit': 5 + 1,
+                                 'min_unit': 1,
+                                 'step_size': 1,
+                                 'reserved': 0,
+                                 'allocation_ratio': 1.0,
+                                 },
+        }
+        self._test_get_gpu_inventories(drvr, expected, ['nvidia-11'])
+
+    def test_get_gpu_inventories_with_a_single_type_and_device_addresses(self):
+        # Set a specific GPU type and device_addresses and restart the driver
+        self.flags(enabled_mdev_types=['nvidia-11'], group='devices')
+        nova.conf.devices.register_dynamic_opts(CONF)
+        self.flags(device_addresses=['0000:06:00.0',
+                   '0000:07:00.0'], group='mdev_nvidia-11')
         drvr = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         expected = {
             # the first GPU also has one mdev allocated against it
@@ -25698,10 +25745,22 @@ class LibvirtDriverTestCase(test.NoDBTestCase, TraitsComparisonMixin):
         device = 'pci_0000_84_00_0'
         self.assertIsNone(drvr._get_vgpu_type_per_pgpu(device))
 
-        # BY default, we return the first type if we only support one.
+        # If we only support one type and the corresponding group and
+        # device_addresses are not specified we return the first type.
         self.flags(enabled_mdev_types=['nvidia-11'], group='devices')
         drvr = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.assertEqual('nvidia-11', drvr._get_vgpu_type_per_pgpu(device))
+
+        # If we only support one type and device_addresses have also been
+        # specified then only return type for specified device_addresses.
+        # 0000:86:00.0 wasn't configured
+        # we need to call register_dynamic_opts(CONF) below again to ensure the
+        # updated 'device_addresses' value is read and the new groups created
+        nova.conf.devices.register_dynamic_opts(CONF)
+        self.flags(device_addresses=['0000:84:00.0'], group='mdev_nvidia-11')
+        drvr = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
+        self.assertEqual('nvidia-11', drvr._get_vgpu_type_per_pgpu(device))
+        self.assertIsNone(drvr._get_vgpu_type_per_pgpu('pci_0000_86_00_0'))
 
         # Now, make sure we provide the right vGPU type for the device
         self.flags(enabled_mdev_types=['nvidia-11', 'nvidia-12'],
