@@ -6917,7 +6917,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # Make sure we register all the types as the compute service could
         # be calling this method before init_host()
-        if len(CONF.devices.enabled_vgpu_types) > 1:
+        if len(CONF.devices.enabled_vgpu_types) > 0:
             nova.conf.devices.register_dynamic_opts(CONF)
 
         for vgpu_type in CONF.devices.enabled_vgpu_types:
@@ -6968,10 +6968,6 @@ class LibvirtDriver(driver.ComputeDriver):
         if not self.supported_vgpu_types:
             return
 
-        if len(self.supported_vgpu_types) == 1:
-            # The operator wanted to only support one single type so we can
-            # blindly return it for every single pGPU
-            return self.supported_vgpu_types[0]
         # The libvirt name is like 'pci_0000_84_00_0'
         try:
             device_address = "{}:{}:{}.{}".format(
@@ -6985,7 +6981,9 @@ class LibvirtDriver(driver.ComputeDriver):
                         "related vGPU type", device_address)
             return
         try:
-            return self.pgpu_type_mapping.get(device_address)
+            vgpu_type = self.pgpu_type_mapping.get(device_address)
+            if vgpu_type:
+                return vgpu_type
         except KeyError:
             LOG.warning("No vGPU type was configured for PCI address: %s",
                         device_address)
@@ -6993,6 +6991,15 @@ class LibvirtDriver(driver.ComputeDriver):
             # because we prefer the callers to return the existing exceptions
             # in case we can't find a specific pGPU
             return
+        # The operator wanted to only support one single type and did not
+        # specify any device addresses then return that type for every single
+        # pGPU
+        if len(self.supported_vgpu_types) == 1:
+            group = getattr(CONF, 'vgpu_%s' % self.supported_vgpu_types[0],
+                            None)
+            if group is None or not group.device_addresses:
+                return self.supported_vgpu_types[0]
+        return
 
     def _count_mediated_devices(self, enabled_vgpu_types):
         """Counts the sysfs objects (handles) that represent a mediated device
