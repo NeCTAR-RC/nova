@@ -446,6 +446,13 @@ before compute nodes have been able to update their service record. In an FFU,
 the service records in the database will be more than one version old until
 the compute nodes start up, but control services need to be online first.
 """),
+    cfg.IntOpt('image_conversion_cpu_limit',
+                default=60,
+                help='CPU time limit in seconds to introspect the image'),
+    cfg.IntOpt('image_conversion_address_space_limit',
+                default=2,
+                help='Address space limit in gigabytes to introspect the '
+                'image'),
 ]
 
 
