@@ -19,6 +19,7 @@ Helpers for qemu tasks.
 import os
 
 from oslo_concurrency import processutils
+from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import units
 
@@ -26,11 +27,8 @@ from nova import exception
 from nova.i18n import _
 import nova.privsep.utils
 
+CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
-
-QEMU_IMG_LIMITS = processutils.ProcessLimits(
-    cpu_time=30,
-    address_space=1 * units.Gi)
 
 
 @nova.privsep.sys_admin_pctxt.entrypoint
@@ -91,6 +89,13 @@ def privileged_qemu_img_info(path, format=None):
     return unprivileged_qemu_img_info(path, format=format)
 
 
+def qemu_limits():
+    return processutils.ProcessLimits(
+        cpu_time=CONF.workarounds.image_conversion_cpu_limit,
+        address_space=
+            CONF.workarounds.image_conversion_address_space_limit * units.Gi)
+
+
 def unprivileged_qemu_img_info(path, format=None):
     """Return an object containing the parsed output from qemu-img info."""
     try:
@@ -106,7 +111,7 @@ def unprivileged_qemu_img_info(path, format=None):
         )
         if format is not None:
             cmd = cmd + ('-f', format)
-        out, err = processutils.execute(*cmd, prlimit=QEMU_IMG_LIMITS)
+        out, err = processutils.execute(*cmd, prlimit=qemu_limits())
     except processutils.ProcessExecutionError as exp:
         if exp.exit_code == -9:
             # this means we hit prlimits, make the exception more specific
