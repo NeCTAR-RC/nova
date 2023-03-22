@@ -18,6 +18,7 @@ import mock
 import nova.privsep.qemu
 from nova import test
 from nova.tests import fixtures
+from oslo_concurrency import processutils
 
 
 class QemuTestCase(test.NoDBTestCase):
@@ -26,6 +27,14 @@ class QemuTestCase(test.NoDBTestCase):
     def setUp(self):
         super(QemuTestCase, self).setUp()
         self.useFixture(fixtures.PrivsepFixture())
+
+    def test_qemu_limits(self):
+        self.flags(image_conversion_cpu_limit=0, group="workarounds")
+        self.flags(image_conversion_address_space_limit=0, group="workarounds")
+        limits = nova.privsep.qemu.qemu_limits()
+        self.assertIsInstance(limits, processutils.ProcessLimits)
+        self.assertEqual(0, limits.cpu_time)
+        self.assertEqual(0, limits.address_space)
 
     @mock.patch('oslo_concurrency.processutils.execute')
     @mock.patch('nova.privsep.utils.supports_direct_io')
@@ -53,11 +62,15 @@ class QemuTestCase(test.NoDBTestCase):
     def test_convert_image_unprivileged(self):
         self._test_convert_image(nova.privsep.qemu.unprivileged_convert_image)
 
+    @mock.patch.object(nova.privsep.qemu, "qemu_limits")
     @mock.patch('oslo_concurrency.processutils.execute')
     @mock.patch('os.path.isdir')
-    def _test_qemu_img_info(self, method, mock_isdir, mock_execute):
+    def _test_qemu_img_info(self, method, mock_isdir, mock_execute,
+            mock_limits):
         mock_isdir.return_value = False
         mock_execute.return_value = (mock.sentinel.out, None)
+        mock_limit = mock.sentinel.limits
+        mock_limits.return_value = mock_limit
         expected_cmd = (
             'env', 'LC_ALL=C', 'LANG=C', 'qemu-img', 'info',
             mock.sentinel.path, '--force-share', '--output=json', '-f',
@@ -69,7 +82,7 @@ class QemuTestCase(test.NoDBTestCase):
             method(mock.sentinel.path, format=mock.sentinel.format))
         # Assert that the expected command is used
         mock_execute.assert_called_once_with(
-            *expected_cmd, prlimit=nova.privsep.qemu.QEMU_IMG_LIMITS)
+            *expected_cmd, prlimit=mock_limit)
 
     def test_privileged_qemu_img_info(self):
         self._test_qemu_img_info(nova.privsep.qemu.privileged_qemu_img_info)
