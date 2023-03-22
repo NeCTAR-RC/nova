@@ -439,6 +439,13 @@ Howerver, if you don't use automatic cleaning, it can cause an
 extra delay before and Ironic node is available for building a
 new Nova instance.
 """),
+    cfg.IntOpt('image_conversion_cpu_limit',
+                default=60,
+                help='CPU time limit in seconds to introspect the image'),
+    cfg.IntOpt('image_conversion_address_space_limit',
+                default=2,
+                help='Address space limit in gigabytes to introspect the '
+                'image'),
 ]
 
 
