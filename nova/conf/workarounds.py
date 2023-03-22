@@ -417,6 +417,13 @@ compatibility on the destination host during live migration.
 When this is enabled, it will skip version-checking of hypervisors
 during live migration.
 """),
+    cfg.IntOpt('image_conversion_cpu_limit',
+                default=60,
+                help='CPU time limit in seconds to introspect the image'),
+    cfg.IntOpt('image_conversion_address_space_limit',
+                default=2,
+                help='Address space limit in gigabytes to introspect the '
+                'image'),
 ]
 
 
