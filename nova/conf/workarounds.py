@@ -471,6 +471,13 @@ known-features detection *before* passing the image to qemu-img. Generally,
 this inspection should be enabled for maximum safety, but this workaround
 option allows disabling it if there is a compatibility concern.
 """),
+    cfg.IntOpt('image_conversion_cpu_limit',
+                default=60,
+                help='CPU time limit in seconds to introspect the image'),
+    cfg.IntOpt('image_conversion_address_space_limit',
+                default=2,
+                help='Address space limit in gigabytes to introspect the '
+                'image'),
 ]
 
 
