@@ -440,6 +440,14 @@ class API:
             # also include 'shared' networks.
             search_opts = {'id': net_ids}
             nets = neutron.list_networks(**search_opts).get('networks', [])
+            if CONF.neutron.default_networks:
+                existing_net_ids = [x['id'] for x in nets]
+                for n_id in net_ids:
+                    if n_id not in CONF.neutron.default_networks:
+                        continue
+                    if n_id in existing_net_ids:
+                        continue
+                    nets.append(neutron.show_network(n_id).get('network'))
         else:
             # (1) Retrieve non-public network list owned by the tenant.
             search_opts = {'tenant_id': project_id, 'shared': False}
@@ -455,6 +463,13 @@ class API:
             # (2) Retrieve public network list.
             search_opts = {'shared': True}
             nets += neutron.list_networks(**search_opts).get('networks', [])
+
+            if CONF.neutron.default_networks:
+                existing_net_ids = [x['id'] for x in nets]
+                for default_net_id in CONF.neutron.default_networks:
+                    if default_net_id not in existing_net_ids:
+                        nets.append(neutron.show_network(
+                            default_net_id).get('network'))
 
         _ensure_requested_network_ordering(
             lambda x: x['id'],
