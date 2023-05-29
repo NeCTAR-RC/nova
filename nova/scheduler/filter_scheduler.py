@@ -472,6 +472,8 @@ class FilterScheduler(driver.Scheduler):
             weighed_subset = weighed_hosts
         chosen_host = random.choice(weighed_subset)
         weighed_hosts.remove(chosen_host)
+        LOG.info("Chosen host: %(chosen)s, Weighed hosts: %(weighed)s",
+                 {'chosen': chosen_host, 'weighed': weighed_hosts})
         return [chosen_host] + weighed_hosts
 
     def _get_all_host_states(self, context, spec_obj, provider_summaries):
