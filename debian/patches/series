@@ -1,0 +1,5 @@
+# Ubuntu specific patches below here. Note these can be dropped eventually.
+drop-sphinxcontrib-rsvgconverter.patch
+drop-sphinx-feature-classification.patch
+arm-console-patch.patch
+#CVE-2023-2088.patch
