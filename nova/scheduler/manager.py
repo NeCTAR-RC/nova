@@ -731,7 +731,7 @@ class SchedulerManager(manager.Manager):
         # Strip off the WeighedHost wrapper class...
         weighed_hosts = [h.obj for h in weighed_hosts]
 
-        # We randomize the first element in the returned list to alleviate
+        # We randomize the first element/s in the returned list to alleviate
         # congestion where the same host is consistently selected among
         # numerous potential hosts for similar request specs.
         host_subset_size = CONF.filter_scheduler.host_subset_size
@@ -740,9 +740,10 @@ class SchedulerManager(manager.Manager):
         else:
             weighed_subset = weighed_hosts
 
-        chosen_host = random.choice(weighed_subset)
-        weighed_hosts.remove(chosen_host)
-        return [chosen_host] + weighed_hosts
+        random.shuffle(weighed_subset)
+        weighed_hosts = weighed_subset + weighed_hosts[len(weighed_subset):]
+        LOG.info("Weighed hosts: %(weighed)s", {'weighed': weighed_hosts})
+        return weighed_hosts
 
     def _get_all_host_states(self, context, spec_obj, provider_summaries):
         """Template method, so a subclass can implement caching."""
