@@ -1021,10 +1021,11 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
                          spec_obj.obj_what_changed())
 
     @mock.patch('nova.scheduler.manager.LOG.debug')
-    @mock.patch('random.choice', side_effect=lambda x: x[1])
+    @mock.patch('random.shuffle', side_effect=lambda x: x.reverse())
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
     @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
-    def test_get_sorted_hosts(self, mock_filt, mock_weighed, mock_rand, debug):
+    def test_get_sorted_hosts(self, mock_filt, mock_weighed, mock_shuffle,
+                              debug):
         """Tests the call that returns a sorted list of hosts by calling the
         host manager's filtering and weighing routines
         """
@@ -1058,17 +1059,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         mock_weighed.assert_called_once_with(mock_filt.return_value,
             mock.sentinel.spec)
 
-        # We override random.choice() to pick the **second** element of the
-        # returned weighed hosts list, which is the host state #2. This tests
-        # the code path that combines the randomly-chosen host with the
-        # remaining list of weighed host state objects
+        # We override random.shuffle() to reverse the list, thus the
+        # head of the list should become [host#2, host#1]
         self.assertEqual([hs2, hs1], results)
 
-    @mock.patch('random.choice', side_effect=lambda x: x[0])
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
     @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
     def test_get_sorted_hosts_subset_less_than_num_weighed(self, mock_filt,
-            mock_weighed, mock_rand):
+            mock_weighed):
         """Tests that when we have >1 weighed hosts but a host subset size of
         1, that we always pick the first host in the weighed host
         """
@@ -1077,10 +1075,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
                 cell_uuid=uuids.cell1)
         hs2 = mock.Mock(spec=host_manager.HostState, host='host2',
                 cell_uuid=uuids.cell2)
-        all_host_states = [hs1, hs2]
+        hs3 = mock.Mock(spec=host_manager.HostState, host='host3',
+                cell_uuid=uuids.cell3)
+        all_host_states = [hs1, hs2, hs3]
 
         mock_weighed.return_value = [
-            weights.WeighedHost(hs1, 1.0), weights.WeighedHost(hs2, 1.0),
+            weights.WeighedHost(hs1, 1.0),
+            weights.WeighedHost(hs2, 0.5),
+            weights.WeighedHost(hs3, 0.5),
         ]
 
         results = self.manager._get_sorted_hosts(mock.sentinel.spec,
@@ -1092,15 +1094,13 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         mock_weighed.assert_called_once_with(mock_filt.return_value,
             mock.sentinel.spec)
 
-        # We should be randomly selecting only from a list of one host state
-        mock_rand.assert_called_once_with([hs1])
-        self.assertEqual([hs1, hs2], results)
+        self.assertEqual([hs1, hs2, hs3], results)
 
-    @mock.patch('random.choice', side_effect=lambda x: x[0])
+    @mock.patch('random.shuffle', side_effect=lambda x: x.reverse())
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
     @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
     def test_get_sorted_hosts_subset_greater_than_num_weighed(self, mock_filt,
-            mock_weighed, mock_rand):
+            mock_weighed, mock_shuffle):
         """Hosts should still be chosen if host subset size is larger than
         number of weighed hosts.
         """
@@ -1109,10 +1109,17 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
                 cell_uuid=uuids.cell1)
         hs2 = mock.Mock(spec=host_manager.HostState, host='host2',
                 cell_uuid=uuids.cell2)
-        all_host_states = [hs1, hs2]
+        hs3 = mock.Mock(spec=host_manager.HostState, host='host3',
+                cell_uuid=uuids.cell3)
+        hs4 = mock.Mock(spec=host_manager.HostState, host='host4',
+                cell_uuid=uuids.cell4)
+        all_host_states = [hs1, hs2, hs3, hs4]
 
         mock_weighed.return_value = [
-            weights.WeighedHost(hs1, 1.0), weights.WeighedHost(hs2, 1.0),
+            weights.WeighedHost(hs1, 1.0),
+            weights.WeighedHost(hs2, 1.0),
+            weights.WeighedHost(hs3, 0.5),
+            weights.WeighedHost(hs4, 0.5),
         ]
 
         results = self.manager._get_sorted_hosts(mock.sentinel.spec,
@@ -1124,11 +1131,11 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         mock_weighed.assert_called_once_with(mock_filt.return_value,
             mock.sentinel.spec)
 
-        # We overrode random.choice() to return the first element in the list,
-        # so even though we had a host_subset_size greater than the number of
-        # weighed hosts (2), we just random.choice() on the entire set of
-        # weighed hosts and thus return [hs1, hs2]
-        self.assertEqual([hs1, hs2], results)
+        # We override random.shuffle() to reverse the list, thus the
+        # weighed list should become [host#4, host#3, host#2, host#1]
+        # (as the host_subset_size is 20 so all four weighed hosts are
+        # included)
+        self.assertEqual([hs4, hs3, hs2, hs1], results)
 
     @mock.patch('random.shuffle', side_effect=lambda x: x.reverse())
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
