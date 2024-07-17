@@ -125,7 +125,7 @@ Build-Depends-Indep:
  python3-wsgi-intercept (>= 1.7.0),
  python3-yaml (>= 5.1),
  python3-zvmcloudconnector (>= 1.3.0),
- qemu-utils
+ qemu-utils,
  systemd,
 Build-Conflicts:
  python-cjson,
