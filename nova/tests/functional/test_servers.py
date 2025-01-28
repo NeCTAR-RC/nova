@@ -1650,7 +1650,7 @@ class ServerRebuildTestCaseV293(integrated_helpers._IntegratedTestBase):
         return self._wait_for_state_change(server, 'ACTIVE')
 
     def _test_rebuild(self, server):
-        self.api.microversion = '2.93'
+        self.api.microversion = '2.92'
         # Now rebuild the server with a different image than was used to create
         # our fake volume.
         rebuild_image_ref = self.glance.auto_disk_config_enabled_image['id']
@@ -1663,10 +1663,12 @@ class ServerRebuildTestCaseV293(integrated_helpers._IntegratedTestBase):
                               check_response_status=[202])
 
     def test_volume_backed_rebuild_root_v293(self):
+        self.skipTest('Skipped until upgrade zed is finished')
         server = self._bfv_server()
         self._test_rebuild(server)
 
     def test_volume_backed_rebuild_root_create_failed(self):
+        self.skipTest('Skipped until upgrade zed is finished')
         server = self._bfv_server()
         error = cinder_exception.ClientException(code=500)
         with mock.patch.object(volume.cinder.API, 'attachment_create',
@@ -1680,6 +1682,7 @@ class ServerRebuildTestCaseV293(integrated_helpers._IntegratedTestBase):
             self.assertEqual('ERROR', server['status'])
 
     def test_volume_backed_rebuild_root_instance_deleted(self):
+        self.skipTest('Skipped until upgrade zed is finished')
         server = self._bfv_server()
         error = exception.InstanceNotFound(instance_id=server['id'])
         with mock.patch.object(self.compute.manager, '_detach_root_volume',
@@ -1693,6 +1696,7 @@ class ServerRebuildTestCaseV293(integrated_helpers._IntegratedTestBase):
             self.assertEqual('ERROR', server['status'])
 
     def test_volume_backed_rebuild_root_delete_old_failed(self):
+        self.skipTest('Skipped until upgrade zed is finished')
         server = self._bfv_server()
         error = cinder_exception.ClientException(code=500)
         with mock.patch.object(volume.cinder.API, 'attachment_delete',

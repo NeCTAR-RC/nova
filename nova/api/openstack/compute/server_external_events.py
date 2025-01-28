@@ -70,7 +70,6 @@ class ServerExternalEventsController(wsgi.Controller):
     @validation.schema(server_external_events.create_v251, '2.51', '2.75')
     @validation.schema(server_external_events.create_v276, '2.76', '2.81')
     @validation.schema(server_external_events.create_v282, '2.82', '2.92')
-    @validation.schema(server_external_events.create_v293, '2.93')
     def create(self, req, body):
         """Creates a new instance event."""
         context = req.environ['nova.context']

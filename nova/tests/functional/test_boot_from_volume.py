@@ -174,7 +174,7 @@ class BootFromVolumeTest(integrated_helpers._IntegratedTestBase):
         # Rebuild
         # The image_uuid is from CinderFixture for the
         # volume representing IMAGE_BACKED_VOL.
-        self.api.microversion = '2.93'
+        self.api.microversion = '2.92'
         image_uuid = '155d900f-4e14-4e4c-a73d-069cbf4541e6'
         post_data = {'rebuild': {'imageRef': image_uuid}}
         self.api.post_server_action(server_id, post_data)
