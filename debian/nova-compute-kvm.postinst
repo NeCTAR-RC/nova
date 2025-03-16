@@ -1,0 +1,15 @@
+#DEBHELPER#
+#!/bin/sh -e
+
+if [ "$1" = "configure" ]; then
+    kvm_group=$(getent group kvm) || true
+
+    if ! echo $kvm_group | grep -qE '\<nova\>'; then
+        adduser nova kvm
+    fi
+
+    chown root:nova /etc/nova/nova-compute.conf
+    chmod 0640 /etc/nova/nova-compute.conf
+fi
+
+#DEBHELPER#

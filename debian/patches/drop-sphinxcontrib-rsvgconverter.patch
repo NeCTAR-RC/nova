@@ -1,0 +1,15 @@
+Description: Drop sphinxcontrib.rsvgconverter as it is currently
+  not packaged for Ubuntu.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Forwarded: No
+
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -44,7 +44,6 @@ extensions = [
+     'ext.extra_specs',
+     'sphinxcontrib.actdiag',
+     'sphinxcontrib.seqdiag',
+-    'sphinxcontrib.rsvgconverter',
+ ]
+ 
+ 
