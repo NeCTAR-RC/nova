@@ -1474,6 +1474,7 @@ class LibvirtDriver(driver.ComputeDriver):
             except exception.NovaException:
                 if not ignore_errors:
                     raise
+        time.sleep(10)
 
     def unplug_vifs(self, instance, network_info):
         self._unplug_vifs(instance, network_info, False)

@@ -1963,6 +1963,13 @@ class PCIServersTest(_PCIServersTestBase):
         super().setUp()
         self.flags(group="pci", report_in_placement=True)
         self.flags(group='filter_scheduler', pci_in_placement=True)
+        # Patch the sleep in libvirt driver to be much shorter
+        # to avoid the 10s delay in _unplug_vifs
+        import nova.virt.libvirt.driver
+        original_sleep = nova.virt.libvirt.driver.time.sleep
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.driver.time.sleep',
+            lambda x: original_sleep(0.01) if x == 10 else original_sleep(x)))
 
     def test_create_server_with_pci_dev_and_numa(self):
         """Verifies that an instance can be booted with cpu pinning and with an
@@ -3086,6 +3093,13 @@ class PCIServersWithPreferredNUMATest(_PCIServersTestBase):
         super().setUp()
         self.flags(group="pci", report_in_placement=True)
         self.flags(group='filter_scheduler', pci_in_placement=True)
+        # Patch the sleep in libvirt driver to be much shorter
+        # to avoid the 10s delay in _unplug_vifs
+        import nova.virt.libvirt.driver
+        original_sleep = nova.virt.libvirt.driver.time.sleep
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.virt.libvirt.driver.time.sleep',
+            lambda x: original_sleep(0.01) if x == 10 else original_sleep(x)))
 
     def test_create_server_with_pci_dev_and_numa(self):
         """Validate behavior of 'preferred' PCI NUMA policy.

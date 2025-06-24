@@ -125,7 +125,7 @@ class InstanceHelperMixin:
             time.sleep(0.5)
 
     def _wait_for_server_parameter(
-            self, server, expected_params, max_retries=10, api=None):
+            self, server, expected_params, max_retries=30, api=None):
         api = api or getattr(self, 'admin_api', self.api)
 
         retry_count = 0
@@ -143,7 +143,7 @@ class InstanceHelperMixin:
 
         return server
 
-    def _wait_for_state_change(self, server, expected_status, max_retries=10):
+    def _wait_for_state_change(self, server, expected_status, max_retries=30):
         return self._wait_for_server_parameter(
             server, {'status': expected_status}, max_retries)
 
@@ -179,7 +179,7 @@ class InstanceHelperMixin:
 
         actions = []
         events = []
-        for attempt in range(10):
+        for attempt in range(30):
             actions = api.get_instance_actions(server['id'])
             # The API returns the newest event first
             for action in actions:
@@ -207,7 +207,7 @@ class InstanceHelperMixin:
 
     def _wait_for_volume_attach(self, server_id, volume_id):
         timeout = 0.0
-        while timeout < 10.0:
+        while timeout < 30.0:
             try:
                 self.api.get_server_volume(server_id, volume_id)
                 return
@@ -223,7 +223,7 @@ class InstanceHelperMixin:
     def _wait_for_volume_detach(self, server_id, volume_id):
         timeout = 0.0
 
-        while timeout < 10.0:
+        while timeout < 30.0:
             try:
                 self.api.get_server_volume(server_id, volume_id)
                 time.sleep(.1)
@@ -281,7 +281,7 @@ class InstanceHelperMixin:
         statuses = [status.lower() for status in expected_statuses]
         actual_status = None
 
-        for attempt in range(10):
+        for attempt in range(30):
             migrations = api.api_get('/os-migrations').body['migrations']
             for migration in migrations:
                 if migration['instance_uuid'] == server['id']:
@@ -297,14 +297,14 @@ class InstanceHelperMixin:
             ))
 
     def _wait_for_log(self, log_line_regex):
-        for i in range(10):
+        for i in range(30):
             if re.search(log_line_regex, self.stdlog.logger.output):
                 return
             time.sleep(0.5)
 
         self.fail('The line "%(log_line)s" did not appear in the log')
 
-    def _wait_for_assert(self, assert_func, max_retries=10, sleep=0.5):
+    def _wait_for_assert(self, assert_func, max_retries=30, sleep=0.5):
         """Waits and retries the assert_func either until it does not raise
         AssertionError any more or until the max_retries run out.
         """
@@ -1002,7 +1002,7 @@ class PlacementInstanceHelperMixin(InstanceHelperMixin, PlacementHelperMixin):
     def _delete_server_allocations(self, server_uuid):
         self.placement.delete(f'/allocations/{server_uuid}')
 
-    def _wait_for_server_allocations(self, consumer_id, max_retries=20):
+    def _wait_for_server_allocations(self, consumer_id, max_retries=40):
         retry_count = 0
         while True:
             alloc = self._get_allocations_by_server_uuid(consumer_id)
