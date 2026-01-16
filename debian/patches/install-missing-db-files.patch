@@ -1,0 +1,8 @@
+Description: Install missing db files, including
+  nova/db/api/alembic.ini and nova/db/main/alembic.ini.
+Author: Corey Bryant <corey.bryant@canonical.com>
+
+--- /dev/null
++++ b/MANIFEST.in
+@@ -0,0 +1 @@
++recursive-include nova/db *

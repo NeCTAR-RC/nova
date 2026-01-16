@@ -1,0 +1,15 @@
+Description: Use OsloOrderedDict for broader Python compat
+Author: James Page <james.page@ubuntu.com>
+Forwarded: no
+
+--- a/nova/tests/unit/notifications/objects/test_notification.py
++++ b/nova/tests/unit/notifications/objects/test_notification.py
+@@ -488,7 +488,7 @@
+     # Get the SCHEMA items to add to the fingerprint
+     # if we are looking at a notification
+     if issubclass(obj_class, notification.NotificationPayloadBase):
+-        schema_data = collections.OrderedDict(
++        schema_data = fixture.OsloOrderedDict(
+             sorted(obj_class.SCHEMA.items()))
+ 
+         extra_data += (schema_data,)

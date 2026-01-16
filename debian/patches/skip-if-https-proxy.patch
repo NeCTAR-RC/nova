@@ -1,0 +1,69 @@
+Description: The lpci builds executed by .launchpad.yaml
+  run with https_proxy set which causes these tests to fail.
+Author: Corey Bryant <corey.bryant@canonical.com>
+
+--- a/nova/tests/unit/api/openstack/test_requestlog.py
++++ b/nova/tests/unit/api/openstack/test_requestlog.py
+@@ -13,6 +13,7 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+ 
++import os
+ from unittest import mock
+ 
+ import fixtures as fx
+@@ -50,6 +51,8 @@
+             self.addCleanup(p.stop)
+             p.start()
+ 
++    @testtools.skipIf("https_proxy" in os.environ,
++                      "Skipping test because https_proxy is set.")
+     @mock.patch('nova.api.openstack.requestlog.RequestLog._should_emit')
+     def test_logs_requests(self, emit):
+         """Ensure requests are logged.
+@@ -73,6 +76,8 @@
+                 '"GET /" status: 200 len: %s' % content_length)
+         self.assertIn(log1, self.stdlog.logger.output)
+ 
++    @testtools.skipIf("https_proxy" in os.environ,
++                      "Skipping test because https_proxy is set.")
+     @mock.patch('nova.api.openstack.requestlog.RequestLog._should_emit')
+     def test_logs_mv(self, emit):
+         """Ensure logs register microversion if passed.
+@@ -103,6 +108,8 @@
+                 content_length)
+         self.assertIn(log1, self.stdlog.logger.output)
+ 
++    @testtools.skipIf("https_proxy" in os.environ,
++                      "Skipping test because https_proxy is set.")
+     @mock.patch('nova.api.openstack.compute.versions.Versions.index')
+     @mock.patch('nova.api.openstack.requestlog.RequestLog._should_emit')
+     def test_logs_under_exception(self, emit, v_index):
+@@ -123,6 +130,8 @@
+                 ' status: 500 len: 0 microversion: - time:')
+         self.assertIn(log1, self.stdlog.logger.output)
+ 
++    @testtools.skipIf("https_proxy" in os.environ,
++                      "Skipping test because https_proxy is set.")
+     @mock.patch('nova.api.openstack.requestlog.RequestLog._should_emit')
+     def test_no_log_under_eventlet(self, emit):
+         """Ensure that logs don't end up under eventlet.
+--- a/nova/tests/unit/test_fixtures.py
++++ b/nova/tests/unit/test_fixtures.py
+@@ -17,6 +17,7 @@
+ import copy
+ import datetime
+ import io
++import os
+ from unittest import mock
+ 
+ import fixtures as fx
+@@ -102,6 +103,8 @@
+ 
+ 
+ class TestOSAPIFixture(testtools.TestCase):
++    @testtools.skipIf("https_proxy" in os.environ,
++                      "Skipping test because https_proxy is set.")
+     @mock.patch('nova.objects.Service.get_by_host_and_binary')
+     @mock.patch('nova.objects.Service.create')
+     @mock.patch('nova.utils.raise_if_old_compute', new=mock.Mock())

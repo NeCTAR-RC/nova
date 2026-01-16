@@ -1,0 +1,15 @@
+Description: Drop sphinxcontrib.rsvgconverter as it is currently
+  not packaged for Ubuntu.
+Author: Corey Bryant <corey.bryant@canonical.com>
+Forwarded: No
+
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -42,7 +42,6 @@
+     'ext.versioned_notifications',
+     'ext.feature_matrix',
+     'ext.extra_specs',
+-    'sphinxcontrib.rsvgconverter',
+ ]
+ 
+ 
