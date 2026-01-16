@@ -1,0 +1,31 @@
+Description: Changes the tempdir permissions from 0o701
+  to 0o710. This allows the libvirt-qemu user to access
+  files in the tempdir that are owned by the nova group.
+  This assumes that the libvirt-qemu user is a member of
+  the nova group.
+For example:
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1967956
+Author: Corey Bryant <corey.bryant@canonical.com>
+
+--- a/nova/virt/libvirt/driver.py
++++ b/nova/virt/libvirt/driver.py
+@@ -39,6 +39,7 @@
+ import pwd
+ import random
+ import shutil
++import stat
+ import sys
+ import tempfile
+ import threading
+@@ -3212,8 +3213,9 @@
+                 try:
+                     out_path = os.path.join(tmpdir, snapshot_name)
+                     if live_snapshot:
+-                        # NOTE(xqueralt): libvirt needs o+x in the tempdir
+-                        os.chmod(tmpdir, 0o701)
++                        # NOTE(coreycb): libvirt needs g+x in the tempdir
++                        st = os.stat(tmpdir)
++                        os.chmod(tmpdir, st.st_mode | stat.S_IXGRP)
+                         self._live_snapshot(context, instance, guest,
+                                             disk_path, out_path, source_format,
+                                             image_format, instance.image_meta)

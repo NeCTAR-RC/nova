@@ -1,0 +1,2 @@
+nova.tests.unit.console.test_websocketproxy.NovaProxyRequestHandlerTestCase.test_enforce_session_timeout_timer_not_called
+nova.tests.unit.console.test_websocketproxy.NovaProxyRequestHandlerTestCase.test_enforce_session_timeout_timer_called

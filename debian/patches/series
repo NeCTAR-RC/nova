@@ -1,0 +1,15 @@
+# Ubuntu specific patches below here. Note these can be dropped eventually.
+install-missing-db-files.patch
+change-tempdir-perms-for-libvirt-qemu.patch
+drop-sphinxcontrib-rsvgconverter.patch
+drop-sphinx-feature-classification.patch
+arm-console-patch.patch
+skip-if-https-proxy.patch
+test-hacking-compat.patch
+oslo.versionedobjects-compat.patch
+lp2054446-fix-deepcopy-usage-for-BlockDeviceMapping-in-get_roo.patch
+lp2054446-fix-device-type-when-booting-from-ISO-image.patch
+libvirt-Wrap-un-proxied-listDevices-and-listAllDevic.patch
+libvirt-Fix-regression-of-listDevices-return-type.patch
+lp2095364-Add-ServersViewBuilderTestV296-unit-test-class.patch
+lp2095364-Use-dict-object-for-request_specs_dict.patch
