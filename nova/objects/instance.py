@@ -551,21 +551,14 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
             raise exception.ObjectActionError(action='create',
                                               reason='already deleted')
         updates = self.obj_get_changes()
-        version = versionutils.convert_version_to_tuple(self.VERSION)
-
         if 'node' in updates and 'compute_id' not in updates:
             # NOTE(danms): This is not really the best idea, as we should try
             # not to have different behavior based on the version of the
             # object. However, this exception helps us find cases in testing
             # where these may not be updated together. We can remove this
             # later.
-            if version >= (2, 8):
-                raise exception.ObjectActionError(
-                    ('Instance is being created with node (%r) '
-                     'but not compute_id') % updates['node'])
-            else:
-                LOG.warning('Instance is being created with node %r but '
-                            'no compute_id', updates['node'])
+            LOG.warning('Instance is being created with node %r but '
+                        'no compute_id', updates['node'])
 
         # NOTE(danms): We know because of the check above that deleted
         # is either unset or false. Since we need to avoid passing False
@@ -805,20 +798,14 @@ class Instance(base.NovaPersistentObject, base.NovaObject,
         updates = {}
         changes = self.obj_what_changed()
 
-        version = versionutils.convert_version_to_tuple(self.VERSION)
         if 'node' in changes and 'compute_id' not in changes:
             # NOTE(danms): This is not really the best idea, as we should try
             # not to have different behavior based on the version of the
             # object. However, this exception helps us find cases in testing
             # where these may not be updated together. We can remove this
             # later.
-            if version >= (2, 8):
-                raise exception.ObjectActionError(
-                    ('Instance.node is being updated (%r) '
-                     'but compute_id is not') % self.node)
-            else:
-                LOG.warning('Instance %s node is being updated to %r but '
-                            'compute_id is not', self.uuid, self.node)
+            LOG.warning('Instance %s node is being updated to %r but '
+                        'compute_id is not', self.uuid, self.node)
 
         for field in self.fields:
             # NOTE(danms): For object fields, we construct and call a

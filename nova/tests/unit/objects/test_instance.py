@@ -299,16 +299,20 @@ class _TestInstanceObject(object):
 
         self.assertFalse(mock_log.called)
 
-    def test_save_updates_host_not_compute_id(self):
+    @mock.patch('nova.objects.instance.LOG.warning')
+    def test_save_updates_host_not_compute_id(self, mock_warning):
         instance = objects.Instance(self.context, uuid=uuids.instance,
                                     user_id=self.context.user_id,
                                     project_id=self.context.project_id)
         # Instance create() without node or compute_id is okay
         instance.create()
 
-        # Try to update node without compute_id and make sure save() fails
+        # Try to update node without compute_id and make sure save() warns
         instance.node = 'foo'
-        self.assertRaises(exception.ObjectActionError, instance.save)
+        instance.save()
+        mock_warning.assert_called_once_with(
+            'Instance %s node is being updated to %r but compute_id is not',
+            instance.uuid, 'foo')
 
         # If we update both, then save() should succeed
         instance.compute_id = 1
@@ -337,16 +341,22 @@ class _TestInstanceObject(object):
         instance.node = 'foo'
         instance.save()
 
-    def test_create_with_host_not_compute_id(self):
+    @mock.patch('nova.objects.instance.LOG.warning')
+    def test_create_with_host_not_compute_id(self, mock_warning):
         instance = objects.Instance(self.context, uuid=uuids.instance,
                                     user_id=self.context.user_id,
                                     project_id=self.context.project_id)
-        # Instance create() with node but not compute_id should fail
+        # Instance create() with node but not compute_id should warn
         instance.node = 'foo'
-        self.assertRaises(exception.ObjectActionError, instance.create)
+        instance.create()
+        mock_warning.assert_called_once_with(
+            'Instance is being created with node %r but no compute_id',
+            'foo')
 
-        # If we create with both, then create() should succeed
+        # If we create with both, then create() should still succeed
         instance.compute_id = 1
+        instance.uuid = uuids.instance2
+        del instance.id
         instance.create()
 
     # NOTE(danms): This ensures that older object versions are not held to the
