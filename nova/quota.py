@@ -1222,7 +1222,16 @@ def _server_group_count_members_by_user_legacy(context, group, user_id):
     # counting resources if a cell is down.
     per_cell = nova_context.scatter_gather_all_cells(
         context, group_member_uuids)
-    for uuids in per_cell.values():
+    for cell_uuid, uuids in per_cell.items():
+        # A cell that timed out or raised gives back a failure sentinel,
+        # not a set. Mirror _instances_cores_ram_count_legacy(): skip the
+        # cell so its members are not counted rather than erroring out
+        # the quota check.
+        if nova_context.is_cell_failure_sentinel(uuids):
+            LOG.warning('Cell %s did not respond or errored while counting '
+                        'server group members; members in that cell are not '
+                        'counted.', cell_uuid)
+            continue
         instance_uuids |= uuids
 
     # Count build requests using the same filters to catch group members

@@ -1,0 +1,9 @@
+---
+fixes:
+  - |
+    Server group member counting for quota checks no longer errors out
+    when a cell database is down. Instances in the unreachable cell are
+    skipped with a warning, consistent with the legacy cores/ram counting
+    behaviour. Note this means group members hosted in a down cell are
+    not counted against the ``server_group_members`` quota while the cell
+    is unreachable.
