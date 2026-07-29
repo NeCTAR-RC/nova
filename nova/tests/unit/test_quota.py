@@ -2385,3 +2385,34 @@ class LegacyGroupMemberQuotaTestCase(test.NoDBTestCase):
         mock_build_req_get.assert_called_once_with(
             mock.sentinel.context,
             {'deleted': False, 'user_id': mock.sentinel.user_id, 'uuid': []})
+
+    @mock.patch('nova.objects.BuildRequestList.get_by_filters')
+    @mock.patch('nova.context.scatter_gather_all_cells')
+    def test_down_cell_sentinels_skipped(
+        self, mock_scatter, mock_build_req_get
+    ):
+        """Failure sentinels from down cells are skipped, not merged.
+
+        Merging a sentinel into the uuid set would raise TypeError and
+        turn the quota check during server create into an error. Members
+        in the down cells are simply not counted, consistent with
+        _instances_cores_ram_count_legacy().
+        """
+        mock_scatter.return_value = {
+            uuids.cell1: {uuids.inst1, uuids.inst2},
+            uuids.cell2: context.did_not_respond_sentinel,
+            uuids.cell3: exception.NovaException('cell down'),
+        }
+        br1 = objects.BuildRequest()
+        br1.instance_uuid = uuids.inst1  # duplicate of inst1
+        mock_build_req_get.return_value = objects.BuildRequestList(
+            objects=[br1])
+        group = objects.InstanceGroup()
+        group.members = []
+
+        # Only the two members from the healthy cell are counted; the
+        # build request duplicates inst1 so it does not add to the count.
+        self.assertEqual(
+            {'user': {'server_group_members': 2}},
+            quota._server_group_count_members_by_user_legacy(
+                mock.sentinel.context, group, mock.sentinel.user_id))
