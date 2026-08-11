@@ -28,6 +28,7 @@ from nova import config
 from nova import objects
 from nova.scheduler.client import report
 from nova import service
+from nova import utils
 from nova import version
 
 CONF = nova.conf.CONF
@@ -40,6 +41,7 @@ def main():
     objects.register_all()
     gmr_opts.set_defaults(CONF)
     objects.Service.enable_min_version_cache()
+    utils.allow_cell_scoped_version_check()
 
     gmr.TextGuruMeditation.setup_autorun(version, conf=CONF)
 

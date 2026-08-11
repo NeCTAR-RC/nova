@@ -1303,6 +1303,37 @@ class ComputeRpcAPITestCase(test.NoDBTestCase):
         mock_allcells.assert_called_once_with(mock.ANY, ['nova-compute'])
         mock_minver.assert_not_called()
 
+    @mock.patch('nova.utils._CELL_SCOPED_VERSION_CHECK_ALLOWED', True)
+    @mock.patch('nova.objects.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_version_cap_all_cells_workaround_local(self, mock_allcells,
+                                                    mock_minver):
+        # With the cross-cell service version check disabled, a conductor
+        # configured with an API database connection should still only
+        # query the local cell.
+        self.flags(connection='sqlite:///', group='api_database')
+        self.flags(compute='auto', group='upgrade_levels')
+        self.flags(disable_cross_cell_service_version_check=True,
+                   group='workarounds')
+        mock_minver.return_value = 0
+        compute_rpcapi.ComputeAPI()._determine_version_cap(mock.Mock())
+        mock_minver.assert_called_once_with(mock.ANY, 'nova-compute')
+        mock_allcells.assert_not_called()
+
+    @mock.patch('nova.objects.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_version_cap_all_cells_workaround_ignored(self, mock_allcells,
+                                                      mock_minver):
+        # Services other than nova-conductor ignore the workaround.
+        self.flags(connection='sqlite:///', group='api_database')
+        self.flags(compute='auto', group='upgrade_levels')
+        self.flags(disable_cross_cell_service_version_check=True,
+                   group='workarounds')
+        mock_allcells.return_value = 0
+        compute_rpcapi.ComputeAPI()._determine_version_cap(mock.Mock())
+        mock_allcells.assert_called_once_with(mock.ANY, ['nova-compute'])
+        mock_minver.assert_not_called()
+
     @mock.patch('nova.compute.rpcapi.LOG.error')
     @mock.patch('nova.objects.Service.get_minimum_version')
     @mock.patch('nova.objects.service.get_minimum_version_all_cells',

@@ -1,0 +1,23 @@
+---
+other:
+  - |
+    The ``[workarounds]/disable_cross_cell_service_version_check``
+    configuration option has been introduced. When enabled on a
+    nova-conductor service, the minimum nova-compute service version is only
+    read from the database of the local cell, even if the service is
+    configured with an ``[api_database]/connection``. This applies to the
+    compute service version check performed at service start-up and to the
+    RPC version cap calculation used when ``[upgrade_levels]/compute`` is set
+    to ``auto``.
+
+    Cell conductors must be configured with an API database connection to
+    support upcalls. In multi-cell deployments where cell conductors cannot
+    reach the database servers of other cells, the all-cells query waits for
+    the 60 second cell timeout before it carries on without those cells, so
+    every service start-up stalls for that long. See `bug 1971228
+    <https://bugs.launchpad.net/nova/+bug/1971228>`_ for details.
+
+    Enable this option on cell conductors in such deployments. Only
+    nova-conductor honours it. All other services, and ``nova-status upgrade
+    check``, ignore it. Do not enable it on the top-level (super)conductor,
+    because its local database is cell0, which has no nova-compute services.

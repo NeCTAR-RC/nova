@@ -478,6 +478,40 @@ option allows disabling it if there is a compatibility concern.
                 default=2,
                 help='Address space limit in gigabytes to introspect the '
                 'image'),
+    cfg.BoolOpt(
+        'disable_cross_cell_service_version_check',
+        default=False,
+        help="""
+When this is set on a nova-conductor service, the minimum nova-compute service
+version is only read from the database of the local cell, even if the service
+is configured with an ``[api_database]/connection``. This affects the compute
+service version check performed at service start-up and the compute RPC
+version cap calculated when ``[upgrade_levels]/compute`` is ``auto``. By
+default, any service with an API database connection reads the minimum
+nova-compute service version from all cells.
+
+Cell conductors must be configured with an API database connection to support
+upcalls. In deployments where cell conductors are firewalled from the database
+servers of other cells, the all-cells query waits for the 60 second cell
+timeout and then carries on without the cells that did not answer, so every
+service start-up stalls for that long. Enable this option on cell conductors
+in such deployments.
+
+Only nova-conductor honours this option. All other services, and
+``nova-status upgrade check``, ignore it. Do not enable it on the top-level
+(super)conductor. Its local database is cell0, which has no nova-compute
+services, so the start-up check would be skipped and the compute RPC version
+would not be capped.
+
+Related options:
+
+* ``[api_database]/connection`` - this option only has an effect when a
+  connection is configured.
+* ``[upgrade_levels]/compute`` - the ``auto`` RPC version cap is calculated
+  from the local cell only when this option is honoured.
+* ``[workarounds]/disable_compute_service_check_for_ffu`` - downgrades a
+  failed check to a warning but does not avoid the cross-cell query.
+"""),
 ]
 
 

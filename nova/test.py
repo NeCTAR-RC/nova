@@ -278,6 +278,9 @@ class TestCase(base.BaseTestCase):
         # Reset the compute RPC API globals (mostly the _ROUTER).
         compute_rpcapi.reset_globals()
 
+        # Reset the flag that only nova-conductor sets at start-up.
+        utils._CELL_SCOPED_VERSION_CHECK_ALLOWED = False
+
         self.addCleanup(self._clear_attrs)
         self.useFixture(fixtures.EnvironmentVariable('http_proxy'))
         self.policy = self.useFixture(nova_fixtures.PolicyFixture())

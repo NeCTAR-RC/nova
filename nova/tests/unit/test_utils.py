@@ -1301,6 +1301,114 @@ class TestOldComputeCheck(test.NoDBTestCase):
             'service without the [api_database]/connection config option. The '
             'service version check will only query the local cell.')
 
+    @mock.patch.object(utils, '_CELL_SCOPED_VERSION_CHECK_ALLOWED', True)
+    @mock.patch('nova.objects.service.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_workaround_forces_local_check_with_api_db_configured(
+            self, mock_get_all, mock_get):
+        # A cell conductor configured with an API database connection for
+        # upcalls but with the cross-cell version check disabled should only
+        # query the local cell.
+        self.flags(group='api_database', connection='fake db connection')
+        self.flags(group='workarounds',
+                   disable_cross_cell_service_version_check=True)
+        oldest = service_obj.SERVICE_VERSION_ALIASES[
+            service_obj.OLDEST_SUPPORTED_SERVICE_VERSION]
+        mock_get.return_value = oldest - 1
+
+        ex = self.assertRaises(
+            exception.TooOldComputeService, utils.raise_if_old_compute)
+
+        self.assertIn('cell', str(ex))
+        mock_get_all.assert_not_called()
+        mock_get.assert_called_once_with(mock.ANY, 'nova-compute')
+
+    @mock.patch.object(utils, '_CELL_SCOPED_VERSION_CHECK_ALLOWED', True)
+    @mock.patch('nova.utils.LOG')
+    @mock.patch('nova.objects.service.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_workaround_forces_local_check_ok(
+            self, mock_get_all, mock_get, mock_log):
+        self.flags(group='api_database', connection='fake db connection')
+        self.flags(group='workarounds',
+                   disable_cross_cell_service_version_check=True)
+        mock_get.return_value = service_obj.SERVICE_VERSION
+
+        utils.raise_if_old_compute()
+
+        mock_get_all.assert_not_called()
+        mock_get.assert_called_once_with(mock.ANY, 'nova-compute')
+        mock_log.info.assert_called_once_with(
+            'Cross-cell service version check disabled by config; only '
+            'checking nova-compute versions in the local cell.')
+        mock_log.warning.assert_not_called()
+
+    @mock.patch.object(utils, '_CELL_SCOPED_VERSION_CHECK_ALLOWED', True)
+    @mock.patch('nova.utils.LOG')
+    @mock.patch('nova.objects.service.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_workaround_no_local_computes_warns(
+            self, mock_get_all, mock_get, mock_log):
+        # A top-level conductor only sees cell0, which has no computes, so
+        # the workaround silently skips the check there. Say so.
+        self.flags(group='api_database', connection='fake db connection')
+        self.flags(group='workarounds',
+                   disable_cross_cell_service_version_check=True)
+        mock_get.return_value = 0
+
+        utils.raise_if_old_compute()
+
+        mock_get_all.assert_not_called()
+        mock_log.warning.assert_called_once_with(
+            'No nova-compute services were found in the local cell, so the '
+            'service version check was skipped. Do not set '
+            '[workarounds]/disable_cross_cell_service_version_check on a '
+            'top-level conductor.')
+
+    @mock.patch('nova.utils.LOG')
+    @mock.patch('nova.objects.service.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_workaround_ignored_outside_conductor(
+            self, mock_get_all, mock_get, mock_log):
+        # Only nova-conductor honours the workaround. Every other service
+        # with an API database connection keeps checking all cells.
+        self.flags(group='api_database', connection='fake db connection')
+        self.flags(group='workarounds',
+                   disable_cross_cell_service_version_check=True)
+        mock_get_all.return_value = service_obj.SERVICE_VERSION
+
+        utils.raise_if_old_compute()
+
+        mock_get_all.assert_called_once_with(mock.ANY, ['nova-compute'])
+        mock_get.assert_not_called()
+        mock_log.info.assert_not_called()
+
+    @mock.patch.object(utils, '_CELL_SCOPED_VERSION_CHECK_ALLOWED', True)
+    @mock.patch('nova.utils.LOG')
+    @mock.patch('nova.objects.service.Service.get_minimum_version')
+    @mock.patch('nova.objects.service.get_minimum_version_all_cells')
+    def test_workaround_without_api_db_logs_nothing(
+            self, mock_get_all, mock_get, mock_log):
+        # Without an API database connection the check was never
+        # cross-cell, so the workaround changes nothing and stays quiet.
+        self.flags(group='api_database', connection=None)
+        self.flags(group='workarounds',
+                   disable_cross_cell_service_version_check=True)
+        mock_get.return_value = 0
+
+        utils.raise_if_old_compute()
+
+        mock_get_all.assert_not_called()
+        mock_get.assert_called_once_with(mock.ANY, 'nova-compute')
+        mock_log.info.assert_not_called()
+        mock_log.warning.assert_not_called()
+
+    @mock.patch.object(utils, '_CELL_SCOPED_VERSION_CHECK_ALLOWED', False)
+    def test_allow_cell_scoped_version_check(self):
+        utils.allow_cell_scoped_version_check()
+
+        self.assertTrue(utils._CELL_SCOPED_VERSION_CHECK_ALLOWED)
+
 
 class RunOnceTests(test.NoDBTestCase):
 

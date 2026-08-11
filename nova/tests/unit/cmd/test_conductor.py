@@ -36,3 +36,20 @@ class TestConductor(test.NoDBTestCase):
 
         mock_serve.assert_called_once_with(
             service_create.return_value, workers=mock.ANY)
+
+    @mock.patch('nova.utils.allow_cell_scoped_version_check')
+    @mock.patch('nova.service.Service.create')
+    @mock.patch('nova.service.serve')
+    @mock.patch('nova.service.wait')
+    def test_allows_cell_scoped_version_check(
+        self, mock_wait, mock_serve, service_create, mock_allow
+    ):
+        # The start-up version check runs inside Service.create(), so the
+        # conductor has to opt in before that.
+        service_create.side_effect = (
+            lambda **kwargs: mock_allow.assert_called_once_with())
+
+        conductor.main()
+
+        service_create.assert_called_once_with(
+            binary='nova-conductor', topic=mock.ANY)

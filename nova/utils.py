@@ -1100,6 +1100,33 @@ def normalize_rc_name(rc_name):
     return norm_name
 
 
+# Set by nova-conductor at start-up. No other service may honour
+# [workarounds]/disable_cross_cell_service_version_check.
+_CELL_SCOPED_VERSION_CHECK_ALLOWED = False
+
+
+def allow_cell_scoped_version_check():
+    """Let this process honour disable_cross_cell_service_version_check."""
+    global _CELL_SCOPED_VERSION_CHECK_ALLOWED
+    _CELL_SCOPED_VERSION_CHECK_ALLOWED = True
+
+
+def service_version_check_all_cells():
+    """Whether the minimum service version is read from all cells.
+
+    :returns: True if this service should query every cell, False if it
+        should only query its own cell.
+    """
+    if not CONF.api_database.connection:
+        return False
+    if (CONF.workarounds.disable_cross_cell_service_version_check and
+            _CELL_SCOPED_VERSION_CHECK_ALLOWED):
+        LOG.info('Cross-cell service version check disabled by config; '
+                 'only checking nova-compute versions in the local cell.')
+        return False
+    return True
+
+
 def raise_if_old_compute():
     # to avoid circular imports
     from nova import context as nova_context
@@ -1107,7 +1134,8 @@ def raise_if_old_compute():
 
     ctxt = nova_context.get_admin_context()
 
-    if CONF.api_database.connection is not None:
+    all_cells = service_version_check_all_cells()
+    if all_cells:
         scope = 'system'
         try:
             current_service_version = service.get_minimum_version_all_cells(
@@ -1137,6 +1165,14 @@ def raise_if_old_compute():
     if current_service_version == 0:
         # 0 means no compute in the system,
         # probably a fresh install before the computes are registered
+        if not all_cells and CONF.api_database.connection:
+            # Only the workaround gets us here. The local database of a
+            # top-level conductor is cell0, which never has computes.
+            LOG.warning(
+                'No nova-compute services were found in the local cell, so '
+                'the service version check was skipped. Do not set '
+                '[workarounds]/disable_cross_cell_service_version_check on '
+                'a top-level conductor.')
         return
 
     oldest_supported_service_level = service.SERVICE_VERSION_ALIASES[

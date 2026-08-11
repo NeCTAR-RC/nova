@@ -29,6 +29,7 @@ from nova.objects import base as objects_base
 from nova.objects import service as service_obj
 from nova import profiler
 from nova import rpc
+from nova import utils
 
 CONF = nova.conf.CONF
 RPC_TOPIC = "compute"
@@ -489,7 +490,7 @@ class ComputeAPI(object):
 
         # NOTE(danms): If we have a connection to the api database,
         # we should iterate all cells. If not, we must only look locally.
-        if CONF.api_database.connection:
+        if utils.service_version_check_all_cells():
             try:
                 service_version = service_obj.get_minimum_version_all_cells(
                     context.get_admin_context(), ['nova-compute'])
