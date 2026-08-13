@@ -1,0 +1,19 @@
+---
+upgrade:
+  - |
+    The ``[api] cell_failure_hold_seconds`` circuit breaker now re-tests
+    a failed cell with a single probe request per worker process
+    (single-flight probing). Previously the failure mark was simply
+    dropped when the hold window expired, so every request arriving
+    between expiry and the first probe's timeout queried the still-dead
+    cell in parallel, each hanging for up to ``[api] cell_timeout``
+    seconds; measured on a busy deployment, more than half of all
+    listing requests paid the probe cost. Now exactly one request per
+    worker probes the cell at hold expiry while every other request
+    keeps receiving the immediate down-cell answer. If the probe
+    succeeds the cell returns to service for all requests immediately;
+    if it fails a new hold window starts; if the probing request dies
+    without reporting (for example the client disconnected), the probe
+    lease expires after ``cell_timeout`` plus a small grace period and
+    the next request probes instead. No configuration change is
+    required and the option's default (0, disabled) is unchanged.

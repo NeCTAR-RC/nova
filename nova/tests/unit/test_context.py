@@ -483,7 +483,8 @@ class ContextTestCase(test.NoDBTestCase):
         # Explicit: option disabled.
         self.flags(cell_failure_hold_seconds=0, group='api')
         # Pre-populate the cache to prove it is ignored when disabled.
-        context._CELL_FAILURES[mapping1.uuid] = time.monotonic() + 60
+        context._CELL_FAILURES[mapping1.uuid] = (
+            context._CELL_DOWN, time.monotonic() + 60)
 
         context.scatter_gather_cells(
             ctxt, mappings, 30, objects.InstanceList.get_by_filters,
@@ -550,7 +551,8 @@ class ContextTestCase(test.NoDBTestCase):
         # Hold disabled so the pre-existing mark does not short-circuit the
         # cell before we get to call it.
         self.flags(cell_failure_hold_seconds=0, group='api')
-        context._CELL_FAILURES[mapping1.uuid] = time.monotonic() + 60
+        context._CELL_FAILURES[mapping1.uuid] = (
+            context._CELL_DOWN, time.monotonic() + 60)
         mock_get_inst.side_effect = [
             mock.sentinel.instances,
             exception.InstanceNotFound(instance_id=uuids.instance)]
@@ -616,8 +618,8 @@ class ContextTestCase(test.NoDBTestCase):
             self._scatter_gather_failure_cache_test_setup())
         self.flags(cell_failure_hold_seconds=60, group='api')
         # Pretend cell1 failed recently.
-        expiry = time.monotonic() + 60
-        context._CELL_FAILURES[mapping1.uuid] = expiry
+        entry = (context._CELL_DOWN, time.monotonic() + 60)
+        context._CELL_FAILURES[mapping1.uuid] = entry
 
         results = context.scatter_gather_cells(
             ctxt, mappings, 30, objects.InstanceList.get_by_filters,
@@ -630,7 +632,7 @@ class ContextTestCase(test.NoDBTestCase):
         self.assertEqual(1, mock_target_cell.call_count)
         # The skip did not re-mark the cell, else the hold window would
         # slide forever under constant traffic.
-        self.assertEqual(expiry, context._CELL_FAILURES[mapping1.uuid])
+        self.assertEqual(entry, context._CELL_FAILURES[mapping1.uuid])
 
     def test_mark_cell_healthy_clears_failure(self):
         """_mark_cell_healthy removes any failure mark, including on race.
@@ -641,13 +643,19 @@ class ContextTestCase(test.NoDBTestCase):
         """
         self.addCleanup(context._CELL_FAILURES.clear)
         self.flags(cell_failure_hold_seconds=60, group='api')
-        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_DOWN, time.monotonic() + 60)
 
         context._mark_cell_healthy(uuids.cell1)
 
         self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
         # Calling on a cell not in the cache is a no-op.
         context._mark_cell_healthy(uuids.cell2)
+        # It also clears an in-flight probe mark (probe succeeded).
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_PROBING, time.monotonic() + 25)
+        context._mark_cell_healthy(uuids.cell1)
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
 
     def test_mark_cell_failed_disabled(self):
         """_mark_cell_failed is a no-op when the hold is disabled."""
@@ -658,20 +666,146 @@ class ContextTestCase(test.NoDBTestCase):
 
         self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
 
-    def test_is_cell_recently_failed_hold_expires(self):
-        """Stale entries are dropped lazily so the cell is re-tested."""
+    def test_should_skip_cell_down_states(self):
+        """The hold window skips; expiry elects a single prober."""
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.flags(cell_timeout=15, group='api')
+
+        # A down cell inside the hold window is skipped.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_DOWN, time.monotonic() + 60)
+        self.assertTrue(context._should_skip_cell(uuids.cell1))
+
+        # When the hold expires the entry is NOT dropped: the caller is
+        # elected the sole prober and the entry moves to probing with a
+        # lease of cell_timeout + slack.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_DOWN, time.monotonic() - 1)
+        before = time.monotonic()
+        self.assertFalse(context._should_skip_cell(uuids.cell1))
+        state, expiry = context._CELL_FAILURES[uuids.cell1]
+        self.assertEqual(context._CELL_PROBING, state)
+        lease = context.get_cell_timeout() + context._PROBE_LEASE_SLACK
+        self.assertGreaterEqual(expiry, before + lease)
+
+        # While the probe lease is live, everyone else keeps skipping:
+        # this is the single-flight property.
+        self.assertTrue(context._should_skip_cell(uuids.cell1))
+
+        # An unknown cell is never skipped.
+        self.assertFalse(context._should_skip_cell(uuids.cell2))
+        self.assertNotIn(uuids.cell2, context._CELL_FAILURES)
+
+    def test_should_skip_cell_probe_lease_takeover(self):
+        """An expired probe lease means the prober died; re-elect."""
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.flags(cell_timeout=15, group='api')
+
+        # A probing entry whose lease has expired (the prober died
+        # without reporting, e.g. a client disconnect closed a listing
+        # generator): the next caller takes over as prober.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_PROBING, time.monotonic() - 1)
+        self.assertFalse(context._should_skip_cell(uuids.cell1))
+        state, expiry = context._CELL_FAILURES[uuids.cell1]
+        self.assertEqual(context._CELL_PROBING, state)
+        self.assertGreater(expiry, time.monotonic())
+
+    def test_should_skip_cell_probe_outcomes(self):
+        """A probe result moves the entry out of the probing state."""
         self.addCleanup(context._CELL_FAILURES.clear)
         self.flags(cell_failure_hold_seconds=60, group='api')
 
-        # An entry whose expiry is in the past should be treated as healthy
-        # and removed from the cache on lookup.
-        context._CELL_FAILURES[uuids.cell1] = time.monotonic() - 1
-        self.assertFalse(context._is_cell_recently_failed(uuids.cell1))
-        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+        # Probe failed: back to down with a fresh hold window.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_PROBING, time.monotonic() + 25)
+        context._mark_cell_failed(uuids.cell1)
+        state, _expiry = context._CELL_FAILURES[uuids.cell1]
+        self.assertEqual(context._CELL_DOWN, state)
+        self.assertTrue(context._should_skip_cell(uuids.cell1))
 
-        # An entry whose expiry is in the future is still failed.
-        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
-        self.assertTrue(context._is_cell_recently_failed(uuids.cell1))
+        # Probe succeeded: mark cleared, cell back in service for all.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_PROBING, time.monotonic() + 25)
+        context._mark_cell_healthy(uuids.cell1)
+        self.assertFalse(context._should_skip_cell(uuids.cell1))
+
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_elected_probe_targets_cell(
+            self, mock_get_inst, mock_target_cell):
+        """A scatter arriving after hold expiry probes the cell."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        context._CELL_FAILURES[mapping1.uuid] = (
+            context._CELL_DOWN, time.monotonic() - 1)
+
+        context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        # Both cells were targeted: this request was elected to probe
+        # cell1, and the successful (mocked) result cleared the mark.
+        self.assertEqual(2, mock_target_cell.call_count)
+        self.assertNotIn(mapping1.uuid, context._CELL_FAILURES)
+
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_skips_cell_while_probe_in_flight(
+            self, mock_get_inst, mock_target_cell):
+        """A scatter during another request's probe keeps skipping."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        entry = (context._CELL_PROBING, time.monotonic() + 25)
+        context._CELL_FAILURES[mapping1.uuid] = entry
+
+        results = context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertIs(context.did_not_respond_sentinel,
+                      results[mapping1.uuid])
+        # Only cell0 was targeted and the probe entry was left alone.
+        self.assertEqual(1, mock_target_cell.call_count)
+        self.assertEqual(entry, context._CELL_FAILURES[mapping1.uuid])
+
+    @mock.patch('nova.context.target_cell')
+    def test_scatter_gather_generator_result_does_not_mark_healthy(
+            self, mock_target_cell):
+        """Spawning a listing generator must not clear the probe mark.
+
+        For listings fn is query_wrapper, a generator function: calling
+        it executes nothing, so the cell has not answered yet. If
+        gather_result treated the returned generator as a success it
+        would clear the probing mark immediately and every request in
+        the next cell_timeout seconds would pile onto the dead cell -
+        the stampede single-flight exists to prevent. query_wrapper owns
+        the health reporting on that path.
+        """
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        # Expired hold: this scatter is elected to probe cell1.
+        context._CELL_FAILURES[mapping1.uuid] = (
+            context._CELL_DOWN, time.monotonic() - 1)
+
+        def fake_query_wrapper(cctxt):
+            yield mock.sentinel.record
+
+        context.scatter_gather_cells(ctxt, mappings, 30,
+                                     fake_query_wrapper)
+
+        # The probe mark is still in place; only consuming the generator
+        # (in the merge feeder) may report the outcome.
+        state, _expiry = context._CELL_FAILURES[mapping1.uuid]
+        self.assertEqual(context._CELL_PROBING, state)
 
     @mock.patch('nova.context.target_cell')
     @mock.patch('eventlet.timeout.Timeout')
@@ -681,9 +815,9 @@ class ContextTestCase(test.NoDBTestCase):
         ctxt, mapping0, mapping1, mappings = (
             self._scatter_gather_failure_cache_test_setup())
         self.flags(cell_failure_hold_seconds=60, group='api')
-        expiry = time.monotonic() + 60
-        context._CELL_FAILURES[mapping0.uuid] = expiry
-        context._CELL_FAILURES[mapping1.uuid] = expiry
+        entry = (context._CELL_DOWN, time.monotonic() + 60)
+        context._CELL_FAILURES[mapping0.uuid] = entry
+        context._CELL_FAILURES[mapping1.uuid] = entry
 
         results = context.scatter_gather_cells(
             ctxt, mappings, 30, objects.InstanceList.get_by_filters,

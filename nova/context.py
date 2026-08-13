@@ -19,7 +19,9 @@
 
 from contextlib import contextmanager
 import copy
+import threading
 import time
+import types
 
 import eventlet.queue
 import eventlet.timeout
@@ -52,34 +54,73 @@ CELLS = []
 # for out-of-tree consumers; use get_cell_timeout() which honours the
 # [api] cell_timeout option.
 CELL_TIMEOUT = 60
-# Circuit breaker: cell_uuid -> monotonic expiry timestamp of the
-# "skip this cell" hold window. Process-local; controlled by
-# [api] cell_failure_hold_seconds.
+# Circuit breaker: cell_uuid -> (state, monotonic expiry). Process-local;
+# controlled by [api] cell_failure_hold_seconds. Guarded by _CELL_LOCK
+# because nova-api serves requests from multiple OS threads under
+# mod_wsgi (under eventlet monkey-patching the lock is green; either way
+# check-then-set on the shared dict must be atomic).
 _CELL_FAILURES = {}
+_CELL_LOCK = threading.Lock()
+# _CELL_DOWN: inside the failure hold window; skip the cell until expiry.
+# _CELL_PROBING: the hold expired and exactly one request (the "prober")
+# is re-testing the cell; everyone else keeps skipping until the probe
+# reports through _mark_cell_failed()/_mark_cell_healthy() or its lease
+# expires.
+_CELL_DOWN = 'down'
+_CELL_PROBING = 'probing'
+# A probe normally reports within cell_timeout: the scatter-gather kill
+# or query_wrapper()'s timeout fires and marks the cell. The lease only
+# has to cover a prober that dies without reporting at all, for example
+# a client disconnect closing a listing generator mid-consumption
+# (GeneratorExit bypasses the marking paths).
+_PROBE_LEASE_SLACK = 10
 
 
-def _is_cell_recently_failed(cell_uuid):
-    """Return True if cell_uuid is inside an active failure hold window.
+def _should_skip_cell(cell_uuid):
+    """Return True if this caller should short-circuit cell_uuid.
 
-    Returns False (and lazily drops the entry) once the window has elapsed,
-    so the next request re-tests the cell.
+    Implements the failure hold window with single-flight probing:
+
+    * down, hold running -> skip.
+    * down, hold expired -> this caller is elected the sole prober: the
+      entry moves to probing with a lease and the caller proceeds to
+      query the cell for real.
+    * probing, lease running -> skip; a probe is already in flight.
+    * probing, lease expired -> the prober died without reporting;
+      elect this caller as the new prober.
+
+    Single-flight matters because the cache is only consulted before a
+    query starts: if the expired entry were simply dropped (the previous
+    behaviour), every request arriving between hold expiry and the first
+    probe's timeout would see no mark and pile onto the dead cell, each
+    hanging for up to cell_timeout and crowding the worker's greenthread
+    pool - which is how a dead cell starves scatter-gathers aimed at
+    healthy cells.
     """
     if CONF.api.cell_failure_hold_seconds <= 0:
         return False
-    expiry = _CELL_FAILURES.get(cell_uuid)
-    if expiry is None:
-        return False
-    if time.monotonic() >= expiry:
-        _CELL_FAILURES.pop(cell_uuid, None)
-        return False
-    return True
+    with _CELL_LOCK:
+        entry = _CELL_FAILURES.get(cell_uuid)
+        if entry is None:
+            return False
+        state, expiry = entry
+        if time.monotonic() < expiry:
+            return True
+        lease = get_cell_timeout() + _PROBE_LEASE_SLACK
+        _CELL_FAILURES[cell_uuid] = (_CELL_PROBING,
+                                     time.monotonic() + lease)
+    LOG.debug('Cell %s failure hold expired; electing this request to '
+              'probe it', cell_uuid)
+    return False
 
 
 def _mark_cell_failed(cell_uuid):
     """Record a cell failure with the configured hold window."""
     hold = CONF.api.cell_failure_hold_seconds
     if hold > 0:
-        _CELL_FAILURES[cell_uuid] = time.monotonic() + hold
+        with _CELL_LOCK:
+            _CELL_FAILURES[cell_uuid] = (_CELL_DOWN,
+                                         time.monotonic() + hold)
         # WARNING rather than INFO: this withdraws the cell from every
         # scatter-gather in this process for the hold window, and the
         # breaker runs wherever scatter-gather runs (the scheduler and
@@ -89,8 +130,9 @@ def _mark_cell_failed(cell_uuid):
 
 
 def _mark_cell_healthy(cell_uuid):
-    """Clear any recent-failure mark after a successful response."""
-    _CELL_FAILURES.pop(cell_uuid, None)
+    """Clear any failure or probing mark after a successful response."""
+    with _CELL_LOCK:
+        _CELL_FAILURES.pop(cell_uuid, None)
 
 
 # NOTE(shiyan): Exceptions that mean the cell itself did not answer, as
@@ -498,7 +540,14 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
                 # far as the circuit breaker is concerned it is healthy.
                 _mark_cell_healthy(cell_uuid)
         else:
-            _mark_cell_healthy(cell_uuid)
+            # Calling a generator function (the multi-cell listing path,
+            # where fn is query_wrapper) executes nothing: the cell has
+            # not answered yet, so it proves nothing about health -
+            # marking here would clear an in-flight probe and reopen the
+            # stampede on the listing path. query_wrapper() owns the
+            # health reporting for generators.
+            if not isinstance(result, types.GeneratorType):
+                _mark_cell_healthy(cell_uuid)
         # The queue is already synchronized.
         queue.put((cell_uuid, result))
 
@@ -507,15 +556,18 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
         # cannot exhaust the API worker pool by forcing every request to
         # wait the full per-cell timeout. Controlled by
         # [api] cell_failure_hold_seconds (0 disables, preserving legacy
-        # behaviour). Skips are kept out of ``results`` because the gather
+        # behaviour). When the hold expires, _should_skip_cell() lets
+        # exactly one request through to re-test the cell (single-flight
+        # probing); everyone else keeps skipping until that probe
+        # reports. Skips are kept out of ``results`` because the gather
         # loop below equates completion with
         # len(results) == len(greenthreads). A skipped cell is deliberately
         # not re-marked as failed, otherwise the hold window would slide
         # forever under constant traffic.
-        if _is_cell_recently_failed(cell_mapping.uuid):
+        if _should_skip_cell(cell_mapping.uuid):
             skipped_results[cell_mapping.uuid] = did_not_respond_sentinel
-            LOG.debug('Skipping cell %s: inside failure hold window',
-                      cell_mapping.uuid)
+            LOG.debug('Skipping cell %s: inside failure hold or probe '
+                      'window', cell_mapping.uuid)
             continue
         with target_cell(context, cell_mapping) as cctxt:
             greenthreads.append((cell_mapping.uuid,

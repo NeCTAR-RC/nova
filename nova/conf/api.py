@@ -373,9 +373,13 @@ services that scatter across cells (nova-scheduler, nova-conductor) their
 processes each keep one too - in the scheduler a held cell's hosts are
 skipped for the whole hold window, so only set it there deliberately.
 The cache is purely additive: a
-successful response from a cell immediately clears its failure mark, and an
-entry that has aged past the hold window is dropped lazily on the next
-lookup so the cell is re-tested.
+successful response from a cell immediately clears its failure mark. When
+the hold window expires, the cell is re-tested by a single probe request
+(single-flight): exactly one request is let through to query the cell while
+every other request keeps short-circuiting, until the probe either succeeds
+(the mark is cleared) or fails (a new hold window starts). This prevents a
+stampede of requests from piling onto a still-dead cell each time the hold
+expires.
 
 Set to 0 (default) to preserve the legacy behavior of attempting every cell
 on every request. Typical production values are 30-60 seconds, balancing

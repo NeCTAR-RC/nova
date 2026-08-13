@@ -604,7 +604,8 @@ class HostAPIDownCellTestCase(test.TestCase):
             'nova.compute.api.CELLS', [self.cell1, self.cell2]))
 
     def _mark_cell1_failed(self):
-        context._CELL_FAILURES[uuids.cell1_uuid] = time.monotonic() + 60
+        context._CELL_FAILURES[uuids.cell1_uuid] = (
+            context._CELL_DOWN, time.monotonic() + 60)
 
     @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
     def test_compute_node_get_all_skips_recently_failed_cell(self, mock_gbp):
@@ -628,6 +629,31 @@ class HostAPIDownCellTestCase(test.TestCase):
         self.assertEqual([uuids.cn2], [c.uuid for c in result])
         self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
         self.assertNotIn(uuids.cell2_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_probe_success_clears_mark(self, mock_gbp):
+        """A successful probe on this sequential path must report health.
+
+        Unlike scatter-gather, these loops have no gather_result to mark
+        a cell healthy: without the explicit _mark_cell_healthy call a
+        recovered cell would stay in the probing state forever, skipped
+        by everyone except one prober per lease window.
+        """
+        cn1 = objects.ComputeNode(uuid=uuids.cn1)
+        cn2 = objects.ComputeNode(uuid=uuids.cn2)
+        mock_gbp.side_effect = [[cn1], [cn2]]
+        # cell1's hold window has expired: this request is elected to
+        # probe it rather than skip it.
+        context._CELL_FAILURES[uuids.cell1_uuid] = (
+            context._CELL_DOWN, time.monotonic() - 1)
+
+        result = self.host_api.compute_node_get_all(self.ctxt)
+
+        self.assertEqual(2, mock_gbp.call_count)
+        self.assertEqual([uuids.cn1, uuids.cn2], [c.uuid for c in result])
+        # The successful probe cleared the mark: cell1 is back in
+        # service for every subsequent request.
+        self.assertNotIn(uuids.cell1_uuid, context._CELL_FAILURES)
 
     @mock.patch.object(objects.ComputeNode, 'get_by_uuid')
     @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
