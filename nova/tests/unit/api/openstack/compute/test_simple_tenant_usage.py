@@ -634,7 +634,8 @@ class SimpleTenantUsageDownCellTestV21(test.TestCase):
         self.flags(cell_failure_hold_seconds=60, group='api')
         self.addCleanup(context._CELL_FAILURES.clear)
         cells = objects.CellMappingList.get_all(self.admin_context)
-        context._CELL_FAILURES[cells[0].uuid] = time.monotonic() + 60
+        context._CELL_FAILURES[cells[0].uuid] = (
+            context._CELL_DOWN, time.monotonic() + 60)
 
         self.assertRaises(webob.exc.HTTPServiceUnavailable,
                           self.controller.index, self._make_request())

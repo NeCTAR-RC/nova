@@ -6475,7 +6475,7 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            if nova_context._is_cell_recently_failed(cell.uuid):
+            if nova_context._should_skip_cell(cell.uuid):
                 LOG.warning('Skipping cell %s while looking up compute '
                             'node %s: inside failure hold window',
                             cell.identity, compute_id)
@@ -6487,12 +6487,17 @@ class HostAPI:
                             nova_context.get_cell_timeout(),
                             exception.CellTimeout):
                         if is_uuid:
-                            return objects.ComputeNode.get_by_uuid(
+                            node = objects.ComputeNode.get_by_uuid(
                                 cctxt, compute_id)
-                        return objects.ComputeNode.get_by_id(
-                            cctxt, int(compute_id))
+                        else:
+                            node = objects.ComputeNode.get_by_id(
+                                cctxt, int(compute_id))
                 except exception.ComputeHostNotFound:
-                    # NOTE(danms): Keep looking in other cells
+                    # NOTE(danms): Keep looking in other cells. The cell
+                    # answered (with a miss), which is what the failure
+                    # cache needs to know: an elected probe must report
+                    # health or the cell stays in the probing state.
+                    nova_context._mark_cell_healthy(cell.uuid)
                     continue
                 except nova_context._CELL_DOWN_EXCEPTIONS:
                     nova_context._mark_cell_failed(cell.uuid)
@@ -6501,6 +6506,8 @@ class HostAPI:
                                 cell.identity, compute_id)
                     skipped_cells = True
                     continue
+                nova_context._mark_cell_healthy(cell.uuid)
+                return node
 
         if skipped_cells:
             # The node was not found in any responsive cell, but it may
@@ -6519,7 +6526,7 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            if nova_context._is_cell_recently_failed(cell.uuid):
+            if nova_context._should_skip_cell(cell.uuid):
                 LOG.warning('Skipping cell %s while listing compute nodes: '
                             'inside failure hold window; hypervisors in '
                             'that cell are missing from the results',
@@ -6552,7 +6559,9 @@ class HostAPI:
                                 cell_marker = compute_marker.id
                             except exception.ComputeHostNotFound:
                                 # The marker node isn't in this cell so keep
-                                # looking.
+                                # looking. The cell answered, so report
+                                # health to the failure cache.
+                                nova_context._mark_cell_healthy(cell.uuid)
                                 continue
 
                         try:
@@ -6560,7 +6569,9 @@ class HostAPI:
                                 objects.ComputeNodeList.get_by_pagination(
                                     cctxt, limit=limit, marker=cell_marker))
                         except exception.MarkerNotFound:
-                            # NOTE(danms): Keep looking through cells
+                            # NOTE(danms): Keep looking through cells. The
+                            # cell answered, so report health.
+                            nova_context._mark_cell_healthy(cell.uuid)
                             continue
                 except nova_context._CELL_DOWN_EXCEPTIONS:
                     nova_context._mark_cell_failed(cell.uuid)
@@ -6570,6 +6581,7 @@ class HostAPI:
                                 cell.identity)
                     skipped_cells = True
                     continue
+                nova_context._mark_cell_healthy(cell.uuid)
                 computes.extend(cell_computes)
                 # NOTE(danms): We must have found the marker, so continue on
                 # without one
@@ -6600,7 +6612,7 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            if nova_context._is_cell_recently_failed(cell.uuid):
+            if nova_context._should_skip_cell(cell.uuid):
                 LOG.warning('Skipping cell %s while searching hypervisors: '
                             'inside failure hold window; hypervisors in '
                             'that cell are missing from the results',
@@ -6621,6 +6633,7 @@ class HostAPI:
                                 'cell are missing from the results',
                                 cell.identity)
                     continue
+            nova_context._mark_cell_healthy(cell.uuid)
             computes.extend(cell_computes)
         return objects.ComputeNodeList(objects=computes)
 
@@ -6631,7 +6644,7 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
-            if nova_context._is_cell_recently_failed(cell.uuid):
+            if nova_context._should_skip_cell(cell.uuid):
                 LOG.warning('Skipping cell %s while computing hypervisor '
                             'statistics: inside failure hold window; the '
                             'totals will not include that cell',
@@ -6651,6 +6664,7 @@ class HostAPI:
                                 'totals will not include that cell',
                                 cell.identity)
                     continue
+                nova_context._mark_cell_healthy(cell.uuid)
 
         if cell_stats:
             keys = cell_stats[0].keys()

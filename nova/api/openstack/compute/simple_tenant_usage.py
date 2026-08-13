@@ -122,7 +122,7 @@ class SimpleTenantUsageController(wsgi.Controller):
             # readers, so the 503 explanations are deliberately generic:
             # cell UUIDs are deployment topology and belong in the logs,
             # not in tenant-visible responses.
-            if nova_context._is_cell_recently_failed(cell.uuid):
+            if nova_context._should_skip_cell(cell.uuid):
                 LOG.warning('Skipping cell %s during a tenant usage query: '
                             'inside failure hold window; failing the '
                             'request because usage data would be '
@@ -142,7 +142,10 @@ class SimpleTenantUsageController(wsgi.Controller):
                                 marker=marker))
                 except exception.MarkerNotFound:
                     # NOTE(danms): We need to keep looking through the later
-                    # cells to find the marker
+                    # cells to find the marker. The cell answered, so
+                    # report health to the failure cache (an elected probe
+                    # must not be left dangling in the probing state).
+                    nova_context._mark_cell_healthy(cell.uuid)
                     continue
                 except nova_context._CELL_DOWN_EXCEPTIONS:
                     nova_context._mark_cell_failed(cell.uuid)
@@ -153,6 +156,7 @@ class SimpleTenantUsageController(wsgi.Controller):
                     raise exc.HTTPServiceUnavailable(
                         explanation=_('A cell is not currently responding; '
                                       'usage data would be incomplete.'))
+                nova_context._mark_cell_healthy(cell.uuid)
                 all_instances.extend(instances)
                 # NOTE(danms): We must have found a marker if we had one,
                 # so make sure we don't require a marker in the next cell

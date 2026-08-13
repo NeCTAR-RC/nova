@@ -278,7 +278,8 @@ class TestUtils(test.NoDBTestCase):
         self.flags(cell_failure_hold_seconds=60, group='api')
         self.addCleanup(context._CELL_FAILURES.clear)
         # Pretend the cell failed recently; a clean completion clears it.
-        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_DOWN, time.monotonic() + 60)
         ctx = mock.MagicMock()
         ctx.cell_uuid = uuids.cell1
 
@@ -289,6 +290,34 @@ class TestUtils(test.NoDBTestCase):
         self.assertEqual([1, 2, 3],
                          list(multi_cell_list.query_wrapper(
                              ctx, tester, [1, 2, 3])))
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_marks_cell_healthy_on_first_record(self):
+        """The first record already proves the cell answered.
+
+        A limit-truncated listing abandons the generator before it is
+        exhausted (GeneratorExit skips every marking path), so an
+        elected probe must report health as soon as the first record
+        arrives or a recovered cell would dangle in the probing state.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        # This request was elected to probe the cell.
+        context._CELL_FAILURES[uuids.cell1] = (
+            context._CELL_PROBING, time.monotonic() + 25)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx, data):
+            for thing in data:
+                yield thing
+
+        gen = multi_cell_list.query_wrapper(ctx, tester, [1, 2, 3])
+        # Consume a single record, then abandon the generator the way a
+        # limit-truncated heapq.merge does.
+        self.assertEqual(1, next(gen))
+        gen.close()
+
         self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
 
 

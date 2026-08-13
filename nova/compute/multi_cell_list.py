@@ -108,7 +108,15 @@ def query_wrapper(ctx, fn, *args, **kwargs):
                                   exception.CellTimeout):
         try:
             for record in fn(ctx, *args, **kwargs):
-                answered = True
+                if not answered:
+                    # The first record proves the cell answered. Report
+                    # health here, not only on exhaustion below: a
+                    # limit-truncated listing abandons this generator
+                    # early (GeneratorExit skips every marking path), and
+                    # an elected probe must not be left dangling in the
+                    # probing state when the cell is actually fine.
+                    context._mark_cell_healthy(ctx.cell_uuid)
+                    answered = True
                 yield record
         except exception.CellTimeout:
             # NOTE(shiyan): Listing queries run lazily in here during
