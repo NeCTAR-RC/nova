@@ -6219,9 +6219,18 @@ class HostAPI:
         service_dict = nova_context.scatter_gather_all_cells(context,
             objects.ServiceList.get_all, disabled, set_zones=set_zones)
 
+        # NOTE(shiyan): cell0's result can be a failure sentinel (a bare
+        # object) or an exception when cell0 timed out or was skipped by
+        # the circuit breaker, exactly like any other cell; iterating it
+        # raises TypeError and turns every request through this method
+        # (server create AZ validation, os-services at any microversion)
+        # into a 500 for the whole hold window. The loop below already
+        # handles sentinels; this warning-only check must skip them too.
+        cell0_services = service_dict.get(objects.CellMapping.CELL0_UUID, [])
+        if nova_context.is_cell_failure_sentinel(cell0_services):
+            cell0_services = []
         cell0_computes = [
-            x for x in
-            service_dict.get(objects.CellMapping.CELL0_UUID, [])
+            x for x in cell0_services
             if x.binary == 'nova-compute']
         for cn in cell0_computes:
             LOG.warning(
