@@ -1,0 +1,13 @@
+---
+fixes:
+  - |
+    Fixed a ``TypeError`` (HTTP 500) in service listing when cell0 is
+    unreachable. The warning that reports rogue compute services in
+    cell0 iterated cell0's cross-cell query result without checking for
+    the down-cell failure sentinel, so any request that lists services
+    across cells - including the availability zone validation performed
+    by server create, and ``os-services`` at every microversion -
+    returned a 500 whenever cell0 timed out or was being skipped by the
+    ``[api] cell_failure_hold_seconds`` circuit breaker. Such cells are
+    now skipped by the warning check and handled by the existing
+    down-cell reporting instead.

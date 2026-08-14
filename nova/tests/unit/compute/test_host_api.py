@@ -210,6 +210,31 @@ class ComputeHostAPITestCase(test.TestCase):
                 {'service': 'rogue'})
             self.assertEqual([service], services)
 
+    @mock.patch('nova.context.scatter_gather_cells')
+    def test_service_get_all_cell0_down(self, mock_sg):
+        """A cell0 failure result must not break the whole listing.
+
+        The rogue-compute-in-cell0 warning check iterated cell0's
+        scatter result unguarded: when cell0 timed out or was inside
+        the circuit breaker's hold window, the sentinel (a bare object)
+        raised TypeError and every request through this path - server
+        create AZ validation, os-services at any microversion - 500ed
+        for the rest of the hold window.
+        """
+        service = objects.Service(binary='nova-compute',
+                                  host='host-%s' % uuids.cell1)
+        for cell0_result in (context.did_not_respond_sentinel,
+                             oslo_db_exc.DBConnectionError()):
+            mock_sg.return_value = {
+                objects.CellMapping.CELL0_UUID: cell0_result,
+                uuids.cell1: [service],
+            }
+            services = self.host_api.service_get_all(
+                self.ctxt, all_cells=True)
+            # cell0 is skipped with a warning; cell1's services survive.
+            self.assertEqual(['host-%s' % uuids.cell1],
+                             [svc.host for svc in services])
+
     @mock.patch('nova.objects.CellMappingList.get_all')
     @mock.patch.object(objects.HostMappingList, 'get_by_cell_id')
     @mock.patch('nova.context.scatter_gather_all_cells')
