@@ -16,6 +16,7 @@ import datetime
 import time
 from unittest import mock
 
+import eventlet
 from oslo_db import exception as oslo_db_exc
 from oslo_utils.fixture import uuidsentinel as uuids
 from sqlalchemy import exc as sqla_exc
@@ -184,7 +185,48 @@ class TestUtils(test.NoDBTestCase):
         self.assertEqual([1, 2],
                          list(multi_cell_list.query_wrapper(
                              mock.MagicMock(), tester, [1, 2])))
-        mock_timeout.assert_called_once_with(15, exception.CellTimeout)
+
+        # The timeout is armed once per fetch rather than once for the
+        # whole generator, so it is never left armed across a yield.
+        budgets = [call.args[0] for call in mock_timeout.call_args_list
+                   if call.args]
+        self.assertTrue(budgets)
+        for call in mock_timeout.call_args_list:
+            if call.args:
+                self.assertEqual(exception.CellTimeout, call.args[1])
+        # The first fetch gets the configured timeout, and each later
+        # fetch gets what is left of this cell's own budget.
+        self.assertEqual(15, budgets[0])
+        self.assertEqual(sorted(budgets, reverse=True), budgets)
+        self.assertGreater(budgets[-1], 0)
+
+    def test_query_wrapper_budget_accumulates_across_fetches(self):
+        """cell_timeout bounds this cell's own time, not one fetch.
+
+        Arming per fetch must not hand a slow cell a fresh full timeout
+        every batch, or a cell that dribbles could hold a listing open
+        indefinitely.
+        """
+        self.flags(cell_timeout=1, group='api')
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def dribbling_cell(ctx):
+            for thing in ('one', 'two', 'three'):
+                eventlet.sleep(0.6)
+                yield thing
+
+        records = list(multi_cell_list.query_wrapper(ctx, dribbling_cell))
+
+        # The first batch fits inside the budget. The second exhausts
+        # what is left of it, so the cell is cut off there.
+        self.assertEqual('one', records[0])
+        self.assertEqual(context.did_not_respond_sentinel,
+                         records[-1]._db_record)
+        # It answered before running out, so it is not held down.
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
 
     def test_query_wrapper_db_error_does_not_mark_cell(self):
         """A plain DBError is ambiguous and must not touch the cache.
@@ -381,6 +423,82 @@ class TestUtils(test.NoDBTestCase):
         gen.close()
 
         self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_stray_timer_does_not_blame_a_parked_healthy_cell(self):
+        """A stalled cell must not make a healthy sibling look down.
+
+        Listing queries run lazily in the request greenthread, one cell
+        at a time, so a healthy cell sits parked at its yield while a
+        stalled sibling blocks. Its timer must not still be running
+        there: eventlet binds a timer to the greenthread that built it,
+        so a timer left armed across a yield detonates in whatever cell
+        happens to be executing when it expires.
+
+        Three cells are needed to show it. The stalled cell cancels its
+        own timer as it unwinds, and the first healthy timer is spent
+        tripping it, so only a third cell leaves a timer still armed to
+        land on a healthy cell afterwards.
+
+        The generators are driven by hand rather than through
+        heapq.merge() so the interleaving is deterministic. The order
+        below is the one heapq.merge() produces: it advances every
+        iterable once, in order, before pulling any of them again.
+        """
+        self.flags(cell_timeout=2, group='api')
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+
+        def ctx_for(cell_uuid):
+            ctx = mock.MagicMock()
+            ctx.cell_uuid = cell_uuid
+            return ctx
+
+        def slow_second_batch(ctx):
+            yield 'first'
+            # The second batch is fetched only once the merge comes back
+            # to this cell. This is the window a stray timer lands in.
+            eventlet.sleep(1)
+            yield 'second'
+
+        def two_batches(ctx):
+            yield 'one'
+            yield 'two'
+
+        def stalled_cell(ctx):
+            eventlet.sleep(30)
+            yield 'never'
+
+        first = multi_cell_list.query_wrapper(
+            ctx_for(uuids.healthy_one), slow_second_batch)
+        second = multi_cell_list.query_wrapper(
+            ctx_for(uuids.healthy_two), two_batches)
+        stalled = multi_cell_list.query_wrapper(
+            ctx_for(uuids.stalled_cell), stalled_cell)
+
+        # Both healthy cells answer at once and park at their yield,
+        # staggered so their timers cannot expire together.
+        self.assertEqual('first', next(first))
+        eventlet.sleep(0.5)
+        self.assertEqual('one', next(second))
+        eventlet.sleep(0.5)
+        # The stalled cell blocks until a timeout trips it.
+        stalled_records = list(stalled)
+        # Now the merge returns to the healthy cells.
+        first_records = list(first)
+        second_records = list(second)
+
+        # The stalled cell is the only one that timed out, and the only
+        # one held down.
+        self.assertEqual([context.did_not_respond_sentinel],
+                         [x._db_record for x in stalled_records])
+        self.assertIn(uuids.stalled_cell, context._CELL_FAILURES)
+
+        # The healthy cells keep streaming and are never blamed, neither
+        # in the response nor in the failure cache.
+        self.assertEqual(['second'], first_records)
+        self.assertEqual(['two'], second_records)
+        self.assertNotIn(uuids.healthy_one, context._CELL_FAILURES)
+        self.assertNotIn(uuids.healthy_two, context._CELL_FAILURES)
 
 
 class TestListContext(multi_cell_list.RecordSortContext):

@@ -1,0 +1,30 @@
+---
+fixes:
+  - |
+    Cross-cell server and migration listings no longer report a healthy cell
+    as down when a different cell is unreachable. Listing queries run lazily
+    in the API request greenthread, one cell at a time, so a cell that has
+    handed over a record sits parked while the merge reads its siblings. Its
+    per-cell timeout stayed armed while it was parked, and because eventlet
+    binds a timer to the greenthread that created it rather than to the cell,
+    an expired timer fired into whichever cell the merge happened to be
+    reading. That cell was then omitted from the response, appearing as
+    ``UNKNOWN`` servers under microversion 2.69 or silently missing below it,
+    and could also be held down in the cell failure cache.
+
+    The timeout is now armed around each fetch and cancelled before every
+    record is handed on, so only the cell actually running a query has a
+    timer live and a timeout can only be charged to the cell that spent the
+    time. One unreachable cell now costs only that cell's records.
+upgrade:
+  - |
+    ``[api] cell_timeout`` now bounds the time a single cell spends on its
+    own queries during a multi-cell listing, rather than wall clock since
+    that cell's first query began. The budget is tracked across batches, so a
+    cell that returns records slowly cannot keep renewing it. A listing that
+    previously ended early because a stray timeout cut it short will now run
+    to completion, returning the records it used to drop and therefore
+    possibly taking longer. Cells that are genuinely unreachable are still
+    cut off after ``[api] cell_timeout`` as before. Size the option below the
+    front-end proxy or load balancer timeout, as its help text already
+    advises.

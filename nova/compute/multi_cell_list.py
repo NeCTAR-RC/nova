@@ -14,6 +14,7 @@ import abc
 import collections
 import copy
 import heapq
+import time
 
 import eventlet
 from oslo_db import exception as oslo_db_exc
@@ -103,85 +104,108 @@ def query_wrapper(ctx, fn, *args, **kwargs):
     objects, which will prioritize them to the merge sort, causing them to
     be handled by the main get_objects_sorted() feeder loop quickly and
     gracefully.
+
+    The timeout is armed around each fetch and cancelled before every
+    yield, so it only runs while this cell is the one doing work. eventlet
+    binds a timer to the greenthread that constructs it, and listing
+    queries all run lazily in the single request greenthread, so a timer
+    left armed across a yield keeps ticking while this cell is parked and
+    detonates in whatever cell happens to be executing when it expires -
+    blaming whichever cell the merge was reading rather than the one that
+    spent the time. Arming per fetch keeps at most one timer live, the one
+    belonging to the cell being read, so a timeout can only ever be charged
+    to the cell that earned it. What ``[api] cell_timeout`` bounds here is
+    therefore this cell's own query time, not wall clock since the listing
+    began.
     """
     answered = False
-    with eventlet.timeout.Timeout(context.get_cell_timeout(),
-                                  exception.CellTimeout):
-        try:
-            for record in fn(ctx, *args, **kwargs):
-                if not answered:
-                    # The first record proves the cell answered. Report
-                    # health here, not only on exhaustion below: a
-                    # limit-truncated listing abandons this generator
-                    # early (GeneratorExit skips every marking path), and
-                    # an elected probe must not be left dangling in the
-                    # probing state when the cell is actually fine.
-                    context._mark_cell_healthy(ctx.cell_uuid)
-                    answered = True
-                yield record
-        except exception.CellTimeout:
-            # NOTE(shiyan): Listing queries run lazily in here during
-            # result consumption, not inside scatter_gather_cells(), so
-            # the scatter-gather failure cache is fed from here too.
+    budget = context.get_cell_timeout()
+    try:
+        records = iter(fn(ctx, *args, **kwargs))
+        while True:
+            if budget <= 0:
+                # This cell has spent its whole allowance on its own
+                # queries. Nothing left to give it.
+                raise exception.CellTimeout()
+            started = time.monotonic()
+            try:
+                with eventlet.timeout.Timeout(budget,
+                                              exception.CellTimeout):
+                    record = next(records)
+            except StopIteration:
+                break
+            finally:
+                # Charge this cell only for the time it just spent.
+                budget -= time.monotonic() - started
+            if not answered:
+                # The first record proves the cell answered. Report
+                # health here, not only on exhaustion below: a
+                # limit-truncated listing abandons this generator
+                # early (GeneratorExit skips every marking path), and
+                # an elected probe must not be left dangling in the
+                # probing state when the cell is actually fine.
+                context._mark_cell_healthy(ctx.cell_uuid)
+                answered = True
+            # No timer is armed across this yield.
+            yield record
+    except exception.CellTimeout:
+        # NOTE(shiyan): Listing queries run lazily in here during
+        # result consumption, not inside scatter_gather_cells(), so
+        # the scatter-gather failure cache is fed from here too.
+        if not answered:
+            context._mark_cell_failed(ctx.cell_uuid)
+        else:
+            # This cell answered and then spent the rest of its own
+            # budget without producing another record. It is reachable
+            # but slow rather than down, and the records it already
+            # returned prove it, so keep the response partial and leave
+            # the failure cache alone.
+            LOG.warning('Cell %s exhausted its query budget after '
+                        'answering; returning a partial result and not '
+                        'marking the cell down', ctx.cell_uuid)
+        # Here, we yield a RecordWrapper (no sort_ctx needed since
+        # we won't call into the implementation's comparison routines)
+        # wrapping the sentinel indicating timeout.
+        yield RecordWrapper(ctx, None, context.did_not_respond_sentinel)
+        return
+    except Exception as e:
+        if context._is_cell_down_exception(e):
             if not answered:
                 context._mark_cell_failed(ctx.cell_uuid)
             else:
-                # A cell that already yielded records in this request is
-                # not down. Every generator's timer targets the request
-                # greenthread and keeps ticking while its generator is
-                # suspended, so one slow sibling pull lets an expired
-                # timer detonate in whatever frame is executing - often
-                # this cell's in-flight DB read. Keep this response
-                # partial, but do not feed the failure cache.
-                LOG.warning('Cell %s timed out after answering; treating '
-                            'as a stray sibling timeout and not marking '
-                            'the cell down', ctx.cell_uuid)
-            # Here, we yield a RecordWrapper (no sort_ctx needed since
-            # we won't call into the implementation's comparison routines)
-            # wrapping the sentinel indicating timeout.
-            yield RecordWrapper(ctx, None, context.did_not_respond_sentinel)
-            return
-        except Exception as e:
-            if context._is_cell_down_exception(e):
-                if not answered:
-                    context._mark_cell_failed(ctx.cell_uuid)
-                else:
-                    # The stray-timer shape above, one layer deeper: a
-                    # timer that fires inside this cell's DB read surfaces
-                    # as a DBConnectionError once sqlalchemy invalidates
-                    # the connection and oslo_db drops the CellTimeout
-                    # cause.
-                    LOG.warning('Cell %s hit a connection error after '
-                                'answering; treating as a stray sibling '
-                                'timeout and not marking the cell down',
-                                ctx.cell_uuid)
-            elif isinstance(e, oslo_db_exc.DBError):
-                # A DB-layer error that is not a recognised down shape is
-                # ambiguous: oslo_db maps some unreachability modes (for
-                # example mysql 1040 'Too many connections') to plain
-                # DBError, so treating it as proof of health would clear a
-                # legitimate failure mark while the cell is saturated -
-                # exactly when the breaker must hold. It is equally not
-                # proof of failure (healthy cells throw transient DB
-                # errors such as deadlocks), so leave the failure cache
-                # untouched either way.
-                LOG.debug('Cell %s raised an ambiguous DB error; not '
-                          'updating the cell failure cache', ctx.cell_uuid)
-            else:
-                # An ordinary application error means the cell answered.
-                context._mark_cell_healthy(ctx.cell_uuid)
-            # Here, we yield a RecordWrapper (no sort_ctx needed since
-            # we won't call into the implementation's comparison routines)
-            # wrapping the exception object indicating failure. Yield the
-            # original object: rebuilding a copy with e.__class__(e.args)
-            # blows up on exception types whose constructor needs more
-            # than args (sqlalchemy's DBAPIError family wants statement,
-            # params and orig), turning a fast-failing cell query into a
-            # TypeError 500 for the whole listing.
-            yield RecordWrapper(ctx, None, e)
-            return
+                # The budget-exhausted shape above, one layer deeper:
+                # the timeout fired inside this cell's DB read and came
+                # back rewrapped as a connection error.
+                LOG.warning('Cell %s hit a connection error after '
+                            'answering; returning a partial result and '
+                            'not marking the cell down', ctx.cell_uuid)
+        elif isinstance(e, oslo_db_exc.DBError):
+            # A DB-layer error that is not a recognised down shape is
+            # ambiguous: oslo_db maps some unreachability modes (for
+            # example mysql 1040 'Too many connections') to plain
+            # DBError, so treating it as proof of health would clear a
+            # legitimate failure mark while the cell is saturated -
+            # exactly when the breaker must hold. It is equally not
+            # proof of failure (healthy cells throw transient DB
+            # errors such as deadlocks), so leave the failure cache
+            # untouched either way.
+            LOG.debug('Cell %s raised an ambiguous DB error; not '
+                      'updating the cell failure cache', ctx.cell_uuid)
         else:
+            # An ordinary application error means the cell answered.
             context._mark_cell_healthy(ctx.cell_uuid)
+        # Here, we yield a RecordWrapper (no sort_ctx needed since
+        # we won't call into the implementation's comparison routines)
+        # wrapping the exception object indicating failure. Yield the
+        # original object: rebuilding a copy with e.__class__(e.args)
+        # blows up on exception types whose constructor needs more
+        # than args (sqlalchemy's DBAPIError family wants statement,
+        # params and orig), turning a fast-failing cell query into a
+        # TypeError 500 for the whole listing.
+        yield RecordWrapper(ctx, None, e)
+        return
+    else:
+        context._mark_cell_healthy(ctx.cell_uuid)
 
 
 class CrossCellLister(metaclass=abc.ABCMeta):
