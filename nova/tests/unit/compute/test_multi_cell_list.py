@@ -18,6 +18,7 @@ from unittest import mock
 
 from oslo_db import exception as oslo_db_exc
 from oslo_utils.fixture import uuidsentinel as uuids
+from sqlalchemy import exc as sqla_exc
 
 from nova.compute import multi_cell_list
 from nova import context
@@ -185,6 +186,49 @@ class TestUtils(test.NoDBTestCase):
                              mock.MagicMock(), tester, [1, 2])))
         mock_timeout.assert_called_once_with(15, exception.CellTimeout)
 
+    def test_query_wrapper_db_error_does_not_mark_cell(self):
+        """A plain DBError is ambiguous and must not touch the cache.
+
+        oslo_db maps some unreachability modes (for example mysql 1040
+        'Too many connections') to plain DBError, so it is not proof the
+        cell answered; healthy cells also throw transient DB errors
+        (deadlocks), so it is not proof of failure either.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            raise oslo_db_exc.DBError('Too many connections')
+
+        result = [x._db_record for x in
+                  multi_cell_list.query_wrapper(ctx, tester)]
+        self.assertIsInstance(result[0], oslo_db_exc.DBError)
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_db_error_does_not_clear_down_mark(self):
+        """A prober hitting a plain DBError must not unmark the cell.
+
+        The saturation shape: the cell was marked down by a connection
+        refusal, the elected probe then gets 'Too many connections' as a
+        plain DBError. Marking healthy here would reopen full traffic
+        onto the saturated database and the breaker would flap.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        entry = (context._CELL_DOWN, time.monotonic() + 60)
+        context._CELL_FAILURES[uuids.cell1] = entry
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            raise oslo_db_exc.DBError('Too many connections')
+
+        list(multi_cell_list.query_wrapper(ctx, tester))
+
+        self.assertEqual(entry, context._CELL_FAILURES[uuids.cell1])
+
     def test_query_wrapper_marks_cell_failed_on_timeout(self):
         self.flags(cell_failure_hold_seconds=60, group='api')
         self.addCleanup(context._CELL_FAILURES.clear)
@@ -273,6 +317,24 @@ class TestUtils(test.NoDBTestCase):
         self.assertIsInstance(results[1]._db_record,
                               oslo_db_exc.DBConnectionError)
         self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_yields_original_exception_object(self):
+        """Exceptions that cannot be rebuilt from args must pass through.
+
+        sqlalchemy's DBAPIError family needs (statement, params, orig),
+        so rebuilding a copy with e.__class__(e.args) raises TypeError
+        mid-listing and the whole request returns a 500 instead of
+        down-cell handling.
+        """
+        error = sqla_exc.OperationalError('SELECT 1', {},
+                                          RuntimeError('refused'))
+
+        def tester(ctx):
+            raise error
+
+        results = list(multi_cell_list.query_wrapper(
+            mock.MagicMock(), tester))
+        self.assertIs(error, results[0]._db_record)
 
     def test_query_wrapper_marks_cell_healthy_on_completion(self):
         self.flags(cell_failure_hold_seconds=60, group='api')

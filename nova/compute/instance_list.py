@@ -12,6 +12,9 @@
 
 import copy
 
+import eventlet
+from oslo_log import log as logging
+
 from nova.compute import multi_cell_list
 import nova.conf
 from nova import context
@@ -22,6 +25,7 @@ from nova.objects import instance as instance_obj
 
 
 CONF = nova.conf.CONF
+LOG = logging.getLogger(__name__)
 
 
 class InstanceSortContext(multi_cell_list.RecordSortContext):
@@ -60,18 +64,55 @@ class InstanceLister(multi_cell_list.CrossCellLister):
         except exception.InstanceMappingNotFound:
             raise exception.MarkerNotFound(marker=marker)
 
+        if im.cell_mapping is None:
+            # Mapped, but to no cell: the instance was never scheduled or
+            # its record was purged from under the mapping. There is no
+            # cell to look in, so this is a plain miss. (The unguarded
+            # target_cell(None) that used to run here fell through to the
+            # untargeted database and reported the same miss by luck.)
+            raise exception.MarkerNotFound(marker=marker)
+
+        cell_uuid = im.cell_mapping.uuid
+        # NOTE(shiyan): This lookup targets the marker's cell directly,
+        # before any scatter-gather runs, so the circuit breaker never
+        # sees it: gate and bound it here the same way. Unbounded, a
+        # paginated listing whose marker lives in a down cell holds an
+        # API worker for the whole DB reconnect ladder - the exact
+        # worker-burn the breaker exists to prevent. An unreachable cell
+        # must surface as CellTimeout (a retryable 503), never as
+        # MarkerNotFound: that becomes a 400 wrongly telling the client
+        # the marker it was handed on the previous page is invalid.
+        if context._should_skip_cell(cell_uuid):
+            LOG.warning('Cell %s is inside its failure hold window and '
+                        'holds pagination marker %s; failing the request',
+                        cell_uuid, marker)
+            raise exception.CellTimeout()
+
         elevated = ctx.elevated(read_deleted='yes')
         with context.target_cell(elevated, im.cell_mapping) as cctx:
             try:
-                # NOTE(danms): We query this with no columns_to_join()
-                # as we're just getting values for the sort keys from
-                # it and none of the valid sort keys are on joined
-                # columns.
-                db_inst = db.instance_get_by_uuid(cctx, marker,
-                                                  columns_to_join=[])
+                with eventlet.timeout.Timeout(context.get_cell_timeout(),
+                                              exception.CellTimeout):
+                    # NOTE(danms): We query this with no columns_to_join()
+                    # as we're just getting values for the sort keys from
+                    # it and none of the valid sort keys are on joined
+                    # columns.
+                    db_inst = db.instance_get_by_uuid(cctx, marker,
+                                                      columns_to_join=[])
             except exception.InstanceNotFound:
+                # The cell answered (with a miss). Report health: this
+                # request may be the elected probe for the cell, which
+                # must not be left dangling in the probing state.
+                context._mark_cell_healthy(cell_uuid)
                 raise exception.MarkerNotFound(marker=marker)
-        return im.cell_mapping.uuid, db_inst
+            except context._CELL_DOWN_EXCEPTIONS:
+                context._mark_cell_failed(cell_uuid)
+                LOG.warning('Cell %s timed out or errored while looking '
+                            'up pagination marker %s; failing the request',
+                            cell_uuid, marker)
+                raise exception.CellTimeout()
+        context._mark_cell_healthy(cell_uuid)
+        return cell_uuid, db_inst
 
     def get_marker_by_values(self, ctx, values):
         return db.instance_get_by_sort_filters(ctx,

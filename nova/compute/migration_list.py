@@ -56,12 +56,26 @@ class MigrationLister(multi_cell_list.CrossCellLister):
         results = context.scatter_gather_skip_cell0(
             ctx, db.migration_get_by_uuid, marker)
         db_migration = None
+        unreachable = False
         for result_cell_uuid, result in results.items():
-            if not context.is_cell_failure_sentinel(result):
-                db_migration = result
-                cell_uuid = result_cell_uuid
-                break
+            if (result is context.did_not_respond_sentinel or
+                    context._is_cell_down_exception(result)):
+                unreachable = True
+                continue
+            if isinstance(result, Exception):
+                # An ordinary miss (MigrationNotFound in every cell the
+                # marker does not live in) - the cell answered.
+                continue
+            db_migration = result
+            cell_uuid = result_cell_uuid
+            break
         if not db_migration:
+            if unreachable:
+                # The marker may live in a cell we could not reach, so
+                # MarkerNotFound (a 400 telling the client the marker it
+                # was handed on the previous page is invalid) would be a
+                # lie. Report the cell outage instead.
+                raise exception.CellTimeout()
             raise exception.MarkerNotFound(marker=marker)
         return cell_uuid, db_migration
 

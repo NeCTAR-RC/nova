@@ -16,6 +16,7 @@ import copy
 import heapq
 
 import eventlet
+from oslo_db import exception as oslo_db_exc
 from oslo_log import log as logging
 
 import nova.conf
@@ -141,24 +142,43 @@ def query_wrapper(ctx, fn, *args, **kwargs):
             yield RecordWrapper(ctx, None, context.did_not_respond_sentinel)
             return
         except Exception as e:
-            if not context._is_cell_down_exception(e):
+            if context._is_cell_down_exception(e):
+                if not answered:
+                    context._mark_cell_failed(ctx.cell_uuid)
+                else:
+                    # The stray-timer shape above, one layer deeper: a
+                    # timer that fires inside this cell's DB read surfaces
+                    # as a DBConnectionError once sqlalchemy invalidates
+                    # the connection and oslo_db drops the CellTimeout
+                    # cause.
+                    LOG.warning('Cell %s hit a connection error after '
+                                'answering; treating as a stray sibling '
+                                'timeout and not marking the cell down',
+                                ctx.cell_uuid)
+            elif isinstance(e, oslo_db_exc.DBError):
+                # A DB-layer error that is not a recognised down shape is
+                # ambiguous: oslo_db maps some unreachability modes (for
+                # example mysql 1040 'Too many connections') to plain
+                # DBError, so treating it as proof of health would clear a
+                # legitimate failure mark while the cell is saturated -
+                # exactly when the breaker must hold. It is equally not
+                # proof of failure (healthy cells throw transient DB
+                # errors such as deadlocks), so leave the failure cache
+                # untouched either way.
+                LOG.debug('Cell %s raised an ambiguous DB error; not '
+                          'updating the cell failure cache', ctx.cell_uuid)
+            else:
                 # An ordinary application error means the cell answered.
                 context._mark_cell_healthy(ctx.cell_uuid)
-            elif not answered:
-                context._mark_cell_failed(ctx.cell_uuid)
-            else:
-                # The stray-timer shape above, one layer deeper: a timer
-                # that fires inside this cell's DB read surfaces as a
-                # DBConnectionError once sqlalchemy invalidates the
-                # connection and oslo_db drops the CellTimeout cause.
-                LOG.warning('Cell %s hit a connection error after '
-                            'answering; treating as a stray sibling '
-                            'timeout and not marking the cell down',
-                            ctx.cell_uuid)
             # Here, we yield a RecordWrapper (no sort_ctx needed since
             # we won't call into the implementation's comparison routines)
-            # wrapping the exception object indicating failure.
-            yield RecordWrapper(ctx, None, e.__class__(e.args))
+            # wrapping the exception object indicating failure. Yield the
+            # original object: rebuilding a copy with e.__class__(e.args)
+            # blows up on exception types whose constructor needs more
+            # than args (sqlalchemy's DBAPIError family wants statement,
+            # params and orig), turning a fast-failing cell query into a
+            # TypeError 500 for the whole listing.
+            yield RecordWrapper(ctx, None, e)
             return
         else:
             context._mark_cell_healthy(ctx.cell_uuid)

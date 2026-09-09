@@ -346,6 +346,37 @@ class ContextTestCase(test.NoDBTestCase):
         record = objects.Instance()
         self.assertFalse(context.is_cell_failure_sentinel(record))
 
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_db_error_leaves_mark_alone(self, mock_get_inst):
+        """An ambiguous DB error must not clear a failure mark.
+
+        oslo_db maps some unreachability modes (for example mysql 1040
+        'Too many connections') to plain DBError, so treating it as
+        proof of health would reopen full traffic to a saturated cell -
+        exactly when the breaker must hold. It is equally not proof of
+        failure, so the cache must not gain a mark either.
+        """
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, mapping0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        # Hold disabled so the pre-existing mark does not short-circuit the
+        # cell before we get to call it.
+        self.flags(cell_failure_hold_seconds=0, group='api')
+        entry = (context._CELL_DOWN, time.monotonic() + 60)
+        context._CELL_FAILURES[mapping1.uuid] = entry
+        mock_get_inst.side_effect = [
+            mock.sentinel.instances,
+            oslo_db_exc.DBError('Too many connections')]
+
+        context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        # The mark is neither cleared nor replaced, and the healthy
+        # cell gained none.
+        self.assertEqual(entry, context._CELL_FAILURES[mapping1.uuid])
+        self.assertNotIn(mapping0.uuid, context._CELL_FAILURES)
+
     @mock.patch('nova.context.target_cell')
     @mock.patch('nova.objects.InstanceList.get_by_filters')
     def test_scatter_gather_cells(self, mock_get_inst, mock_target_cell):

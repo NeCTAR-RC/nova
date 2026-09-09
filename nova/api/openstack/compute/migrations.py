@@ -130,6 +130,16 @@ class MigrationsController(wsgi.Controller):
                     limit=limit, marker=marker)
             except exception.MarkerNotFound as e:
                 raise exc.HTTPBadRequest(explanation=e.format_message())
+            except exception.CellTimeout:
+                # The pagination marker was not found in any responsive
+                # cell but a cell was unreachable, so the marker may live
+                # there: a 400 MarkerNotFound would wrongly tell the
+                # client that the marker it was handed on the previous
+                # page is invalid.
+                msg = _('A cell is not currently responding and the '
+                        'pagination marker may belong to it; try again '
+                        'later')
+                raise exc.HTTPServiceUnavailable(explanation=msg)
         else:
             migrations = self.compute_api.get_migrations(
                 context, search_opts)
@@ -162,7 +172,7 @@ class MigrationsController(wsgi.Controller):
         return self._index(req, add_link=True)
 
     @wsgi.Controller.api_version("2.59", "2.65")  # noqa
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     @validation.query_schema(schema_migrations.list_query_params_v259,
                              "2.59", "2.65")
     def index(self, req):  # noqa
@@ -175,7 +185,7 @@ class MigrationsController(wsgi.Controller):
                            allow_changes_since=True)
 
     @wsgi.Controller.api_version("2.66")  # noqa
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     @validation.query_schema(schema_migrations.list_query_params_v266,
                              "2.66", "2.79")
     @validation.query_schema(schema_migrations.list_query_params_v280,

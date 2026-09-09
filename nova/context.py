@@ -535,6 +535,16 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
             result = e
             if _is_cell_down_exception(e):
                 _mark_cell_failed(cell_uuid)
+            elif isinstance(e, oslo_db_exc.DBError):
+                # A DB-layer error that is not a recognised down shape is
+                # ambiguous: oslo_db maps some unreachability modes (for
+                # example mysql 1040 'Too many connections') to plain
+                # DBError, so treating it as proof of health would clear a
+                # legitimate failure mark while the cell is saturated. It
+                # is equally not proof of failure (healthy cells throw
+                # transient DB errors such as deadlocks), so leave the
+                # failure cache untouched either way.
+                pass
             else:
                 # The cell answered, it just answered with an error, so as
                 # far as the circuit breaker is concerned it is healthy.
