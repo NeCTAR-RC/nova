@@ -1,0 +1,23 @@
+---
+features:
+  - |
+    Added a new ``[api] cell_failure_hold_seconds`` option implementing a
+    short-lived, per-worker circuit breaker for the cross-cell
+    scatter-gather utility. When set to a positive value, a cell that
+    raises or times out during a scatter-gather operation is skipped for
+    that many seconds and reported with the usual down-cell sentinel,
+    instead of every request re-paying the per-cell timeout while the
+    cell is down. A successful response clears the mark immediately;
+    when the window expires the cell is re-tested by a single probe
+    request while other requests keep short-circuiting. The cache is
+    local to each process that runs scatter-gather operations: each
+    nova-api worker keeps its own, and setting the option for
+    nova-scheduler or nova-conductor engages the breaker in those
+    services too (in the scheduler a held cell's hosts are skipped for
+    the whole hold window), so scope the option deliberately.
+
+    Skipped cells surface exactly like timed-out cells: server listings
+    honour ``[api] list_records_by_skipping_down_cells`` and, from API
+    microversion 2.69, may return records with UNKNOWN status. The
+    default of 0 keeps the previous behaviour of attempting every cell
+    on every request.

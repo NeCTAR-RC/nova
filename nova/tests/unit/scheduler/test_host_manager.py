@@ -1249,7 +1249,7 @@ class HostManagerTestCase(test.NoDBTestCase):
             self.assertEqual(0, len(nodes), nodes)
         self.assertEqual(2, mock_sgc.call_count, mock_sgc.mock_calls)
         mock_sgc.assert_has_calls([mock.call(
-            ctxt, [cell1], nova_context.CELL_TIMEOUT, mock.ANY)] * 2)
+            ctxt, [cell1], nova_context.get_cell_timeout(), mock.ANY)] * 2)
 
 
 class HostManagerChangedNodesTestCase(test.NoDBTestCase):

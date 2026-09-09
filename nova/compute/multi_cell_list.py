@@ -11,6 +11,7 @@
 #    under the License.
 
 import abc
+import collections
 import copy
 import heapq
 
@@ -85,6 +86,13 @@ class RecordWrapper(object):
         return r == -1
 
 
+# NOTE(shiyan): Minimal stand-in for a cell-targeted RequestContext,
+# used to wrap raw failure sentinels recorded by scatter_gather_cells()
+# itself, where no such context exists. RecordWrapper only reads
+# ctx.cell_uuid.
+_SentinelContext = collections.namedtuple('_SentinelContext', ['cell_uuid'])
+
+
 def query_wrapper(ctx, fn, *args, **kwargs):
     """This is a helper to run a query with predictable fail semantics.
 
@@ -95,22 +103,57 @@ def query_wrapper(ctx, fn, *args, **kwargs):
     be handled by the main get_objects_sorted() feeder loop quickly and
     gracefully.
     """
-    with eventlet.timeout.Timeout(context.CELL_TIMEOUT, exception.CellTimeout):
+    answered = False
+    with eventlet.timeout.Timeout(context.get_cell_timeout(),
+                                  exception.CellTimeout):
         try:
             for record in fn(ctx, *args, **kwargs):
+                answered = True
                 yield record
         except exception.CellTimeout:
+            # NOTE(shiyan): Listing queries run lazily in here during
+            # result consumption, not inside scatter_gather_cells(), so
+            # the scatter-gather failure cache is fed from here too.
+            if not answered:
+                context._mark_cell_failed(ctx.cell_uuid)
+            else:
+                # A cell that already yielded records in this request is
+                # not down. Every generator's timer targets the request
+                # greenthread and keeps ticking while its generator is
+                # suspended, so one slow sibling pull lets an expired
+                # timer detonate in whatever frame is executing - often
+                # this cell's in-flight DB read. Keep this response
+                # partial, but do not feed the failure cache.
+                LOG.warning('Cell %s timed out after answering; treating '
+                            'as a stray sibling timeout and not marking '
+                            'the cell down', ctx.cell_uuid)
             # Here, we yield a RecordWrapper (no sort_ctx needed since
             # we won't call into the implementation's comparison routines)
             # wrapping the sentinel indicating timeout.
             yield RecordWrapper(ctx, None, context.did_not_respond_sentinel)
             return
         except Exception as e:
+            if not context._is_cell_down_exception(e):
+                # An ordinary application error means the cell answered.
+                context._mark_cell_healthy(ctx.cell_uuid)
+            elif not answered:
+                context._mark_cell_failed(ctx.cell_uuid)
+            else:
+                # The stray-timer shape above, one layer deeper: a timer
+                # that fires inside this cell's DB read surfaces as a
+                # DBConnectionError once sqlalchemy invalidates the
+                # connection and oslo_db drops the CellTimeout cause.
+                LOG.warning('Cell %s hit a connection error after '
+                            'answering; treating as a stray sibling '
+                            'timeout and not marking the cell down',
+                            ctx.cell_uuid)
             # Here, we yield a RecordWrapper (no sort_ctx needed since
             # we won't call into the implementation's comparison routines)
             # wrapping the exception object indicating failure.
             yield RecordWrapper(ctx, None, e.__class__(e.args))
             return
+        else:
+            context._mark_cell_healthy(ctx.cell_uuid)
 
 
 class CrossCellLister(metaclass=abc.ABCMeta):
@@ -386,11 +429,23 @@ class CrossCellLister(metaclass=abc.ABCMeta):
         # be generated and consumed just like any normal result below.
         if self.cells:
             results = context.scatter_gather_cells(ctx, self.cells,
-                                                   context.CELL_TIMEOUT,
+                                                   context.get_cell_timeout(),
                                                    query_wrapper, do_query)
         else:
             results = context.scatter_gather_all_cells(ctx,
                                                        query_wrapper, do_query)
+
+        # NOTE(shiyan): scatter_gather_cells() can record a raw failure
+        # sentinel for a cell instead of running query_wrapper() (for
+        # example when a scatter-level short-circuit skips the cell
+        # entirely). heapq.merge() below requires every result to be
+        # iterable, so wrap any raw sentinel in a single-element list of
+        # a sentinel RecordWrapper, which the feeder loop below already
+        # knows how to handle.
+        for cell_uuid, result in results.items():
+            if context.is_cell_failure_sentinel(result):
+                results[cell_uuid] = [
+                    RecordWrapper(_SentinelContext(cell_uuid), None, result)]
 
         # If a limit was provided, it was passed to the per-cell query
         # routines.  That means we have NUM_CELLS * limit items across

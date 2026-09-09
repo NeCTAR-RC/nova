@@ -357,6 +357,56 @@ option will be ignored. See "Handling Down Cells" section of the Compute API
 guide (https://docs.openstack.org/api-guide/compute/down_cells.html) for
 more information.
 """),
+    cfg.IntOpt("cell_failure_hold_seconds",
+        default=0,
+        min=0,
+        help="""
+Short-lived, in-process circuit breaker for the cross-cell scatter-gather
+utility. When set to a positive integer, a cell that fails (raises an
+exception or times out) during a scatter-gather operation is recorded for
+this many seconds; subsequent requests touching that cell short-circuit with
+the did_not_respond sentinel instead of re-paying the per-cell timeout.
+
+The cache is local to each process that runs scatter-gather operations:
+each nova-api worker keeps its own, and if this option is set for other
+services that scatter across cells (nova-scheduler, nova-conductor) their
+processes each keep one too - in the scheduler a held cell's hosts are
+skipped for the whole hold window, so only set it there deliberately.
+The cache is purely additive: a
+successful response from a cell immediately clears its failure mark, and an
+entry that has aged past the hold window is dropped lazily on the next
+lookup so the cell is re-tested.
+
+Set to 0 (default) to preserve the legacy behavior of attempting every cell
+on every request. Typical production values are 30-60 seconds, balancing
+fast failure during outages against quick recovery when a cell is restored.
+
+Related options:
+
+* list_records_by_skipping_down_cells
+"""),
+    cfg.IntOpt("cell_timeout",
+        default=60,
+        min=1,
+        help="""
+The total time in seconds to wait for cell databases to respond during
+cross-cell operations (the scatter-gather utility). A cell that does not
+respond within this time is treated as down and reported with the usual
+down-cell sentinel. This timeout also governs the per-cell queries made by
+multi-cell listings and by the scheduler.
+
+Note that a single API request can wait on several scatter-gather
+operations in sequence (for example a server list detail request performs
+an instance list plus a block device mapping gather), so the worst-case
+request duration is a small multiple of this value. Size it well below the
+front-end proxy or load balancer timeout so requests still complete
+degraded within the client's budget when a cell is down.
+
+Related options:
+
+* cell_failure_hold_seconds
+* list_records_by_skipping_down_cells
+"""),
 ]
 
 os_network_opts = [

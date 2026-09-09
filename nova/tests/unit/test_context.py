@@ -12,7 +12,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
 from unittest import mock
+
+from oslo_db import exception as oslo_db_exc
 
 from oslo_context import context as o_context
 from oslo_context import fixture as o_fixture
@@ -435,6 +438,266 @@ class ContextTestCase(test.NoDBTestCase):
         mock_log_exception.assert_not_called()
 
     @mock.patch('nova.context.scatter_gather_cells')
+    def test_scatter_gather_single_cell_uses_configured_timeout(
+            self, mock_scatter):
+        """[api] cell_timeout flows through the wrapper helpers."""
+        self.flags(cell_timeout=15, group='api')
+        ctxt = context.get_context()
+        mapping0 = objects.CellMapping(database_connection='fake://db0',
+                                       transport_url='none:///',
+                                       uuid=objects.CellMapping.CELL0_UUID)
+
+        filters = {'deleted': False}
+        context.scatter_gather_single_cell(
+            ctxt, mapping0, objects.InstanceList.get_by_filters, filters)
+
+        mock_scatter.assert_called_once_with(
+            ctxt, [mapping0], 15, objects.InstanceList.get_by_filters,
+            filters)
+
+    def _scatter_gather_failure_cache_test_setup(self):
+        """Common fixtures for circuit-breaker tests.
+
+        Returns (ctxt, mapping0, mapping1, mappings). Ensures any state
+        left in the module-level failure cache is cleaned up.
+        """
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctxt = context.get_context()
+        mapping0 = objects.CellMapping(database_connection='fake://db0',
+                                       transport_url='none:///',
+                                       uuid=objects.CellMapping.CELL0_UUID)
+        mapping1 = objects.CellMapping(database_connection='fake://db1',
+                                       transport_url='fake://mq1',
+                                       uuid=uuids.cell1)
+        mappings = objects.CellMappingList(objects=[mapping0, mapping1])
+        return ctxt, mapping0, mapping1, mappings
+
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_failure_cache_disabled_by_default(
+            self, mock_get_inst, mock_target_cell):
+        """With cell_failure_hold_seconds=0 (default), no short-circuit."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        # Explicit: option disabled.
+        self.flags(cell_failure_hold_seconds=0, group='api')
+        # Pre-populate the cache to prove it is ignored when disabled.
+        context._CELL_FAILURES[mapping1.uuid] = time.monotonic() + 60
+
+        context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        # Both cells were still targeted because the option is 0.
+        self.assertEqual(2, mock_target_cell.call_count)
+
+    @mock.patch('nova.context.LOG.exception')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_marks_failed_cell(self, mock_get_inst,
+                                              mock_log_exception):
+        """A connection failure from a cell records it in the cache."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        # cell0 succeeds, cell1 cannot be reached.
+        mock_get_inst.side_effect = [mock.sentinel.instances,
+                                     oslo_db_exc.DBConnectionError()]
+
+        context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertIn(mapping1.uuid, context._CELL_FAILURES)
+        self.assertNotIn(objects.CellMapping.CELL0_UUID,
+                         context._CELL_FAILURES)
+
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_app_error_does_not_mark_cell_failed(
+            self, mock_get_inst):
+        """An ordinary application error must not trip the breaker.
+
+        A cell answering with e.g. InstanceNotFound (polling a deleted
+        server) is perfectly healthy. Marking it failed would
+        short-circuit it for the whole hold window and turn every
+        subsequent request touching that cell into a down-cell response.
+        """
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        mock_get_inst.side_effect = [
+            mock.sentinel.instances,
+            exception.InstanceNotFound(instance_id=uuids.instance)]
+
+        results = context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        # The exception is still returned to the caller to handle...
+        self.assertIsInstance(results[mapping1.uuid],
+                              exception.InstanceNotFound)
+        # ...but no cell was marked as down.
+        self.assertEqual({}, context._CELL_FAILURES)
+
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_app_error_clears_stale_mark(self, mock_get_inst):
+        """A cell answering with an error clears a stale failure mark."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, _m0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        # Hold disabled so the pre-existing mark does not short-circuit the
+        # cell before we get to call it.
+        self.flags(cell_failure_hold_seconds=0, group='api')
+        context._CELL_FAILURES[mapping1.uuid] = time.monotonic() + 60
+        mock_get_inst.side_effect = [
+            mock.sentinel.instances,
+            exception.InstanceNotFound(instance_id=uuids.instance)]
+
+        context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertNotIn(mapping1.uuid, context._CELL_FAILURES)
+
+    def test_is_cell_down_exception(self):
+        """Only unreachable-cell errors may trip the breaker."""
+        self.assertTrue(context._is_cell_down_exception(
+            exception.CellTimeout()))
+        self.assertTrue(context._is_cell_down_exception(
+            oslo_db_exc.DBConnectionError()))
+        # Ordinary application errors mean the cell answered.
+        self.assertFalse(context._is_cell_down_exception(
+            exception.InstanceNotFound(instance_id=uuids.instance)))
+        self.assertFalse(context._is_cell_down_exception(
+            exception.MarkerNotFound(marker=uuids.instance)))
+        self.assertFalse(context._is_cell_down_exception(
+            test.TestingException()))
+
+    @mock.patch('nova.context.LOG.warning')
+    @mock.patch('eventlet.timeout.Timeout')
+    @mock.patch('eventlet.queue.LightQueue.get')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_marks_timed_out_cell(self, mock_get_inst,
+                                                 mock_get_result,
+                                                 mock_timeout,
+                                                 mock_log_warning):
+        """A timeout records the unresponsive cell in the failure cache."""
+        # This is needed because we're mocking get_by_filters.
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, mapping0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+
+        # Simulate cell1 not responding.
+        mock_get_result.side_effect = [(mapping0.uuid,
+                                        mock.sentinel.instances),
+                                       exception.CellTimeout()]
+
+        results = context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertEqual(2, len(results))
+        # The timeout machinery was entered because there was work to wait
+        # on.
+        mock_timeout.assert_called_once_with(30, exception.CellTimeout)
+        self.assertIn(mapping1.uuid, context._CELL_FAILURES)
+        self.assertNotIn(mapping0.uuid, context._CELL_FAILURES)
+
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('nova.objects.InstanceList.get_by_filters')
+    def test_scatter_gather_short_circuits_recently_failed_cell(
+            self, mock_get_inst, mock_target_cell):
+        """A cell inside the hold window returns sentinel without spawning."""
+        self.useFixture(nova_fixtures.SpawnIsSynchronousFixture())
+        ctxt, mapping0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        # Pretend cell1 failed recently.
+        expiry = time.monotonic() + 60
+        context._CELL_FAILURES[mapping1.uuid] = expiry
+
+        results = context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertEqual(2, len(results))
+        self.assertIs(context.did_not_respond_sentinel,
+                      results[mapping1.uuid])
+        # Only cell0 was targeted; cell1 was short-circuited.
+        self.assertEqual(1, mock_target_cell.call_count)
+        # The skip did not re-mark the cell, else the hold window would
+        # slide forever under constant traffic.
+        self.assertEqual(expiry, context._CELL_FAILURES[mapping1.uuid])
+
+    def test_mark_cell_healthy_clears_failure(self):
+        """_mark_cell_healthy removes any failure mark, including on race.
+
+        Protects the scatter_gather race where one request is already in
+        flight against a cell when another marks the cell as failed; the
+        successful response should clear the spurious mark.
+        """
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
+
+        context._mark_cell_healthy(uuids.cell1)
+
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+        # Calling on a cell not in the cache is a no-op.
+        context._mark_cell_healthy(uuids.cell2)
+
+    def test_mark_cell_failed_disabled(self):
+        """_mark_cell_failed is a no-op when the hold is disabled."""
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.flags(cell_failure_hold_seconds=0, group='api')
+
+        context._mark_cell_failed(uuids.cell1)
+
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_is_cell_recently_failed_hold_expires(self):
+        """Stale entries are dropped lazily so the cell is re-tested."""
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.flags(cell_failure_hold_seconds=60, group='api')
+
+        # An entry whose expiry is in the past should be treated as healthy
+        # and removed from the cache on lookup.
+        context._CELL_FAILURES[uuids.cell1] = time.monotonic() - 1
+        self.assertFalse(context._is_cell_recently_failed(uuids.cell1))
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+        # An entry whose expiry is in the future is still failed.
+        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
+        self.assertTrue(context._is_cell_recently_failed(uuids.cell1))
+
+    @mock.patch('nova.context.target_cell')
+    @mock.patch('eventlet.timeout.Timeout')
+    def test_scatter_gather_all_short_circuited(self, mock_timeout,
+                                                mock_target_cell):
+        """All cells skipped -> returns immediately without waiting."""
+        ctxt, mapping0, mapping1, mappings = (
+            self._scatter_gather_failure_cache_test_setup())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        expiry = time.monotonic() + 60
+        context._CELL_FAILURES[mapping0.uuid] = expiry
+        context._CELL_FAILURES[mapping1.uuid] = expiry
+
+        results = context.scatter_gather_cells(
+            ctxt, mappings, 30, objects.InstanceList.get_by_filters,
+            {'deleted': False})
+
+        self.assertEqual({mapping0.uuid: context.did_not_respond_sentinel,
+                          mapping1.uuid: context.did_not_respond_sentinel},
+                         results)
+        # Nothing was targeted or spawned and the timeout machinery was
+        # not entered.
+        mock_target_cell.assert_not_called()
+        mock_timeout.assert_not_called()
+
+    @mock.patch('nova.context.scatter_gather_cells')
     @mock.patch('nova.objects.CellMappingList.get_all')
     def test_scatter_gather_all_cells(self, mock_get_all, mock_scatter):
         ctxt = context.get_context()
@@ -488,6 +751,6 @@ class ContextTestCase(test.NoDBTestCase):
             objects.InstanceList.get_by_filters, filters, sort_dir='foo')
 
         mock_scatter.assert_called_once_with(
-            ctxt, [mapping0], context.CELL_TIMEOUT,
+            ctxt, [mapping0], context.get_cell_timeout(),
             objects.InstanceList.get_by_filters, filters,
             sort_dir='foo')
