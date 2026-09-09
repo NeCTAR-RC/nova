@@ -1,0 +1,14 @@
+---
+fixes:
+  - |
+    The cell circuit breaker no longer treats an ambiguous database error as
+    proof that a cell is healthy. ``oslo_db`` maps some unreachability modes,
+    notably mysql 1040 ``Too many connections``, to a plain ``DBError`` rather
+    than to a recognised down-cell exception. Clearing a cell's failure mark
+    on one of those cleared it precisely while the cell was saturated, so the
+    breaker flapped in the overload mode it exists to handle. A plain
+    ``DBError`` outside the recognised down shapes is now treated as proof of
+    neither health nor failure, on both the scatter-gather and the multi-cell
+    listing paths, and the failure cache is left untouched. Healthy cells also
+    raise transient database errors such as deadlocks, so marking the cell
+    failed would be equally wrong.

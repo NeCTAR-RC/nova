@@ -113,7 +113,7 @@ class ServersController(wsgi.Controller):
         super(ServersController, self).__init__()
         self.compute_api = compute.API()
 
-    @wsgi.expected_errors((400, 403))
+    @wsgi.expected_errors((400, 403, 503))
     @validation.query_schema(schema_servers.query_params_v275, '2.75')
     @validation.query_schema(schema_servers.query_params_v273, '2.73', '2.74')
     @validation.query_schema(schema_servers.query_params_v266, '2.66', '2.72')
@@ -129,7 +129,7 @@ class ServersController(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=err.format_message())
         return servers
 
-    @wsgi.expected_errors((400, 403))
+    @wsgi.expected_errors((400, 403, 503))
     @validation.query_schema(schema_servers.query_params_v275, '2.75')
     @validation.query_schema(schema_servers.query_params_v273, '2.73', '2.74')
     @validation.query_schema(schema_servers.query_params_v266, '2.66', '2.72')
@@ -332,6 +332,16 @@ class ServersController(wsgi.Controller):
         except exception.MarkerNotFound:
             msg = _('marker [%s] not found') % marker
             raise exc.HTTPBadRequest(explanation=msg)
+        except exception.CellTimeout:
+            # The cell holding the pagination marker is unreachable or
+            # inside its failure hold window, so the listing cannot
+            # continue from the marker. MarkerNotFound (a 400) would
+            # wrongly tell the client its marker is invalid. Deliberately
+            # generic: this is a tenant-facing API, so no cell
+            # identifiers in the message (they are in the logs).
+            msg = _('A cell is not currently responding and the request '
+                    'cannot be completed; try again later')
+            raise exc.HTTPServiceUnavailable(explanation=msg)
         except exception.FlavorNotFound:
             LOG.debug("Flavor '%s' could not be found ",
                       search_opts['flavor'])

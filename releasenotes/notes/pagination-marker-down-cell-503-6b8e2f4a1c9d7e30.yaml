@@ -1,0 +1,15 @@
+---
+fixes:
+  - |
+    Paginated listings no longer misbehave when the cell holding the
+    pagination marker is unreachable or inside the
+    ``[api] cell_failure_hold_seconds`` circuit-breaker hold window.
+    Previously ``GET /servers`` and ``GET /servers/detail`` with a marker
+    in a down cell blocked the API worker for the full ``oslo.db``
+    reconnect ladder (usually surfacing as a gateway 504 while the worker
+    stayed busy for minutes), and ``GET /os-migrations`` with such a
+    marker returned a misleading ``400 MarkerNotFound``. The marker
+    lookup is now bounded by ``[api] cell_timeout``, consults and feeds
+    the circuit breaker like every other cell query, and such requests
+    return a retryable ``503 Service Unavailable`` with a generic
+    message instead.

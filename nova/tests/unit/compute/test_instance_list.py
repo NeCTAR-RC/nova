@@ -10,8 +10,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
 from unittest import mock
 
+from oslo_db import exception as oslo_db_exc
 from oslo_utils.fixture import uuidsentinel as uuids
 
 from nova.compute import instance_list
@@ -367,3 +369,107 @@ class TestInstanceListBig(test.NoDBTestCase):
         # sort to fill the buffer for the first cell feeder that runs
         # dry.
         self.assertEqual(6, mock_inst.call_count)
+
+
+class TestInstanceListMarker(test.NoDBTestCase):
+    """get_marker_record must respect the cell failure machinery.
+
+    The marker lookup targets one specific cell before any
+    scatter-gather runs, so it gates on and feeds the circuit breaker
+    itself; an unreachable cell surfaces as CellTimeout (a retryable
+    503), never as MarkerNotFound (a 400 disowning a marker the API
+    itself issued).
+    """
+
+    def setUp(self):
+        super(TestInstanceListMarker, self).setUp()
+        self.context = nova_context.RequestContext()
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(nova_context._CELL_FAILURES.clear)
+        self.lister = instance_list.InstanceLister(None, None)
+        self.cell_mapping = objects.CellMapping(
+            uuid=uuids.cell1, name='cell1', transport_url='fake:///',
+            database_connection='fake://')
+
+    def _mock_mapping(self):
+        im = objects.InstanceMapping(cell_mapping=self.cell_mapping)
+        return mock.patch.object(objects.InstanceMapping,
+                                 'get_by_instance_uuid', return_value=im)
+
+    def test_marker_in_held_cell_fails_fast(self):
+        """A held cell fails the lookup without touching its database."""
+        nova_context._CELL_FAILURES[uuids.cell1] = (
+            nova_context._CELL_DOWN, time.monotonic() + 60)
+        with self._mock_mapping():
+            with mock.patch.object(instance_list.db,
+                                   'instance_get_by_uuid') as mock_get:
+                self.assertRaises(exception.CellTimeout,
+                                  self.lister.get_marker_record,
+                                  self.context, uuids.marker)
+                mock_get.assert_not_called()
+
+    @mock.patch('nova.context.target_cell')
+    def test_marker_cell_failure_marks_and_raises(self, mock_target):
+        """A failed marker lookup feeds the breaker and raises CellTimeout."""
+        mock_target.return_value.__enter__.return_value = self.context
+        with self._mock_mapping():
+            with mock.patch.object(
+                    instance_list.db, 'instance_get_by_uuid',
+                    side_effect=oslo_db_exc.DBConnectionError()):
+                self.assertRaises(exception.CellTimeout,
+                                  self.lister.get_marker_record,
+                                  self.context, uuids.marker)
+        self.assertIn(uuids.cell1, nova_context._CELL_FAILURES)
+
+    @mock.patch('nova.context.target_cell')
+    def test_marker_probe_success_clears_mark(self, mock_target):
+        """This lookup can be the elected probe: success must report health.
+
+        Without the explicit healthy mark a recovered cell would be left
+        dangling in the probing state.
+        """
+        nova_context._CELL_FAILURES[uuids.cell1] = (
+            nova_context._CELL_DOWN, time.monotonic() - 1)
+        mock_target.return_value.__enter__.return_value = self.context
+        db_inst = {'uuid': uuids.marker}
+        with self._mock_mapping():
+            with mock.patch.object(
+                    instance_list.db, 'instance_get_by_uuid',
+                    return_value=db_inst):
+                cell_uuid, record = self.lister.get_marker_record(
+                    self.context, uuids.marker)
+        self.assertEqual(uuids.cell1, cell_uuid)
+        self.assertEqual(db_inst, record)
+        self.assertNotIn(uuids.cell1, nova_context._CELL_FAILURES)
+
+    @mock.patch('nova.context.target_cell')
+    def test_marker_miss_marks_healthy_and_raises_not_found(
+            self, mock_target):
+        """A genuine miss (deleted marker) is still MarkerNotFound."""
+        mock_target.return_value.__enter__.return_value = self.context
+        with self._mock_mapping():
+            with mock.patch.object(
+                    instance_list.db, 'instance_get_by_uuid',
+                    side_effect=exception.InstanceNotFound(
+                        instance_id=uuids.marker)):
+                self.assertRaises(exception.MarkerNotFound,
+                                  self.lister.get_marker_record,
+                                  self.context, uuids.marker)
+        self.assertNotIn(uuids.cell1, nova_context._CELL_FAILURES)
+
+    def test_marker_mapping_without_cell_is_not_found(self):
+        """A mapping with no cell (never scheduled, or purged) is a miss.
+
+        There is no cell to consult, so no cell database is touched and
+        nothing is marked; the caller gets MarkerNotFound as before.
+        """
+        im = objects.InstanceMapping(cell_mapping=None)
+        with mock.patch.object(objects.InstanceMapping,
+                               'get_by_instance_uuid', return_value=im):
+            with mock.patch.object(instance_list.db,
+                                   'instance_get_by_uuid') as mock_get:
+                self.assertRaises(exception.MarkerNotFound,
+                                  self.lister.get_marker_record,
+                                  self.context, uuids.marker)
+                mock_get.assert_not_called()
+        self.assertEqual({}, nova_context._CELL_FAILURES)
