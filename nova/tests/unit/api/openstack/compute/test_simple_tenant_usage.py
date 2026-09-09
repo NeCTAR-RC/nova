@@ -14,8 +14,10 @@
 #    under the License.
 
 import datetime
+import time
 from unittest import mock
 
+from oslo_db import exception as oslo_db_exc
 from oslo_utils.fixture import uuidsentinel as uuids
 from oslo_utils import timeutils
 import webob
@@ -600,6 +602,79 @@ class SimpleTenantUsageControllerTestV21(test.TestCase):
         self.inst_obj.instance_type_id = 99
         flavor = self.controller._get_flavor(self.context, self.inst_obj, {})
         self.assertIsNone(flavor)
+
+
+class SimpleTenantUsageDownCellTestV21(test.TestCase):
+    """Usage requests fail fast with 503 on a down cell.
+
+    Usage data feeds billing, so it must never be silently partial: a
+    cell that is inside the circuit-breaker hold window or that fails
+    during the query results in HTTPServiceUnavailable, not a partial
+    total. Marker pagination semantics are covered by the existing limit
+    and marker tests.
+    """
+    version = '2.1'
+    controller = simple_tenant_usage_v21.SimpleTenantUsageController()
+
+    def setUp(self):
+        super(SimpleTenantUsageDownCellTestV21, self).setUp()
+        self.admin_context = context.RequestContext('fakeadmin_0',
+                                                    'faketenant_0',
+                                                    is_admin=True)
+
+    def _make_request(self):
+        req = fakes.HTTPRequest.blank('?start=%s&end=%s' %
+                    (START.isoformat(), STOP.isoformat()),
+                    version=self.version)
+        req.environ['nova.context'] = self.admin_context
+        return req
+
+    def test_index_503_when_cell_recently_failed(self):
+        """A cell inside the failure hold window fails the request fast."""
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        cells = objects.CellMappingList.get_all(self.admin_context)
+        context._CELL_FAILURES[cells[0].uuid] = time.monotonic() + 60
+
+        self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                          self.controller.index, self._make_request())
+
+    @mock.patch('nova.objects.InstanceList.get_active_by_window_joined')
+    def test_index_503_when_cell_times_out(self, mock_get):
+        """A cell timing out mid-query marks it failed and returns 503."""
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        mock_get.side_effect = exception.CellTimeout()
+
+        self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                          self.controller.index, self._make_request())
+        # The failing cell was recorded for the circuit breaker.
+        self.assertEqual(1, len(context._CELL_FAILURES))
+
+    @mock.patch('nova.objects.InstanceList.get_active_by_window_joined')
+    def test_index_503_when_cell_connection_fails(self, mock_get):
+        """A lost DB connection marks the cell failed and returns 503."""
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        mock_get.side_effect = oslo_db_exc.DBConnectionError()
+
+        self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                          self.controller.index, self._make_request())
+        self.assertEqual(1, len(context._CELL_FAILURES))
+
+    @mock.patch('nova.objects.InstanceList.get_active_by_window_joined')
+    def test_index_generic_db_error_does_not_trip_breaker(self, mock_get):
+        """An ordinary DBError means the cell answered, so it must not be
+        treated as down: the error propagates and no failure is recorded.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        mock_get.side_effect = oslo_db_exc.DBError()
+
+        # expected_errors() converts the unexpected DBError to a 500.
+        self.assertRaises(webob.exc.HTTPInternalServerError,
+                          self.controller.index, self._make_request())
+        self.assertEqual(0, len(context._CELL_FAILURES))
 
 
 class SimpleTenantUsageUtilsV21(test.NoDBTestCase):

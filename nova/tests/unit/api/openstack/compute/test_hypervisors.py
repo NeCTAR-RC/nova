@@ -540,6 +540,25 @@ class HypervisorsTestV21(test.NoDBTestCase):
         req = self._get_request(True)
         self.assertRaises(exc.HTTPNotFound, self.controller.show, req, 'abc')
 
+    def test_show_cell_not_responding(self):
+        """A skipped or unresponsive cell means we cannot tell missing from
+        unreachable, so show returns 503 rather than a misleading 404.
+        """
+        self.controller.host_api.compute_node_get.side_effect = (
+            exception.CellTimeout())
+        req = self._get_request(True)
+        hyper_id = self._get_hyper_id()
+        self.assertRaises(exc.HTTPServiceUnavailable,
+                          self.controller.show, req, hyper_id)
+
+    def test_uptime_cell_not_responding(self):
+        self.controller.host_api.compute_node_get.side_effect = (
+            exception.CellTimeout())
+        req = self._get_request(True)
+        hyper_id = self._get_hyper_id()
+        self.assertRaises(exc.HTTPServiceUnavailable,
+                          self.controller.uptime, req, hyper_id)
+
     def test_uptime(self):
         with mock.patch.object(
             self.controller.host_api, 'get_host_uptime',
@@ -1513,6 +1532,10 @@ class HypervisorsTestV288(HypervisorsTestV275):
         pass
 
     def test_uptime_hypervisor_not_mapped(self):
+        # the separate 'uptime' API has been removed, so skip this test
+        pass
+
+    def test_uptime_cell_not_responding(self):
         # the separate 'uptime' API has been removed, so skip this test
         pass
 

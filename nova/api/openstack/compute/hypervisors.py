@@ -193,6 +193,16 @@ class HypervisorsController(wsgi.Controller):
             except exception.MarkerNotFound:
                 msg = _('marker [%s] not found') % marker
                 raise webob.exc.HTTPBadRequest(explanation=msg)
+            except exception.CellTimeout:
+                # The marker was not found, but a cell was unreachable or
+                # inside its failure hold window, so the marker may live
+                # there: a 400 MarkerNotFound would wrongly tell the
+                # client that the marker it was handed on the previous
+                # page is invalid.
+                msg = _('A cell is not currently responding and the '
+                        'pagination marker may belong to it; try again '
+                        'later')
+                raise webob.exc.HTTPServiceUnavailable(explanation=msg)
 
         hypervisors_list = []
         for hyp in compute_nodes:
@@ -230,7 +240,7 @@ class HypervisorsController(wsgi.Controller):
         return hypervisors_dict
 
     @wsgi.Controller.api_version("2.53")
-    @wsgi.expected_errors((400, 404))
+    @wsgi.expected_errors((400, 404, 503))
     @validation.query_schema(hyper_schema.index_query_v253, "2.53")
     def index(self, req):
         """Starting with the 2.53 microversion, the id field in the response
@@ -243,7 +253,7 @@ class HypervisorsController(wsgi.Controller):
         return self._index(req, limit=limit, marker=marker, links=True)
 
     @wsgi.Controller.api_version("2.33", "2.52")  # noqa
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     @validation.query_schema(hyper_schema.index_query_v233)
     def index(self, req):  # noqa
         limit, marker = common.get_limit_and_marker(req)
@@ -262,7 +272,7 @@ class HypervisorsController(wsgi.Controller):
                                      marker=marker, links=links)
 
     @wsgi.Controller.api_version("2.53")
-    @wsgi.expected_errors((400, 404))
+    @wsgi.expected_errors((400, 404, 503))
     @validation.query_schema(hyper_schema.index_query_v253, "2.53")
     def detail(self, req):
         """Starting with the 2.53 microversion, the id field in the response
@@ -275,7 +285,7 @@ class HypervisorsController(wsgi.Controller):
         return self._detail(req, limit=limit, marker=marker, links=True)
 
     @wsgi.Controller.api_version("2.33", "2.52")  # noqa
-    @wsgi.expected_errors((400))
+    @wsgi.expected_errors((400, 503))
     @validation.query_schema(hyper_schema.index_query_v233)
     def detail(self, req):  # noqa
         limit, marker = common.get_limit_and_marker(req)
@@ -318,7 +328,7 @@ class HypervisorsController(wsgi.Controller):
                 raise webob.exc.HTTPNotFound(explanation=msg)
 
     @wsgi.Controller.api_version("2.53")
-    @wsgi.expected_errors((400, 404))
+    @wsgi.expected_errors((400, 404, 503))
     @validation.query_schema(hyper_schema.show_query_v253, "2.53")
     def show(self, req, id):
         """The 2.53 microversion requires that the id is a uuid and as a result
@@ -332,7 +342,7 @@ class HypervisorsController(wsgi.Controller):
         return self._show(req, id, with_servers)
 
     @wsgi.Controller.api_version("2.1", "2.52")     # noqa F811
-    @wsgi.expected_errors(404)
+    @wsgi.expected_errors((404, 503))
     @validation.query_schema(hyper_schema.show_query)
     def show(self, req, id):  # noqa
         return self._show(req, id)
@@ -349,6 +359,13 @@ class HypervisorsController(wsgi.Controller):
             # If the ComputeNode is missing, that's a straight up 404
             msg = _("Hypervisor with ID '%s' could not be found.") % id
             raise webob.exc.HTTPNotFound(explanation=msg)
+        except exception.CellTimeout:
+            # The node was not found in the responsive cells, but at least
+            # one cell did not answer, so we cannot tell missing from
+            # unreachable.
+            msg = _("Hypervisor with ID '%s' could not be looked up because "
+                    "a cell is not responding.") % id
+            raise webob.exc.HTTPServiceUnavailable(explanation=msg)
 
         instances = None
         if with_servers:
@@ -377,7 +394,7 @@ class HypervisorsController(wsgi.Controller):
         }
 
     @wsgi.Controller.api_version('2.1', '2.87')
-    @wsgi.expected_errors((400, 404, 501))
+    @wsgi.expected_errors((400, 404, 501, 503))
     @validation.query_schema(hyper_schema.uptime_query)
     def uptime(self, req, id):
         """Prior to microversion 2.88, you could retrieve a special version of
@@ -396,6 +413,13 @@ class HypervisorsController(wsgi.Controller):
             # If the ComputeNode is missing, that's a straight up 404
             msg = _("Hypervisor with ID '%s' could not be found.") % id
             raise webob.exc.HTTPNotFound(explanation=msg)
+        except exception.CellTimeout:
+            # The node was not found in the responsive cells, but at least
+            # one cell did not answer, so we cannot tell missing from
+            # unreachable.
+            msg = _("Hypervisor with ID '%s' could not be looked up because "
+                    "a cell is not responding.") % id
+            raise webob.exc.HTTPServiceUnavailable(explanation=msg)
 
         try:
             service = self.host_api.service_get_by_compute_host(

@@ -14,9 +14,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
 from unittest import mock
 
 import fixtures
+from oslo_db import exception as oslo_db_exc
 import oslo_messaging as messaging
 from oslo_utils.fixture import uuidsentinel as uuids
 
@@ -577,6 +579,177 @@ class ComputeHostAPITestCase(test.TestCase):
         self.assertEqual(2, compute_get_by_uuid.call_count)
         compute_get_by_uuid.assert_has_calls(
             [mock.call(self.ctxt, uuids.cn_uuid)] * 2)
+
+
+class HostAPIDownCellTestCase(test.TestCase):
+    """Cell-down handling in the HostAPI compute node cell loops.
+
+    One unreachable cell database must not leave os-hypervisors requests
+    running the full oslo.db reconnect ladder: per-cell queries are
+    bounded by [api] cell_timeout, cells inside the
+    [api] cell_failure_hold_seconds window are skipped, and a cell that
+    fails mid-query is marked for the circuit breaker.
+    """
+
+    def setUp(self):
+        super(HostAPIDownCellTestCase, self).setUp()
+        self.host_api = compute.HostAPI()
+        self.ctxt = context.get_admin_context()
+        self.useFixture(nova_fixtures.SingleCellSimple())
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        self.cell1 = objects.CellMapping(uuid=uuids.cell1_uuid)
+        self.cell2 = objects.CellMapping(uuid=uuids.cell2_uuid)
+        self.useFixture(fixtures.MonkeyPatch(
+            'nova.compute.api.CELLS', [self.cell1, self.cell2]))
+
+    def _mark_cell1_failed(self):
+        context._CELL_FAILURES[uuids.cell1_uuid] = time.monotonic() + 60
+
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_skips_recently_failed_cell(self, mock_gbp):
+        cn = objects.ComputeNode(uuid=uuids.cn2)
+        mock_gbp.return_value = [cn]
+        self._mark_cell1_failed()
+
+        result = self.host_api.compute_node_get_all(self.ctxt)
+
+        # Only the healthy cell was queried and the result is partial.
+        self.assertEqual(1, mock_gbp.call_count)
+        self.assertEqual([uuids.cn2], [c.uuid for c in result])
+
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_marks_down_cell_partial(self, mock_gbp):
+        cn = objects.ComputeNode(uuid=uuids.cn2)
+        mock_gbp.side_effect = [oslo_db_exc.DBConnectionError(), [cn]]
+
+        result = self.host_api.compute_node_get_all(self.ctxt)
+
+        self.assertEqual([uuids.cn2], [c.uuid for c in result])
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+        self.assertNotIn(uuids.cell2_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.ComputeNode, 'get_by_uuid')
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_marker_in_skipped_cell(self, mock_gbp,
+                                                         mock_gbu):
+        """A marker that may live in a held cell must not 400.
+
+        The marker's cell is inside its hold window so the marker cannot
+        be resolved: MarkerNotFound would wrongly tell the client that
+        the marker it was handed on the previous page is invalid. Report
+        the outage (CellTimeout -> 503) instead.
+        """
+        self._mark_cell1_failed()
+        mock_gbu.side_effect = exception.ComputeHostNotFound(host=uuids.cn1)
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.compute_node_get_all,
+                          self.ctxt, limit=10, marker=uuids.cn1)
+        # Only the healthy cell was consulted for the marker, and no
+        # pagination ran anywhere.
+        self.assertEqual(1, mock_gbu.call_count)
+        mock_gbp.assert_not_called()
+
+    @mock.patch.object(objects.ComputeNode, 'get_by_uuid')
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_marker_cell_fails_after_resolve(
+            self, mock_gbp, mock_gbu):
+        """The marker resolves, then its cell dies mid-pagination.
+
+        The caller-supplied marker must survive the failure: this path
+        must raise CellTimeout, never a MarkerNotFound naming the
+        internal integer id the marker resolved to.
+        """
+        marker_cn = objects.ComputeNode(id=42, uuid=uuids.cn1)
+        mock_gbu.side_effect = [
+            marker_cn,
+            exception.ComputeHostNotFound(host=uuids.cn1),
+        ]
+        mock_gbp.side_effect = oslo_db_exc.DBConnectionError()
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.compute_node_get_all,
+                          self.ctxt, limit=10, marker=uuids.cn1)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.ComputeNode, 'get_by_uuid')
+    def test_compute_node_get_all_marker_not_found_no_down_cells(
+            self, mock_gbu):
+        """With every cell healthy a bogus marker is still MarkerNotFound."""
+        mock_gbu.side_effect = exception.ComputeHostNotFound(host=uuids.cn1)
+
+        self.assertRaises(exception.MarkerNotFound,
+                          self.host_api.compute_node_get_all,
+                          self.ctxt, limit=10, marker=uuids.cn1)
+
+    @mock.patch('nova.compute.api.eventlet.timeout.Timeout')
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_pagination')
+    def test_compute_node_get_all_uses_configured_timeout(
+            self, mock_gbp, mock_timeout):
+        self.flags(cell_timeout=15, group='api')
+        mock_gbp.return_value = []
+
+        self.host_api.compute_node_get_all(self.ctxt)
+
+        mock_timeout.assert_called_with(15, exception.CellTimeout)
+
+    @mock.patch.object(objects.ComputeNode, 'get_by_uuid')
+    def test_compute_node_get_found_after_down_cell(self, mock_get):
+        cn = objects.ComputeNode(uuid=uuids.cn_uuid)
+        mock_get.side_effect = [oslo_db_exc.DBConnectionError(), cn]
+
+        result = self.host_api.compute_node_get(self.ctxt, uuids.cn_uuid)
+
+        self.assertIs(cn, result)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.ComputeNode, 'get_by_uuid',
+                       side_effect=exception.ComputeHostNotFound(
+                           host=uuids.cn_uuid))
+    def test_compute_node_get_maybe_in_down_cell(self, mock_get):
+        """Not found in the healthy cells while another cell was skipped:
+        the caller gets CellTimeout (a 503 at the API), not a misleading
+        404, because the node may exist in the unreachable cell.
+        """
+        self._mark_cell1_failed()
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.compute_node_get,
+                          self.ctxt, uuids.cn_uuid)
+        # Only the healthy cell was queried.
+        self.assertEqual(1, mock_get.call_count)
+
+    @mock.patch('nova.db.main.api.compute_node_statistics')
+    def test_compute_node_statistics_skips_down_cell(self, mock_cns):
+        mock_cns.return_value = {'stat1': 5}
+        self._mark_cell1_failed()
+
+        stats = self.host_api.compute_node_statistics(self.ctxt)
+
+        self.assertEqual(1, mock_cns.call_count)
+        self.assertEqual({'stat1': 5}, stats)
+
+    @mock.patch('nova.db.main.api.compute_node_statistics')
+    def test_compute_node_statistics_marks_down_cell(self, mock_cns):
+        mock_cns.side_effect = [exception.CellTimeout(), {'stat1': 5}]
+
+        stats = self.host_api.compute_node_statistics(self.ctxt)
+
+        self.assertEqual({'stat1': 5}, stats)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.ComputeNodeList, 'get_by_hypervisor')
+    def test_compute_node_search_by_hypervisor_skips_down_cell(
+            self, mock_gbh):
+        cn = objects.ComputeNode(uuid=uuids.cn2)
+        mock_gbh.side_effect = [oslo_db_exc.DBConnectionError(), [cn]]
+
+        result = self.host_api.compute_node_search_by_hypervisor(
+            self.ctxt, 'match')
+
+        self.assertEqual([uuids.cn2], [c.uuid for c in result])
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
 
 
 class ComputeAggregateAPITestCase(test.TestCase):

@@ -1,0 +1,13 @@
+---
+upgrade:
+  - |
+    The ``os-simple-tenant-usage`` API now returns ``503 Service
+    Unavailable`` when a cell database does not respond within
+    ``[api] cell_timeout``, its connection fails, or it is inside the
+    ``[api] cell_failure_hold_seconds`` circuit-breaker hold window.
+    The response message is deliberately generic because this API is
+    reachable by ordinary project users; the affected cell is named in
+    the nova-api log.
+    Previously such requests hung until the front-end proxy timed out.
+    Usage reports are deliberately never silently partial because the
+    data commonly feeds billing.

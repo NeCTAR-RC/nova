@@ -1,0 +1,18 @@
+---
+fixes:
+  - |
+    The ``os-hypervisors`` API previously queried every cell database
+    sequentially with no bound, so a single unreachable cell database made
+    ``GET /os-hypervisors`` (including ``detail``, ``statistics``, search
+    and show) run the full ``oslo.db`` reconnect ladder (roughly 200
+    seconds with default settings) while holding an API worker, usually
+    surfacing to clients as a gateway 504. Each per-cell query is now
+    bounded by ``[api] cell_timeout`` and consults the
+    ``[api] cell_failure_hold_seconds`` circuit breaker: listings, search
+    and statistics skip the unresponsive cell with a warning and return
+    partial results, while ``GET /os-hypervisors/{id}`` and the uptime
+    action return ``503 Service Unavailable`` when the hypervisor may be
+    located in the unreachable cell. Paginated listings whose marker
+    cannot be resolved because its cell is unreachable also return
+    ``503`` instead of a misleading ``400 MarkerNotFound`` naming an
+    internal identifier.
