@@ -647,7 +647,7 @@ class HostManager(object):
                 return services, objects.ComputeNodeList.get_all_by_uuids(
                     cctxt, compute_uuids)
 
-        timeout = context_module.CELL_TIMEOUT
+        timeout = context_module.get_cell_timeout()
         results = context_module.scatter_gather_cells(context, cells, timeout,
                                                       targeted_operation)
         compute_nodes = collections.defaultdict(list)
@@ -713,7 +713,7 @@ class HostManager(object):
 
         cells = [cell] if cell else self.enabled_cells
 
-        timeout = context_module.CELL_TIMEOUT
+        timeout = context_module.get_cell_timeout()
         nodes_by_cell = context_module.scatter_gather_cells(
             ctxt, cells, timeout, target_fnc)
 

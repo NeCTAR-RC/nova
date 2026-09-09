@@ -749,7 +749,7 @@ class ViewBuilder(common.ViewBuilder):
         bdms = {}
         results = nova_context.scatter_gather_cells(
                         ctxt, cell_mappings.values(),
-                        nova_context.CELL_TIMEOUT,
+                        nova_context.get_cell_timeout(),
                         objects.BlockDeviceMappingList.bdms_by_instance_uuid,
                         instance_uuids)
         for cell_uuid, result in results.items():

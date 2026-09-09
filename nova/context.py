@@ -19,22 +19,26 @@
 
 from contextlib import contextmanager
 import copy
+import time
 
 import eventlet.queue
 import eventlet.timeout
 from keystoneauth1.access import service_catalog as ksa_service_catalog
 from keystoneauth1 import plugin
 from oslo_context import context
+from oslo_db import exception as oslo_db_exc
 from oslo_db.sqlalchemy import enginefacade
 from oslo_log import log as logging
 from oslo_utils import timeutils
 
+import nova.conf
 from nova import exception
 from nova.i18n import _
 from nova import objects
 from nova import policy
 from nova import utils
 
+CONF = nova.conf.CONF
 LOG = logging.getLogger(__name__)
 CELL_CACHE = {}
 # NOTE(melwitt): Used for the scatter-gather utility to indicate we timed out
@@ -44,8 +48,69 @@ did_not_respond_sentinel = object()
 # first time we look. This needs to be refreshed on a timer or
 # trigger.
 CELLS = []
-# Timeout value for waiting for cells to respond
+# Timeout value for waiting for cells to respond. Deprecated alias kept
+# for out-of-tree consumers; use get_cell_timeout() which honours the
+# [api] cell_timeout option.
 CELL_TIMEOUT = 60
+# Circuit breaker: cell_uuid -> monotonic expiry timestamp of the
+# "skip this cell" hold window. Process-local; controlled by
+# [api] cell_failure_hold_seconds.
+_CELL_FAILURES = {}
+
+
+def _is_cell_recently_failed(cell_uuid):
+    """Return True if cell_uuid is inside an active failure hold window.
+
+    Returns False (and lazily drops the entry) once the window has elapsed,
+    so the next request re-tests the cell.
+    """
+    if CONF.api.cell_failure_hold_seconds <= 0:
+        return False
+    expiry = _CELL_FAILURES.get(cell_uuid)
+    if expiry is None:
+        return False
+    if time.monotonic() >= expiry:
+        _CELL_FAILURES.pop(cell_uuid, None)
+        return False
+    return True
+
+
+def _mark_cell_failed(cell_uuid):
+    """Record a cell failure with the configured hold window."""
+    hold = CONF.api.cell_failure_hold_seconds
+    if hold > 0:
+        _CELL_FAILURES[cell_uuid] = time.monotonic() + hold
+        # WARNING rather than INFO: this withdraws the cell from every
+        # scatter-gather in this process for the hold window, and the
+        # breaker runs wherever scatter-gather runs (the scheduler and
+        # conductor too, if the options are set there). This line is what
+        # explains that capacity disappearing.
+        LOG.warning('Cell %s marked failed for %d seconds', cell_uuid, hold)
+
+
+def _mark_cell_healthy(cell_uuid):
+    """Clear any recent-failure mark after a successful response."""
+    _CELL_FAILURES.pop(cell_uuid, None)
+
+
+# NOTE(shiyan): Exceptions that mean the cell itself did not answer, as
+# opposed to an ordinary application error the cell answered *with* (for
+# example InstanceNotFound when polling a deleted server, or
+# MarkerNotFound while paginating). Only the former may trip the circuit
+# breaker: treating a normal error as a cell failure would short-circuit a
+# perfectly healthy cell for the whole hold window, turning every
+# subsequent request touching it into a down-cell response.
+_CELL_DOWN_EXCEPTIONS = (exception.CellTimeout, oslo_db_exc.DBConnectionError)
+
+
+def _is_cell_down_exception(exc):
+    """Return True if exc indicates the cell was unreachable."""
+    return isinstance(exc, _CELL_DOWN_EXCEPTIONS)
+
+
+def get_cell_timeout():
+    """Total time in seconds to wait for cells to respond in a scatter."""
+    return CONF.api.cell_timeout
 
 
 class _ContextAuthPlugin(plugin.BaseAuthPlugin):
@@ -416,6 +481,7 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
     greenthreads = []
     queue = eventlet.queue.LightQueue()
     results = {}
+    skipped_results = {}
 
     def gather_result(cell_uuid, fn, *args, **kwargs):
         try:
@@ -425,35 +491,62 @@ def scatter_gather_cells(context, cell_mappings, timeout, fn, *args, **kwargs):
             if not isinstance(e, exception.NovaException):
                 LOG.exception('Error gathering result from cell %s', cell_uuid)
             result = e
+            if _is_cell_down_exception(e):
+                _mark_cell_failed(cell_uuid)
+            else:
+                # The cell answered, it just answered with an error, so as
+                # far as the circuit breaker is concerned it is healthy.
+                _mark_cell_healthy(cell_uuid)
+        else:
+            _mark_cell_healthy(cell_uuid)
         # The queue is already synchronized.
         queue.put((cell_uuid, result))
 
     for cell_mapping in cell_mappings:
+        # Short-circuit cells that recently failed so a single down cell
+        # cannot exhaust the API worker pool by forcing every request to
+        # wait the full per-cell timeout. Controlled by
+        # [api] cell_failure_hold_seconds (0 disables, preserving legacy
+        # behaviour). Skips are kept out of ``results`` because the gather
+        # loop below equates completion with
+        # len(results) == len(greenthreads). A skipped cell is deliberately
+        # not re-marked as failed, otherwise the hold window would slide
+        # forever under constant traffic.
+        if _is_cell_recently_failed(cell_mapping.uuid):
+            skipped_results[cell_mapping.uuid] = did_not_respond_sentinel
+            LOG.debug('Skipping cell %s: inside failure hold window',
+                      cell_mapping.uuid)
+            continue
         with target_cell(context, cell_mapping) as cctxt:
             greenthreads.append((cell_mapping.uuid,
                                  utils.spawn(gather_result, cell_mapping.uuid,
                                              fn, cctxt, *args, **kwargs)))
 
-    with eventlet.timeout.Timeout(timeout, exception.CellTimeout):
-        try:
-            while len(results) != len(greenthreads):
-                cell_uuid, result = queue.get()
-                results[cell_uuid] = result
-        except exception.CellTimeout:
-            # NOTE(melwitt): We'll fill in did_not_respond_sentinels at the
-            # same time we kill/wait for the green threads.
-            pass
+    # If every cell was short-circuited by the failure cache there is
+    # nothing to wait on.
+    if greenthreads:
+        with eventlet.timeout.Timeout(timeout, exception.CellTimeout):
+            try:
+                while len(results) != len(greenthreads):
+                    cell_uuid, result = queue.get()
+                    results[cell_uuid] = result
+            except exception.CellTimeout:
+                # NOTE(melwitt): We'll fill in did_not_respond_sentinels at
+                # the same time we kill/wait for the green threads.
+                pass
 
     # Kill the green threads still pending and wait on those we know are done.
     for cell_uuid, greenthread in greenthreads:
         if cell_uuid not in results:
             greenthread.kill()
             results[cell_uuid] = did_not_respond_sentinel
+            _mark_cell_failed(cell_uuid)
             LOG.warning('Timed out waiting for response from cell %s',
                         cell_uuid)
         else:
             greenthread.wait()
 
+    results.update(skipped_results)
     return results
 
 
@@ -494,7 +587,7 @@ def scatter_gather_skip_cell0(context, fn, *args, **kwargs):
     """
     load_cells()
     cell_mappings = [cell for cell in CELLS if not cell.is_cell0()]
-    return scatter_gather_cells(context, cell_mappings, CELL_TIMEOUT,
+    return scatter_gather_cells(context, cell_mappings, get_cell_timeout(),
                                 fn, *args, **kwargs)
 
 
@@ -517,7 +610,8 @@ def scatter_gather_single_cell(context, cell_mapping, fn, *args, **kwargs):
               be returned if the call to the cell raised an exception. The
               exception will be logged.
     """
-    return scatter_gather_cells(context, [cell_mapping], CELL_TIMEOUT, fn,
+    return scatter_gather_cells(context, [cell_mapping], get_cell_timeout(),
+                                fn,
                                 *args, **kwargs)
 
 
@@ -540,5 +634,5 @@ def scatter_gather_all_cells(context, fn, *args, **kwargs):
               exception will be logged.
     """
     load_cells()
-    return scatter_gather_cells(context, CELLS, CELL_TIMEOUT,
+    return scatter_gather_cells(context, CELLS, get_cell_timeout(),
                                 fn, *args, **kwargs)

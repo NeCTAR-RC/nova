@@ -1332,7 +1332,7 @@ def _instances_cores_ram_count_legacy(context, project_id, user_id=None):
         nova_context.load_cells()
         cell_mappings = nova_context.CELLS
     results = nova_context.scatter_gather_cells(
-        context, cell_mappings, nova_context.CELL_TIMEOUT,
+        context, cell_mappings, nova_context.get_cell_timeout(),
         objects.InstanceList.get_counts, project_id, user_id=user_id)
     total_counts = {'project': {'instances': 0, 'cores': 0, 'ram': 0}}
     if user_id:

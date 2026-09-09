@@ -13,8 +13,10 @@
 from contextlib import contextmanager
 import copy
 import datetime
+import time
 from unittest import mock
 
+from oslo_db import exception as oslo_db_exc
 from oslo_utils.fixture import uuidsentinel as uuids
 
 from nova.compute import multi_cell_list
@@ -147,7 +149,7 @@ class TestUtils(test.NoDBTestCase):
 
         self.assertEqual([1, 2, 3],
                          list(multi_cell_list.query_wrapper(
-                             None, test, [1, 2, 3])))
+                             mock.MagicMock(), test, [1, 2, 3])))
 
     def test_query_wrapper_timeout(self):
         def test(ctx):
@@ -168,6 +170,126 @@ class TestUtils(test.NoDBTestCase):
             [x._db_record for x in multi_cell_list.query_wrapper(
                 mock.MagicMock(), tester)][0],
             test.TestingException)
+
+    @mock.patch('eventlet.timeout.Timeout')
+    def test_query_wrapper_uses_configured_timeout(self, mock_timeout):
+        """[api] cell_timeout governs the per-cell listing timeout."""
+        self.flags(cell_timeout=15, group='api')
+
+        def tester(ctx, data):
+            for thing in data:
+                yield thing
+
+        self.assertEqual([1, 2],
+                         list(multi_cell_list.query_wrapper(
+                             mock.MagicMock(), tester, [1, 2])))
+        mock_timeout.assert_called_once_with(15, exception.CellTimeout)
+
+    def test_query_wrapper_marks_cell_failed_on_timeout(self):
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            raise exception.CellTimeout
+
+        result = [x._db_record for x in
+                  multi_cell_list.query_wrapper(ctx, tester)]
+        self.assertEqual([context.did_not_respond_sentinel], result)
+        self.assertIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_marks_cell_failed_on_error(self):
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            raise oslo_db_exc.DBConnectionError()
+
+        result = [x._db_record for x in
+                  multi_cell_list.query_wrapper(ctx, tester)]
+        self.assertIsInstance(result[0], oslo_db_exc.DBConnectionError)
+        self.assertIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_app_error_does_not_mark_cell_failed(self):
+        """An ordinary application error means the cell answered."""
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            raise exception.MarkerNotFound(marker=uuids.instance)
+
+        result = [x._db_record for x in
+                  multi_cell_list.query_wrapper(ctx, tester)]
+        self.assertIsInstance(result[0], exception.MarkerNotFound)
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_timeout_after_records_not_marked_failed(self):
+        """A stray sibling timer must not mark an answering cell down.
+
+        Every per-cell timer targets the request greenthread and keeps
+        ticking while its generator is suspended, so one slow sibling
+        pull can detonate an expired timer inside this cell's frame. A
+        cell that already yielded records in this request is not down:
+        keep the response partial, but do not feed the failure cache.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            yield 1
+            raise exception.CellTimeout
+
+        results = list(multi_cell_list.query_wrapper(ctx, tester))
+        self.assertEqual(1, results[0])
+        self.assertEqual(context.did_not_respond_sentinel,
+                         results[1]._db_record)
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_conn_error_after_records_not_marked_failed(self):
+        """Same stray-timer shape, surfacing as a connection error.
+
+        A timer that fires inside this cell's DB read makes sqlalchemy
+        invalidate the connection, and oslo_db rewraps the CellTimeout
+        as a DBConnectionError with the original cause dropped.
+        """
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx):
+            yield 1
+            raise oslo_db_exc.DBConnectionError()
+
+        results = list(multi_cell_list.query_wrapper(ctx, tester))
+        self.assertEqual(1, results[0])
+        self.assertIsInstance(results[1]._db_record,
+                              oslo_db_exc.DBConnectionError)
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
+
+    def test_query_wrapper_marks_cell_healthy_on_completion(self):
+        self.flags(cell_failure_hold_seconds=60, group='api')
+        self.addCleanup(context._CELL_FAILURES.clear)
+        # Pretend the cell failed recently; a clean completion clears it.
+        context._CELL_FAILURES[uuids.cell1] = time.monotonic() + 60
+        ctx = mock.MagicMock()
+        ctx.cell_uuid = uuids.cell1
+
+        def tester(ctx, data):
+            for thing in data:
+                yield thing
+
+        self.assertEqual([1, 2, 3],
+                         list(multi_cell_list.query_wrapper(
+                             ctx, tester, [1, 2, 3])))
+        self.assertNotIn(uuids.cell1, context._CELL_FAILURES)
 
 
 class TestListContext(multi_cell_list.RecordSortContext):
@@ -413,6 +535,48 @@ class TestBaseClass(test.NoDBTestCase):
         self.assertEqual(1, len(lister.cells_responded))
         self.assertEqual(1, len(lister.cells_failed))
         self.assertEqual(1, len(lister.cells_timed_out))
+
+    def test_with_short_circuited_cells(self):
+        """Test raw failure sentinels recorded at scatter level.
+
+        scatter_gather_cells() can record a raw sentinel for a cell
+        without ever running query_wrapper() (for example when a
+        scatter-level short-circuit skips the cell entirely).
+        get_records_sorted() must wrap those so the feeder loop handles
+        them like any other down-cell result instead of blowing up in
+        heapq.merge().
+        """
+        data = [{'id': 'foo-%i' % i} for i in range(0, 100)]
+        cells = [objects.CellMapping(uuid=getattr(uuids, 'cell%i' % i),
+                                     name='cell%i' % i)
+                 for i in range(0, 3)]
+
+        real_scatter_gather = context.scatter_gather_cells
+
+        def fake_scatter_gather(ctx, cell_mappings, timeout, fn, *a, **k):
+            results = real_scatter_gather(ctx, cell_mappings, timeout,
+                                          fn, *a, **k)
+            # Simulate cell0 being short-circuited with a raw
+            # did-not-respond sentinel and cell1 failing with a raw
+            # exception, neither of which ran query_wrapper().
+            results[uuids.cell0] = context.did_not_respond_sentinel
+            results[uuids.cell1] = exception.NovaException('cell down')
+            return results
+
+        lister = TestLister(data, [], [], cells=cells)
+        ctx = context.RequestContext()
+        with mock.patch.object(context, 'scatter_gather_cells',
+                               side_effect=fake_scatter_gather):
+            result = lister.get_records_sorted(ctx, {}, 50, None)
+            # We should still have 50 results since there are enough from
+            # the good cell to fill our limit.
+            self.assertEqual(50, len(list(result)))
+        # Make sure the sentinels were accounted like ordinary down cells
+        self.assertEqual(1, len(lister.cells_responded))
+        self.assertEqual(1, len(lister.cells_timed_out))
+        self.assertEqual(1, len(lister.cells_failed))
+        self.assertEqual({uuids.cell0}, set(lister.cells_timed_out))
+        self.assertEqual({uuids.cell1}, set(lister.cells_failed))
 
     def test_marker_cell_not_requeried(self):
         data = [{'id': 'foo-%i' % i} for i in range(0, 100)]

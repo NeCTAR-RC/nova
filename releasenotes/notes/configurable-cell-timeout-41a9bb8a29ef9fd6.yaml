@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    The total time the API waits for each cell database during cross-cell
+    operations is now configurable with the new ``[api] cell_timeout``
+    option. The default of 60 seconds matches the previously hard-coded
+    value, so behaviour is unchanged until the option is set. The timeout
+    also governs multi-cell listing queries and scheduler cell queries.
+    Note that a single API request can wait on several scatter-gather
+    operations in sequence, so size this option well below the front-end
+    proxy or load balancer timeout.
