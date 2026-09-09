@@ -8185,6 +8185,74 @@ class ComputeAPIUnitTestCase(_ComputeAPIUnitTestMixIn, test.NoDBTestCase):
             mock_target_cell.return_value.__enter__.return_value,
             uuids.host, use_slave=True)
 
+    @mock.patch('nova.context.scatter_gather_skip_cell0')
+    def test_get_migrations(self, mock_scatter):
+        """Migrations from all healthy cells are merged."""
+        migration1 = objects.Migration(uuid=uuids.mig1)
+        migration2 = objects.Migration(uuid=uuids.mig2)
+        mock_scatter.return_value = {
+            uuids.cell1: objects.MigrationList(objects=[migration1]),
+            uuids.cell2: objects.MigrationList(objects=[migration2]),
+        }
+        filters = {'host': 'host1'}
+
+        migrations = self.compute_api.get_migrations(self.context, filters)
+
+        self.assertEqual(sorted([uuids.mig1, uuids.mig2]),
+                         sorted(m.uuid for m in migrations))
+        mock_scatter.assert_called_once_with(
+            self.context, objects.MigrationList.get_by_filters, filters)
+
+    @mock.patch('nova.compute.api.LOG.warning')
+    @mock.patch('nova.context.scatter_gather_skip_cell0')
+    def test_get_migrations_skips_down_cells(self, mock_scatter,
+                                             mock_log_warning):
+        """Down cells are omitted from the result with a warning."""
+        migration1 = objects.Migration(uuid=uuids.mig1)
+        mock_scatter.return_value = {
+            uuids.cell1: objects.MigrationList(objects=[migration1]),
+            uuids.cell2: context.did_not_respond_sentinel,
+            uuids.cell3: exception.CellTimeout(),
+        }
+
+        migrations = self.compute_api.get_migrations(self.context, {})
+
+        self.assertEqual([uuids.mig1], [m.uuid for m in migrations])
+        self.assertEqual(2, mock_log_warning.call_count)
+
+    @mock.patch('nova.context.scatter_gather_skip_cell0')
+    def test_get_migrations_fails_loud_when_configured(self, mock_scatter):
+        """With skipping disabled a down cell fails the request.
+
+        This API commonly feeds host maintenance tooling, which must not
+        conclude "no migrations" from a silently partial answer when the
+        operator asked for loud failures.
+        """
+        self.flags(list_records_by_skipping_down_cells=False, group='api')
+        mock_scatter.return_value = {
+            uuids.cell1: objects.MigrationList(objects=[]),
+            uuids.cell2: context.did_not_respond_sentinel,
+        }
+
+        self.assertRaises(exception.NovaException,
+                          self.compute_api.get_migrations,
+                          self.context, {})
+
+    @mock.patch('nova.context.scatter_gather_skip_cell0')
+    def test_get_migrations_reraises_application_error(self, mock_scatter):
+        """An ordinary error means the cell answered: raise, do not skip.
+
+        Swallowing it as a down cell would turn a deterministic failure
+        into a silently empty 200.
+        """
+        mock_scatter.return_value = {
+            uuids.cell1: test.TestingException('deterministic failure'),
+        }
+
+        self.assertRaises(test.TestingException,
+                          self.compute_api.get_migrations,
+                          self.context, {})
+
     def _test_get_migrations_sorted_filter_duplicates(self, migrations,
                                                       expected):
         """Tests the cross-cell scenario where there are multiple migrations

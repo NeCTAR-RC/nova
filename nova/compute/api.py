@@ -25,6 +25,7 @@ import re
 import typing as ty
 
 from castellan import key_manager
+import eventlet.timeout
 import os_traits
 from oslo_log import log as logging
 from oslo_messaging import exceptions as oslo_exceptions
@@ -5741,15 +5742,33 @@ class API:
 
     def get_migrations(self, context, filters):
         """Get all migrations for the given filters."""
-        load_cells()
+        # NOTE(shiyan): Query the cells in parallel with a timeout rather
+        # than sequentially with none, so a single down cell cannot hang
+        # the request indefinitely. Only a cell that did not answer may
+        # be skipped, and only when [api] list_records_by_skipping_down_
+        # cells allows a partial listing (the sorted twin honours the
+        # same option): this API commonly feeds host maintenance tooling,
+        # which must not conclude "no migrations" from a silently partial
+        # answer. An ordinary application error is re-raised - the cell
+        # answered, and swallowing its error would also hide a
+        # deterministic failure as an empty result.
+        results = nova_context.scatter_gather_skip_cell0(
+            context, objects.MigrationList.get_by_filters, filters)
 
         migrations = []
-        for cell in CELLS:
-            if cell.uuid == objects.CellMapping.CELL0_UUID:
+        for cell_uuid, result in results.items():
+            if (result is nova_context.did_not_respond_sentinel or
+                    nova_context._is_cell_down_exception(result)):
+                if not CONF.api.list_records_by_skipping_down_cells:
+                    raise exception.NovaException(
+                        _('Cell %s is not responding but configuration '
+                          'indicates that we should fail.') % cell_uuid)
+                LOG.warning('Cell %s is not responding and its migrations '
+                            'are being omitted from the results', cell_uuid)
                 continue
-            with nova_context.target_cell(context, cell) as cctxt:
-                migrations.extend(objects.MigrationList.get_by_filters(
-                    cctxt, filters).objects)
+            elif isinstance(result, Exception):
+                raise result
+            migrations.extend(result.objects)
         return objects.MigrationList(objects=migrations)
 
     def get_migrations_sorted(self, context, filters, sort_dirs=None,
@@ -6399,19 +6418,42 @@ class HostAPI:
         # NOTE(danms): Unfortunately this API exposes database identifiers
         # which means we really can't do something efficient here
         is_uuid = uuidutils.is_uuid_like(compute_id)
+        skipped_cells = False
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
+            if nova_context._is_cell_recently_failed(cell.uuid):
+                LOG.warning('Skipping cell %s while looking up compute '
+                            'node %s: inside failure hold window',
+                            cell.identity, compute_id)
+                skipped_cells = True
+                continue
             with nova_context.target_cell(context, cell) as cctxt:
                 try:
-                    if is_uuid:
-                        return objects.ComputeNode.get_by_uuid(cctxt,
-                                                               compute_id)
-                    return objects.ComputeNode.get_by_id(cctxt,
-                                                         int(compute_id))
+                    with eventlet.timeout.Timeout(
+                            nova_context.get_cell_timeout(),
+                            exception.CellTimeout):
+                        if is_uuid:
+                            return objects.ComputeNode.get_by_uuid(
+                                cctxt, compute_id)
+                        return objects.ComputeNode.get_by_id(
+                            cctxt, int(compute_id))
                 except exception.ComputeHostNotFound:
                     # NOTE(danms): Keep looking in other cells
                     continue
+                except nova_context._CELL_DOWN_EXCEPTIONS:
+                    nova_context._mark_cell_failed(cell.uuid)
+                    LOG.warning('Cell %s timed out or errored while '
+                                'looking up compute node %s',
+                                cell.identity, compute_id)
+                    skipped_cells = True
+                    continue
+
+        if skipped_cells:
+            # The node was not found in any responsive cell, but it may
+            # exist in one of the cells we could not query, so NotFound
+            # would be a lie.
+            raise exception.CellTimeout()
 
         raise exception.ComputeHostNotFound(host=compute_id)
 
@@ -6419,30 +6461,61 @@ class HostAPI:
         load_cells()
 
         computes = []
+        skipped_cells = False
         uuid_marker = marker and uuidutils.is_uuid_like(marker)
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
+            if nova_context._is_cell_recently_failed(cell.uuid):
+                LOG.warning('Skipping cell %s while listing compute nodes: '
+                            'inside failure hold window; hypervisors in '
+                            'that cell are missing from the results',
+                            cell.identity)
+                skipped_cells = True
+                continue
             with nova_context.target_cell(context, cell) as cctxt:
-
-                # If we have a marker and it's a uuid, see if the compute node
-                # is in this cell.
-                if marker and uuid_marker:
-                    try:
-                        compute_marker = objects.ComputeNode.get_by_uuid(
-                            cctxt, marker)
-                        # we found the marker compute node, so use it's id
-                        # for the actual marker for paging in this cell's db
-                        marker = compute_marker.id
-                    except exception.ComputeHostNotFound:
-                        # The marker node isn't in this cell so keep looking.
-                        continue
-
                 try:
-                    cell_computes = objects.ComputeNodeList.get_by_pagination(
-                        cctxt, limit=limit, marker=marker)
-                except exception.MarkerNotFound:
-                    # NOTE(danms): Keep looking through cells
+                    with eventlet.timeout.Timeout(
+                            nova_context.get_cell_timeout(),
+                            exception.CellTimeout):
+                        # NOTE(shiyan): Resolve the marker into a
+                        # cell-local variable rather than mutating the
+                        # caller-supplied one: if this cell fails after
+                        # the resolution, the original marker must
+                        # survive for the error path below (a leaked
+                        # internal integer id in a MarkerNotFound would
+                        # otherwise reach the client).
+                        cell_marker = marker
+                        # If we have a marker and it's a uuid, see if the
+                        # compute node is in this cell.
+                        if marker and uuid_marker:
+                            try:
+                                compute_marker = (
+                                    objects.ComputeNode.get_by_uuid(
+                                        cctxt, marker))
+                                # we found the marker compute node, so use
+                                # it's id for the actual marker for paging
+                                # in this cell's db
+                                cell_marker = compute_marker.id
+                            except exception.ComputeHostNotFound:
+                                # The marker node isn't in this cell so keep
+                                # looking.
+                                continue
+
+                        try:
+                            cell_computes = (
+                                objects.ComputeNodeList.get_by_pagination(
+                                    cctxt, limit=limit, marker=cell_marker))
+                        except exception.MarkerNotFound:
+                            # NOTE(danms): Keep looking through cells
+                            continue
+                except nova_context._CELL_DOWN_EXCEPTIONS:
+                    nova_context._mark_cell_failed(cell.uuid)
+                    LOG.warning('Cell %s timed out or errored while listing '
+                                'compute nodes; hypervisors in that cell '
+                                'are missing from the results',
+                                cell.identity)
+                    skipped_cells = True
                     continue
                 computes.extend(cell_computes)
                 # NOTE(danms): We must have found the marker, so continue on
@@ -6454,6 +6527,13 @@ class HostAPI:
                         break
 
         if marker is not None and len(computes) == 0:
+            if skipped_cells:
+                # The marker was not found in any responsive cell, but it
+                # may live in one of the cells we could not query, so
+                # MarkerNotFound (a 400 telling the client the marker it
+                # was handed on the previous page is invalid) would be a
+                # lie. Report the cell outage instead.
+                raise exception.CellTimeout()
             # NOTE(danms): If we did not find the marker in any cell,
             # mimic the db_api behavior here.
             raise exception.MarkerNotFound(marker=marker)
@@ -6467,9 +6547,27 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
+            if nova_context._is_cell_recently_failed(cell.uuid):
+                LOG.warning('Skipping cell %s while searching hypervisors: '
+                            'inside failure hold window; hypervisors in '
+                            'that cell are missing from the results',
+                            cell.identity)
+                continue
             with nova_context.target_cell(context, cell) as cctxt:
-                cell_computes = objects.ComputeNodeList.get_by_hypervisor(
-                    cctxt, hypervisor_match)
+                try:
+                    with eventlet.timeout.Timeout(
+                            nova_context.get_cell_timeout(),
+                            exception.CellTimeout):
+                        cell_computes = (
+                            objects.ComputeNodeList.get_by_hypervisor(
+                                cctxt, hypervisor_match))
+                except nova_context._CELL_DOWN_EXCEPTIONS:
+                    nova_context._mark_cell_failed(cell.uuid)
+                    LOG.warning('Cell %s timed out or errored during a '
+                                'hypervisor search; hypervisors in that '
+                                'cell are missing from the results',
+                                cell.identity)
+                    continue
             computes.extend(cell_computes)
         return objects.ComputeNodeList(objects=computes)
 
@@ -6480,8 +6578,26 @@ class HostAPI:
         for cell in CELLS:
             if cell.uuid == objects.CellMapping.CELL0_UUID:
                 continue
+            if nova_context._is_cell_recently_failed(cell.uuid):
+                LOG.warning('Skipping cell %s while computing hypervisor '
+                            'statistics: inside failure hold window; the '
+                            'totals will not include that cell',
+                            cell.identity)
+                continue
             with nova_context.target_cell(context, cell) as cctxt:
-                cell_stats.append(main_db_api.compute_node_statistics(cctxt))
+                try:
+                    with eventlet.timeout.Timeout(
+                            nova_context.get_cell_timeout(),
+                            exception.CellTimeout):
+                        cell_stats.append(
+                            main_db_api.compute_node_statistics(cctxt))
+                except nova_context._CELL_DOWN_EXCEPTIONS:
+                    nova_context._mark_cell_failed(cell.uuid)
+                    LOG.warning('Cell %s timed out or errored while '
+                                'computing hypervisor statistics; the '
+                                'totals will not include that cell',
+                                cell.identity)
+                    continue
 
         if cell_stats:
             keys = cell_stats[0].keys()

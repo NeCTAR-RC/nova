@@ -1,0 +1,12 @@
+---
+fixes:
+  - |
+    The ``os-migrations`` API (unsorted listing) no longer hangs
+    indefinitely when a cell database is unresponsive. Cells are now
+    queried in parallel with the standard cell timeout. Migrations from
+    an unreachable cell are omitted from the result with a warning when
+    ``[api] list_records_by_skipping_down_cells`` is true (the default);
+    when it is false the request fails instead of silently returning a
+    partial listing, matching the sorted migration listing. An ordinary
+    application error from a cell is re-raised rather than being
+    mistaken for a down cell.

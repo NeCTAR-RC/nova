@@ -17,7 +17,9 @@ import collections
 import datetime
 from urllib import parse as urlparse
 
+import eventlet.timeout
 import iso8601
+from oslo_log import log as logging
 from oslo_utils import timeutils
 from webob import exc
 
@@ -34,6 +36,7 @@ from nova import objects
 from nova.policies import simple_tenant_usage as stu_policies
 
 CONF = nova.conf.CONF
+LOG = logging.getLogger(__name__)
 
 
 def parse_strtime(dstr, fmt):
@@ -110,17 +113,46 @@ class SimpleTenantUsageController(wsgi.Controller):
         all_instances = []
         cells = objects.CellMappingList.get_all(context)
         for cell in cells:
+            # NOTE(shiyan): Usage totals must never be silently partial
+            # because they feed billing, so unlike listings this API fails
+            # fast on a down cell instead of skipping it. The iteration
+            # stays sequential because marker/limit pagination depends on
+            # the MarkerNotFound fall-through below.
+            # NOTE(shiyan): This API is reachable by ordinary project
+            # readers, so the 503 explanations are deliberately generic:
+            # cell UUIDs are deployment topology and belong in the logs,
+            # not in tenant-visible responses.
+            if nova_context._is_cell_recently_failed(cell.uuid):
+                LOG.warning('Skipping cell %s during a tenant usage query: '
+                            'inside failure hold window; failing the '
+                            'request because usage data would be '
+                            'incomplete.', cell.uuid)
+                raise exc.HTTPServiceUnavailable(
+                    explanation=_('A cell is not currently responding; '
+                                  'usage data would be incomplete.'))
             with nova_context.target_cell(context, cell) as cctxt:
                 try:
-                    instances = (
-                        objects.InstanceList.get_active_by_window_joined(
-                            cctxt, period_start, period_stop, tenant_id,
-                            expected_attrs=['flavor'], limit=limit,
-                            marker=marker))
+                    with eventlet.timeout.Timeout(
+                            nova_context.get_cell_timeout(),
+                            exception.CellTimeout):
+                        instances = (
+                            objects.InstanceList.get_active_by_window_joined(
+                                cctxt, period_start, period_stop, tenant_id,
+                                expected_attrs=['flavor'], limit=limit,
+                                marker=marker))
                 except exception.MarkerNotFound:
                     # NOTE(danms): We need to keep looking through the later
                     # cells to find the marker
                     continue
+                except nova_context._CELL_DOWN_EXCEPTIONS:
+                    nova_context._mark_cell_failed(cell.uuid)
+                    LOG.warning('Cell %s timed out or errored during a '
+                                'tenant usage query; failing the request '
+                                'because usage data would be incomplete.',
+                                cell.uuid)
+                    raise exc.HTTPServiceUnavailable(
+                        explanation=_('A cell is not currently responding; '
+                                      'usage data would be incomplete.'))
                 all_instances.extend(instances)
                 # NOTE(danms): We must have found a marker if we had one,
                 # so make sure we don't require a marker in the next cell
@@ -264,14 +296,14 @@ class SimpleTenantUsageController(wsgi.Controller):
     @wsgi.Controller.api_version("2.40")
     @validation.query_schema(schema.index_query_275, '2.75')
     @validation.query_schema(schema.index_query_v240, '2.40', '2.74')
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     def index(self, req):
         """Retrieve tenant_usage for all tenants."""
         return self._index(req, links=True)
 
     @wsgi.Controller.api_version("2.1", "2.39")  # noqa
     @validation.query_schema(schema.index_query)
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     def index(self, req):  # noqa
         """Retrieve tenant_usage for all tenants."""
         return self._index(req)
@@ -279,14 +311,14 @@ class SimpleTenantUsageController(wsgi.Controller):
     @wsgi.Controller.api_version("2.40")
     @validation.query_schema(schema.show_query_275, '2.75')
     @validation.query_schema(schema.show_query_v240, '2.40', '2.74')
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     def show(self, req, id):
         """Retrieve tenant_usage for a specified tenant."""
         return self._show(req, id, links=True)
 
     @wsgi.Controller.api_version("2.1", "2.39")  # noqa
     @validation.query_schema(schema.show_query)
-    @wsgi.expected_errors(400)
+    @wsgi.expected_errors((400, 503))
     def show(self, req, id):  # noqa
         """Retrieve tenant_usage for a specified tenant."""
         return self._show(req, id)
