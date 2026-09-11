@@ -473,6 +473,17 @@ class AggregateTestCaseV21(test.NoDBTestCase):
                               body={"add_host": {"host": "bogus_host"}})
             mock_add.assert_called_once_with(self.context, "1", "bogus_host")
 
+    def test_add_host_cell_not_responding(self):
+        """The host has no mapping and the cell-by-cell lookup could not
+        reach every cell, so it may live in the cell that did not answer:
+        503, not a misleading 404.
+        """
+        with mock.patch.object(self.controller.api, 'add_host_to_aggregate',
+                               side_effect=exception.CellTimeout()):
+            self.assertRaises(exc.HTTPServiceUnavailable,
+                              eval(self.add_host), self.req, "1",
+                              body={"add_host": {"host": "unmapped_host"}})
+
     def test_add_host_with_missing_host(self):
         self.assertRaises(self.bad_request, eval(self.add_host),
                 self.req, "1", body={"add_host": {"asdf": "asdf"}})
@@ -553,6 +564,14 @@ class AggregateTestCaseV21(test.NoDBTestCase):
         self.assertIn('Failed to remove host bogushost from aggregate 1. '
                       'Error: Compute host bogushost could not be found.',
                       self.stdlog.logger.output)
+
+    def test_remove_host_cell_not_responding(self):
+        with mock.patch.object(self.controller.api,
+                               'remove_host_from_aggregate',
+                               side_effect=exception.CellTimeout()):
+            self.assertRaises(exc.HTTPServiceUnavailable,
+                              eval(self.remove_host), self.req, "1",
+                              body={"remove_host": {"host": "unmapped_host"}})
 
     def test_remove_host_with_missing_host(self):
         self.assertRaises(self.bad_request, eval(self.remove_host),

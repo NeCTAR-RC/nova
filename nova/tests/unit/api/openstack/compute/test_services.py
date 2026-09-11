@@ -731,6 +731,15 @@ class ServicesTestV21(test.TestCase):
             self.assertRaises(webob.exc.HTTPBadRequest,
                               self.controller.delete, self.req, 1234)
 
+    def test_services_delete_cell_not_responding(self):
+        """The service was not found in the cells that answered while
+        another cell was unreachable, so it may live there: 503, not 404.
+        """
+        with mock.patch.object(self.controller, 'host_api') as host_api:
+            host_api.service_get_by_id.side_effect = exception.CellTimeout()
+            self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                              self.controller.delete, self.req, 1234)
+
     @mock.patch('nova.objects.InstanceList.get_count_by_hosts',
                 return_value=0)
     @mock.patch('nova.objects.HostMapping.get_by_host',
@@ -1200,6 +1209,16 @@ class ServicesTestV253(test.TestCase):
         self.assertRaises(webob.exc.HTTPNotFound,
                           self.controller.delete, self.req, uuidsentinel.svc2)
 
+    def test_delete_cell_not_responding(self):
+        """The service was not found in the cells that answered while
+        another cell was unreachable, so it may live there: 503, not 404.
+        """
+        with mock.patch.object(self.controller.host_api, 'service_get_by_id',
+                               side_effect=exception.CellTimeout()):
+            self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                              self.controller.delete, self.req,
+                              uuidsentinel.svc2)
+
     def test_delete_invalid_uuid(self):
         """Tests that the service uuid is validated in a DELETE request."""
         ex = self.assertRaises(webob.exc.HTTPBadRequest,
@@ -1218,6 +1237,17 @@ class ServicesTestV253(test.TestCase):
         """
         self.assertRaises(webob.exc.HTTPNotFound, self.controller.update,
                           self.req, uuidsentinel.service_uuid, body={})
+
+    def test_update_cell_not_responding(self):
+        """The service was not found in the cells that answered while
+        another cell was unreachable, so it may live there: 503, not 404.
+        """
+        with mock.patch.object(self.controller.host_api, 'service_get_by_id',
+                               side_effect=exception.CellTimeout()):
+            self.assertRaises(webob.exc.HTTPServiceUnavailable,
+                              self.controller.update, self.req,
+                              uuidsentinel.service_uuid,
+                              body={'status': 'disabled'})
 
     def test_update_invalid_status(self):
         """Tests that jsonschema validates the status field in the request body

@@ -27,6 +27,7 @@ import typing as ty
 from castellan import key_manager
 import eventlet.timeout
 import os_traits
+from oslo_db import exception as oslo_db_exc
 from oslo_log import log as logging
 from oslo_messaging import exceptions as oslo_exceptions
 from oslo_serialization import base64 as base64utils
@@ -6076,6 +6077,12 @@ def _get_service_in_cell_by_host(context, host_name):
         try:
             # NOTE(danms): This targets our cell
             service = _find_service_in_cell(context, service_host=host_name)
+        except exception.CellTimeout:
+            # No responsive cell has the host but at least one cell was
+            # unreachable or skipped, so the host may live there and
+            # ComputeHostNotFound would be a lie. CellTimeout is a
+            # NotFound subclass, so this clause has to come first.
+            raise
         except exception.NotFound:
             raise exception.ComputeHostNotFound(host=host_name)
     return service
@@ -6092,6 +6099,9 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
     :param service_host: If not None, the hostname of the service to find
     :returns: An objects.Service
     :raises: ServiceNotUnique if multiple matching IDs are found
+    :raises: CellTimeout if no responsive cell has a match but at least one
+        cell was unreachable or inside its failure hold window, so the
+        service may live in a cell that could not be queried
     :raises: NotFound if no matches are found
     :raises: NovaException if called with neither search option
     """
@@ -6099,6 +6109,7 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
     load_cells()
     service = None
     found_in_cell = None
+    skipped_cells = False
 
     is_uuid = False
     if service_id is not None:
@@ -6118,12 +6129,45 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
 
     for cell in CELLS:
         # NOTE(danms): Services can be in cell0, so don't skip it here
-        try:
-            with nova_context.target_cell(context, cell) as cctxt:
-                cell_service = lookup_fn(cctxt)
-        except exception.NotFound:
-            # NOTE(danms): Keep looking in other cells
+        if nova_context._should_skip_cell(cell.uuid):
+            LOG.warning('Skipping cell %s while looking up service %s: '
+                        'inside failure hold window',
+                        cell.identity, service_id or service_host)
+            skipped_cells = True
             continue
+        with nova_context.target_cell(context, cell) as cctxt:
+            try:
+                with eventlet.timeout.Timeout(
+                        nova_context.get_cell_timeout(),
+                        exception.CellTimeout):
+                    cell_service = lookup_fn(cctxt)
+            except nova_context._CELL_DOWN_EXCEPTIONS:
+                # This clause must precede the NotFound one: CellTimeout
+                # is a NotFound subclass and would otherwise be read as
+                # "not in this cell".
+                nova_context._mark_cell_failed(cell.uuid)
+                LOG.warning('Cell %s timed out or errored while looking '
+                            'up service %s',
+                            cell.identity, service_id or service_host)
+                skipped_cells = True
+                continue
+            except oslo_db_exc.DBError:
+                # A DB-layer error outside the recognised down shapes is
+                # ambiguous (see scatter_gather_cells): skip the cell for
+                # this request but leave the failure cache alone.
+                LOG.warning('Cell %s returned a database error while '
+                            'looking up service %s',
+                            cell.identity, service_id or service_host)
+                skipped_cells = True
+                continue
+            except exception.NotFound:
+                # NOTE(danms): Keep looking in other cells. The cell
+                # answered (with a miss), which the failure cache needs
+                # to know: an elected probe must report health or the
+                # cell stays in the probing state.
+                nova_context._mark_cell_healthy(cell.uuid)
+                continue
+        nova_context._mark_cell_healthy(cell.uuid)
         if service and cell_service:
             raise exception.ServiceNotUnique()
         service = cell_service
@@ -6136,8 +6180,11 @@ def _find_service_in_cell(context, service_id=None, service_host=None):
         # when we return to our caller
         nova_context.set_target_cell(context, found_in_cell)
         return service
-    else:
-        raise exception.NotFound()
+    if skipped_cells:
+        # Not found in any responsive cell, but it may exist in one of
+        # the cells we could not query, so NotFound would be a lie.
+        raise exception.CellTimeout()
+    raise exception.NotFound()
 
 
 class HostAPI:
@@ -6302,9 +6349,19 @@ class HostAPI:
         return ret_services
 
     def service_get_by_id(self, context, service_id):
-        """Get service entry for the given service id or uuid."""
+        """Get service entry for the given service id or uuid.
+
+        :raises: ServiceNotFound if no cell has the service
+        :raises: CellTimeout if no responsive cell has the service but at
+            least one cell was unreachable or inside its failure hold
+            window, so the service may live there
+        """
         try:
             return _find_service_in_cell(context, service_id=service_id)
+        except exception.CellTimeout:
+            # CellTimeout is a NotFound subclass: without this clause it
+            # would be reported as ServiceNotFound, a 404, below.
+            raise
         except exception.NotFound:
             raise exception.ServiceNotFound(service_id=service_id)
 

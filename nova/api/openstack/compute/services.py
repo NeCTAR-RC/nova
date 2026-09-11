@@ -245,7 +245,7 @@ class ServiceController(wsgi.Controller):
             raise webob.exc.HTTPBadRequest(explanation=msg)
 
     @wsgi.response(204)
-    @wsgi.expected_errors((400, 404, 409))
+    @wsgi.expected_errors((400, 404, 409, 503))
     def delete(self, req, id):
         """Deletes the specified service."""
         context = req.environ['nova.context']
@@ -339,6 +339,13 @@ class ServiceController(wsgi.Controller):
         except exception.ServiceNotFound:
             explanation = _("Service %s not found.") % id
             raise webob.exc.HTTPNotFound(explanation=explanation)
+        except exception.CellTimeout:
+            # The service was not found in the cells that answered, but
+            # at least one cell was unreachable or inside its failure
+            # hold window, so it may live there: a 404 would be a lie.
+            explanation = _("A cell is not currently responding and the "
+                            "request cannot be completed; try again later")
+            raise webob.exc.HTTPServiceUnavailable(explanation=explanation)
         except exception.ServiceNotUnique:
             explanation = _("Service id %s refers to multiple services.") % id
             raise webob.exc.HTTPBadRequest(explanation=explanation)
@@ -412,7 +419,7 @@ class ServiceController(wsgi.Controller):
         return self._perform_action(req, id, body, actions)
 
     @wsgi.Controller.api_version(UUID_FOR_ID_MIN_VERSION)  # noqa F811
-    @wsgi.expected_errors((400, 404))
+    @wsgi.expected_errors((400, 404, 503))
     @validation.schema(services.service_update_v2_53, UUID_FOR_ID_MIN_VERSION)
     def update(self, req, id, body):   # noqa
         """Perform service update
@@ -439,6 +446,13 @@ class ServiceController(wsgi.Controller):
             # targeting below.
         except exception.ServiceNotFound as e:
             raise webob.exc.HTTPNotFound(explanation=e.format_message())
+        except exception.CellTimeout:
+            # The service was not found in the cells that answered, but
+            # at least one cell was unreachable or inside its failure
+            # hold window, so it may live there: a 404 would be a lie.
+            msg = _("A cell is not currently responding and the request "
+                    "cannot be completed; try again later")
+            raise webob.exc.HTTPServiceUnavailable(explanation=msg)
 
         # Return 400 if service.binary is not nova-compute.
         # Before the earlier PUT handlers were made cells-aware, you could
