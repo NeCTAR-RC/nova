@@ -172,7 +172,7 @@ class AggregateController(wsgi.Controller):
     # NOTE(gmann): Returns 200 for backwards compatibility but should be 202
     # for representing async API as this API just accepts the request and
     # request hypervisor driver to complete the same in async mode.
-    @wsgi.expected_errors((400, 404, 409))
+    @wsgi.expected_errors((400, 404, 409, 503))
     @wsgi.action('add_host')
     @validation.schema(schema.add_host)
     @validation.response_body_schema(schema.add_host_response, '2.1', '2.40')  # noqa: E501
@@ -198,12 +198,19 @@ class AggregateController(wsgi.Controller):
         except (exception.AggregateHostExists,
                 exception.InvalidAggregateAction) as e:
             raise exc.HTTPConflict(explanation=e.format_message())
+        except exception.CellTimeout:
+            # The host has no host mapping and the cell-by-cell service
+            # lookup could not reach every cell, so the host may live in
+            # the cell that did not answer: a 404 would be a lie.
+            msg = _('A cell is not currently responding and the request '
+                    'cannot be completed; try again later')
+            raise exc.HTTPServiceUnavailable(explanation=msg)
         return self._marshall_aggregate(req, aggregate)
 
     # NOTE(gmann): Returns 200 for backwards compatibility but should be 202
     # for representing async API as this API just accepts the request and
     # request hypervisor driver to complete the same in async mode.
-    @wsgi.expected_errors((400, 404, 409))
+    @wsgi.expected_errors((400, 404, 409, 503))
     @wsgi.action('remove_host')
     @validation.schema(schema.remove_host)
     @validation.response_body_schema(schema.remove_host_response, '2.1', '2.40')  # noqa: E501
@@ -235,6 +242,13 @@ class AggregateController(wsgi.Controller):
             LOG.error('Failed to remove host %s from aggregate %s. Error: %s',
                       host, id, str(e))
             raise exc.HTTPConflict(explanation=e.format_message())
+        except exception.CellTimeout:
+            # The host has no host mapping and the cell-by-cell service
+            # lookup could not reach every cell, so the host may live in
+            # the cell that did not answer: a 404 would be a lie.
+            msg = _('A cell is not currently responding and the request '
+                    'cannot be completed; try again later')
+            raise exc.HTTPServiceUnavailable(explanation=msg)
         return self._marshall_aggregate(req, aggregate)
 
     @wsgi.expected_errors((400, 404))

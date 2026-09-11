@@ -1,0 +1,16 @@
+---
+fixes:
+  - |
+    Looking up a single compute service record by id or uuid
+    (``PUT /os-services/{id}`` and ``DELETE /os-services/{id}``, and the
+    aggregate ``add_host`` and ``remove_host`` actions for a host with no
+    host mapping) scanned every cell database sequentially with no time
+    bound and treated any database error as fatal, so a single unreachable
+    cell returned ``500`` after the full ``oslo.db`` reconnect ladder even
+    when the service lived in a healthy cell. Each per-cell lookup is now
+    bounded by ``[api] cell_timeout`` and consults and feeds the
+    ``[api] cell_failure_hold_seconds`` circuit breaker. A service found in
+    a responsive cell is returned as before. When it is not found and at
+    least one cell was unreachable or skipped, these APIs return a
+    retryable ``503 Service Unavailable`` instead of a misleading ``404``,
+    since the record may exist in the cell that did not answer.

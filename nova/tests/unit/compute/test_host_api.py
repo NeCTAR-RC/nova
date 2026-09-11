@@ -802,6 +802,208 @@ class HostAPIDownCellTestCase(test.TestCase):
         self.assertEqual([uuids.cn2], [c.uuid for c in result])
         self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
 
+    # Single-record service lookups. PUT and DELETE /os-services/{id}
+    # resolve the service by scanning every cell in
+    # _find_service_in_cell(), which used to have no time bound, ignore
+    # the breaker and catch only NotFound, so a down cell 500ed the
+    # request even when the service lived in a healthy cell.
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_found_after_down_cell(self, mock_get):
+        service = objects.Service(uuid=uuids.service_uuid)
+        mock_get.side_effect = [oslo_db_exc.DBConnectionError(), service]
+
+        result = self.host_api.service_get_by_id(
+            self.ctxt, uuids.service_uuid)
+
+        self.assertIs(service, result)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+        self.assertNotIn(uuids.cell2_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_id')
+    def test_service_get_by_integer_id_found_after_down_cell(self, mock_get):
+        """The pre-2.53 integer id path has no early break, so it visits
+        every cell: a down cell anywhere used to fail it.
+        """
+        service = objects.Service(id=42)
+        mock_get.side_effect = [oslo_db_exc.DBConnectionError(), service]
+
+        result = self.host_api.service_get_by_id(self.ctxt, 42)
+
+        self.assertIs(service, result)
+        self.assertEqual(2, mock_get.call_count)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_skips_recently_failed_cell(self, mock_get):
+        service = objects.Service(uuid=uuids.service_uuid)
+        mock_get.return_value = service
+        self._mark_cell1_failed()
+
+        result = self.host_api.service_get_by_id(
+            self.ctxt, uuids.service_uuid)
+
+        self.assertIs(service, result)
+        # Only the healthy cell was queried.
+        self.assertEqual(1, mock_get.call_count)
+
+    @mock.patch.object(objects.Service, 'get_by_id')
+    def test_service_get_by_integer_id_skips_recently_failed_cell(
+            self, mock_get):
+        """Without the skip the integer path would query the held cell
+        too, and a hit in both cells reads as ServiceNotUnique.
+        """
+        service = objects.Service(id=42)
+        mock_get.return_value = service
+        self._mark_cell1_failed()
+
+        result = self.host_api.service_get_by_id(self.ctxt, 42)
+
+        self.assertIs(service, result)
+        self.assertEqual(1, mock_get.call_count)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid',
+                       side_effect=exception.ServiceNotFound(
+                           service_id=uuids.service_uuid))
+    def test_service_get_by_id_maybe_in_down_cell(self, mock_get):
+        """Not found in the healthy cells while another cell was skipped:
+        the caller gets CellTimeout (a 503 at the API), not ServiceNotFound
+        (a 404), because the service may exist in the unreachable cell.
+        """
+        self._mark_cell1_failed()
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.service_get_by_id,
+                          self.ctxt, uuids.service_uuid)
+        self.assertEqual(1, mock_get.call_count)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_down_cell_then_not_found(self, mock_get):
+        mock_get.side_effect = [
+            oslo_db_exc.DBConnectionError(),
+            exception.ServiceNotFound(service_id=uuids.service_uuid)]
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.service_get_by_id,
+                          self.ctxt, uuids.service_uuid)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+        self.assertNotIn(uuids.cell2_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid',
+                       side_effect=exception.ServiceNotFound(
+                           service_id=uuids.service_uuid))
+    def test_service_get_by_id_not_found_all_cells_healthy(self, mock_get):
+        """With every cell answering, a miss is still ServiceNotFound."""
+        self.assertRaises(exception.ServiceNotFound,
+                          self.host_api.service_get_by_id,
+                          self.ctxt, uuids.service_uuid)
+        self.assertEqual(2, mock_get.call_count)
+        self.assertEqual({}, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_ambiguous_db_error_not_marked(self, mock_get):
+        """A plain DBError is proof of neither failure nor health: the cell
+        is skipped for this request and the failure cache is left alone,
+        matching the scatter-gather path.
+        """
+        service = objects.Service(uuid=uuids.service_uuid)
+        mock_get.side_effect = [oslo_db_exc.DBError(), service]
+
+        result = self.host_api.service_get_by_id(
+            self.ctxt, uuids.service_uuid)
+
+        self.assertIs(service, result)
+        self.assertEqual({}, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_ambiguous_db_error_then_not_found(
+            self, mock_get):
+        mock_get.side_effect = [
+            oslo_db_exc.DBError(),
+            exception.ServiceNotFound(service_id=uuids.service_uuid)]
+
+        self.assertRaises(exception.CellTimeout,
+                          self.host_api.service_get_by_id,
+                          self.ctxt, uuids.service_uuid)
+        self.assertEqual({}, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_probe_success_clears_mark(self, mock_get):
+        """A miss is an answer: the elected probe must report health or the
+        cell stays in the probing state, skipped by everyone else.
+        """
+        service = objects.Service(uuid=uuids.service_uuid)
+        mock_get.side_effect = [
+            exception.ServiceNotFound(service_id=uuids.service_uuid),
+            service]
+        # cell1's hold window has expired: this request is elected to
+        # probe it rather than skip it.
+        context._CELL_FAILURES[uuids.cell1_uuid] = (
+            context._CELL_DOWN, time.monotonic() - 1)
+
+        result = self.host_api.service_get_by_id(
+            self.ctxt, uuids.service_uuid)
+
+        self.assertIs(service, result)
+        self.assertEqual(2, mock_get.call_count)
+        self.assertNotIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch('nova.compute.api.eventlet.timeout.Timeout')
+    @mock.patch.object(objects.Service, 'get_by_uuid')
+    def test_service_get_by_id_uses_configured_timeout(
+            self, mock_get, mock_timeout):
+        self.flags(cell_timeout=15, group='api')
+        mock_get.return_value = objects.Service(uuid=uuids.service_uuid)
+
+        self.host_api.service_get_by_id(self.ctxt, uuids.service_uuid)
+
+        mock_timeout.assert_called_once_with(15, exception.CellTimeout)
+
+    @mock.patch.object(objects.HostMapping, 'get_by_host',
+                       side_effect=exception.HostMappingNotFound(
+                           name='unmapped'))
+    @mock.patch.object(objects.Service, 'get_by_compute_host')
+    def test_get_service_in_cell_by_host_found_after_down_cell(
+            self, mock_get, mock_hm):
+        """An unmapped host (aggregate add_host/remove_host) falls back to
+        the same cell scan and must survive a down cell too.
+        """
+        service = objects.Service(host='unmapped')
+        mock_get.side_effect = [oslo_db_exc.DBConnectionError(), service]
+
+        result = compute._get_service_in_cell_by_host(self.ctxt, 'unmapped')
+
+        self.assertIs(service, result)
+        self.assertIn(uuids.cell1_uuid, context._CELL_FAILURES)
+
+    @mock.patch.object(objects.HostMapping, 'get_by_host',
+                       side_effect=exception.HostMappingNotFound(
+                           name='unmapped'))
+    @mock.patch.object(objects.Service, 'get_by_compute_host',
+                       side_effect=exception.ComputeHostNotFound(
+                           host='unmapped'))
+    def test_get_service_in_cell_by_host_maybe_in_down_cell(
+            self, mock_get, mock_hm):
+        self._mark_cell1_failed()
+
+        self.assertRaises(exception.CellTimeout,
+                          compute._get_service_in_cell_by_host,
+                          self.ctxt, 'unmapped')
+        self.assertEqual(1, mock_get.call_count)
+
+    @mock.patch.object(objects.HostMapping, 'get_by_host',
+                       side_effect=exception.HostMappingNotFound(
+                           name='unmapped'))
+    @mock.patch.object(objects.Service, 'get_by_compute_host',
+                       side_effect=exception.ComputeHostNotFound(
+                           host='unmapped'))
+    def test_get_service_in_cell_by_host_not_found_all_cells_healthy(
+            self, mock_get, mock_hm):
+        self.assertRaises(exception.ComputeHostNotFound,
+                          compute._get_service_in_cell_by_host,
+                          self.ctxt, 'unmapped')
+        self.assertEqual(2, mock_get.call_count)
+
 
 class ComputeAggregateAPITestCase(test.TestCase):
     def setUp(self):
