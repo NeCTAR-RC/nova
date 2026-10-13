@@ -18,6 +18,7 @@ from urllib import parse
 
 import fixtures
 from keystoneauth1 import exceptions as ks_exc
+from keystoneauth1 import session as ks_session
 import os_resource_classes as orc
 from oslo_serialization import jsonutils
 from oslo_utils.fixture import uuidsentinel as uuids
@@ -210,6 +211,53 @@ class TestSingleton(test.NoDBTestCase):
         # Make sure we keep getting the same one
         client2 = report.report_client_singleton()
         self.assertEqual(client, client2)
+
+
+class TestClosePooledConnections(test.NoDBTestCase):
+    """The idle connections of the placement client singleton are closed."""
+
+    def test_no_singleton_is_a_noop(self):
+        self.assertIsNone(report.PLACEMENTCLIENT)
+        # Nothing to close yet; must not raise.
+        report.close_pooled_connections()
+
+    def test_closes_the_pooled_connections(self):
+        # Real keystoneauth, requests and urllib3 objects, so that a change
+        # in their layout fails here instead of silently closing nothing.
+        ksa_session = ks_session.Session()
+        adapter = ksa_session.session.get_adapter('https://placement')
+        managers = [
+            adapter.poolmanager,
+            adapter.proxy_manager_for('http://proxy:3128'),
+        ]
+        conns = []
+        for manager in managers:
+            pool = manager.connection_from_url('https://placement')
+            # An idle connection: taken from the pool and put back.
+            conn = pool._get_conn()
+            self.useFixture(fixtures.MockPatchObject(conn, 'close'))
+            pool._put_conn(conn)
+            conns.append(conn)
+        report.PLACEMENTCLIENT = mock.Mock()
+        report.PLACEMENTCLIENT._client.session = ksa_session
+
+        report.close_pooled_connections()
+
+        # Every connection is closed (not just forgotten) and its pool is
+        # dropped from the manager. The client and its session are kept.
+        for conn in conns:
+            conn.close.assert_called_once_with()
+        for manager in managers:
+            self.assertEqual(0, len(manager.pools))
+        self.assertIs(ksa_session, report.PLACEMENTCLIENT._client.session)
+
+    def test_client_without_a_session(self):
+        # A hand-made adapter (as the tests and some callers pass in) need
+        # not carry a session at all.
+        report.PLACEMENTCLIENT = mock.Mock()
+        report.PLACEMENTCLIENT._client = object()
+        # Must not raise.
+        report.close_pooled_connections()
 
 
 class TestConstructor(test.NoDBTestCase):

@@ -27,6 +27,7 @@ import nova.conf
 from nova.conf import remote_debug
 from nova import config
 from nova import objects
+from nova.scheduler.client import report
 from nova.scheduler import rpcapi
 from nova import service
 from nova import version
@@ -50,5 +51,9 @@ def main():
     # Determine the number of workers; if not specified in config, default
     # to number of CPUs
     workers = CONF.scheduler.workers or processutils.get_worker_count()
+    # The placement client was initialized in the master process. Close
+    # its pooled connections so the workers do not share one TLS socket.
+    report.close_pooled_connections()
+
     service.serve(server, workers=workers)
     service.wait()

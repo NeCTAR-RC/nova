@@ -113,6 +113,43 @@ def report_client_singleton():
     return PLACEMENTCLIENT
 
 
+def close_pooled_connections():
+    """Close the idle HTTP connections of the placement client singleton.
+
+    The scheduler and conductor managers initialise the placement client in
+    the service's parent process, before the workers are forked. Creating
+    the client runs version discovery, which leaves an open keep-alive TLS
+    connection to placement in the session's pool. Every worker would
+    inherit that socket together with the same TLS state. The first worker
+    to reuse it is fine; the next one sends a record with a sequence number
+    the server has already seen and fails with
+    ``DECRYPTION_FAILED_OR_BAD_RECORD_MAC``, taking the request it was
+    serving (usually a boot) down with it. See bug 2089388.
+
+    Call this in the parent before forking, so that there is nothing to
+    inherit and each worker opens a connection of its own on its first
+    request. The client, its keystoneauth session and the discovery cache
+    are kept. Each pool is closed by hand because
+    ``requests.Session.close()`` merely forgets the pools and leaves the
+    sockets to the garbage collector.
+    """
+    if PLACEMENTCLIENT is None:
+        return
+    ksa_session = getattr(PLACEMENTCLIENT._client, 'session', None)
+    http_session = getattr(ksa_session, 'session', None)
+    if http_session is None:
+        return
+    for adapter in http_session.adapters.values():
+        managers = [getattr(adapter, 'poolmanager', None)]
+        managers.extend(getattr(adapter, 'proxy_manager', {}).values())
+        for manager in managers:
+            if manager is None:
+                continue
+            for key in manager.pools.keys():
+                manager.pools[key].close()
+            manager.clear()
+
+
 def safe_connect(f):
     @functools.wraps(f)
     def wrapper(self, *a, **k):

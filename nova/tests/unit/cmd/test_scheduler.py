@@ -46,3 +46,19 @@ class TestScheduler(test.NoDBTestCase):
         mock_serve.assert_called_once_with(
             service_create.return_value, workers=4)
         mock_wait.assert_called_once_with()
+
+    @mock.patch('nova.service.Service.create')
+    @mock.patch('nova.service.serve')
+    @mock.patch('nova.service.wait')
+    @mock.patch('nova.scheduler.client.report.close_pooled_connections')
+    def test_placement_connections_closed_before_fork(
+        self, mock_close, mock_wait, mock_serve, service_create
+    ):
+        # serve() forks the workers, so the close must come first
+        mock_serve.side_effect = (
+            lambda *a, **kw: mock_close.assert_called_once_with())
+
+        scheduler.main()
+
+        mock_serve.assert_called_once_with(
+            service_create.return_value, workers=mock.ANY)

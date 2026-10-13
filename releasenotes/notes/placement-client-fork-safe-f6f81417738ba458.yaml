@@ -1,0 +1,14 @@
+---
+fixes:
+  - |
+    After a restart of ``nova-scheduler`` or ``nova-conductor`` with more
+    than one worker, the first placement request from the second worker
+    to run could fail with ``SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC``,
+    which put the instance being scheduled into ``ERROR``. The services
+    initialise the placement client in the parent process before the
+    workers are forked, and the version discovery that runs at that point
+    leaves an open keep-alive TLS connection in the session pool that every
+    worker then inherits and shares. The services now close the pooled
+    placement connections before the workers are forked, so every worker
+    opens a connection of its own. See `bug 2089388
+    <https://bugs.launchpad.net/nova/+bug/2089388>`_.
