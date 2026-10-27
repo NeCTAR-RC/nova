@@ -1024,12 +1024,12 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         self.assertEqual(0, len(spec_obj.obj_what_changed()),
                          spec_obj.obj_what_changed())
 
-    @mock.patch('nova.scheduler.manager.LOG.debug')
+    @mock.patch('nova.scheduler.manager.LOG.info')
     @mock.patch('random.shuffle', side_effect=lambda x: x.reverse())
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
     @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
     def test_get_sorted_hosts(self, mock_filt, mock_weighed, mock_shuffle,
-                              debug):
+                              info):
         """Tests the call that returns a sorted list of hosts by calling the
         host manager's filtering and weighing routines
         """
@@ -1044,18 +1044,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
             weights.WeighedHost(hs1, 1.0), weights.WeighedHost(hs2, 1.0),
         ]
 
-        # Make sure that when logging the weighed hosts we are logging them
-        # with the WeighedHost wrapper class rather than the HostState objects.
-        def fake_debug(message, *args, **kwargs):
-            if message.startswith('Weighed'):
-                self.assertEqual(1, len(args))
-                for weighed_host in args[0]['hosts']:
-                    self.assertIsInstance(weighed_host, weights.WeighedHost)
-        debug.side_effect = fake_debug
-
         results = self.manager._get_sorted_hosts(mock.sentinel.spec,
             all_host_states, mock.sentinel.index)
-        debug.assert_called()
+
+        # Make sure the weighed hosts are logged with their weight values,
+        # taken from the WeighedHost wrapper before it is stripped off.
+        message, params = info.call_args_list[0][0]
+        self.assertTrue(message.startswith('Weighed hosts:'))
+        self.assertEqual('host1:1.0000, host2:1.0000', params['hosts'])
 
         mock_filt.assert_called_once_with(all_host_states, mock.sentinel.spec,
             mock.sentinel.index)
@@ -1066,6 +1062,45 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         # We override random.shuffle() to reverse the list, thus the
         # head of the list should become [host#2, host#1]
         self.assertEqual([hs2, hs1], results)
+
+    @mock.patch('nova.scheduler.manager.LOG.info')
+    @mock.patch('random.shuffle', side_effect=lambda x: x.reverse())
+    @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
+    @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
+    def test_get_sorted_hosts_logs_weights_and_subset(self, mock_filt,
+            mock_weighed, mock_shuffle, mock_info):
+        """Every weighed host is logged at INFO as host:weight in weight
+        order, then the shuffled subset is logged in the order hosts are
+        tried.
+        """
+        self.flags(host_subset_size=2, group='filter_scheduler')
+        hs1 = mock.Mock(spec=host_manager.HostState, host='host1')
+        hs2 = mock.Mock(spec=host_manager.HostState, host='host2')
+        hs3 = mock.Mock(spec=host_manager.HostState, host='host3')
+        all_host_states = [hs1, hs2, hs3]
+        mock_weighed.return_value = [
+            weights.WeighedHost(hs1, 1.5),
+            weights.WeighedHost(hs2, 0.25),
+            weights.WeighedHost(hs3, -0.123456),
+        ]
+
+        results = self.manager._get_sorted_hosts(mock.sentinel.spec,
+            all_host_states, mock.sentinel.index)
+
+        # random.shuffle() reverses the subset of two hosts.
+        self.assertEqual([hs2, hs1, hs3], results)
+        self.assertEqual(2, mock_info.call_count)
+
+        message, params = mock_info.call_args_list[0][0]
+        self.assertTrue(message.startswith('Weighed hosts:'))
+        self.assertEqual('host1:1.5000, host2:0.2500, host3:-0.1235',
+                         params['hosts'])
+        self.assertEqual(3, params['total'])
+
+        message, params = mock_info.call_args_list[1][0]
+        self.assertTrue(message.startswith('Shuffled top'))
+        self.assertEqual(2, params['size'])
+        self.assertEqual('host2, host1', params['hosts'])
 
     @mock.patch('nova.scheduler.host_manager.HostManager.get_weighed_hosts')
     @mock.patch('nova.scheduler.host_manager.HostManager.get_filtered_hosts')
