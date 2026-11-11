@@ -739,7 +739,13 @@ class SchedulerManager(manager.Manager):
 
         # Log the weighed hosts before stripping off the wrapper class so that
         # the weight value gets logged.
-        LOG.debug("Weighed %(hosts)s", {'hosts': weighed_hosts})
+        # NOTE(nectar): logged at INFO, one compact "host:weight" pair per
+        # host in weight order, so the effect of weigher settings can be
+        # seen in production logs without enabling DEBUG.
+        LOG.info("Weighed hosts: %(hosts)s (%(total)d hosts)",
+                 {'hosts': ', '.join('%s:%.4f' % (w.obj.host, w.weight)
+                                     for w in weighed_hosts),
+                  'total': len(weighed_hosts)})
         # Strip off the WeighedHost wrapper class...
         weighed_hosts = [h.obj for h in weighed_hosts]
 
@@ -754,7 +760,11 @@ class SchedulerManager(manager.Manager):
 
         random.shuffle(weighed_subset)
         weighed_hosts = weighed_subset + weighed_hosts[len(weighed_subset):]
-        LOG.info("Weighed hosts: %(weighed)s", {'weighed': weighed_hosts})
+        # NOTE(nectar): only the shuffled subset differs from the weight order
+        # logged above, so log just that subset, in the order hosts are tried.
+        LOG.info("Shuffled top %(size)d hosts: %(hosts)s",
+                 {'size': len(weighed_subset),
+                  'hosts': ', '.join(h.host for h in weighed_subset)})
         return weighed_hosts
 
     def _get_all_host_states(self, context, spec_obj, provider_summaries):
